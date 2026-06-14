@@ -101,7 +101,7 @@ class ChatViewModel(
 
     private val _messages = MutableStateFlow<List<ChatMessage>>(
         listOf(
-            ChatMessage.AiMessage("Halo! Ceritakan transaksimu, contoh: 'beli eskrim 20rb' atau foto struk belanja kamu:)")
+            ChatMessage.AiMessage("Halo! Ceritakan transaksimu, contoh: 'beli eskrim 20rb' atau Foto struk belanja kamu😊")
         )
     )
     val messages: StateFlow<List<ChatMessage>> = _messages.asStateFlow()
