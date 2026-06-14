@@ -311,7 +311,7 @@ fun SecuritySettingsSection(
             }
 
             Text(
-                text = "Aktifkan kunci pengaman PIN atau Biometrik (Sidik Jari/Metode Wajah) untuk mencegah orang lain melihat catatan keuangan Anda.",
+                text = "Aktifkan kunci pengaman PIN atau Biometrik Sidik Jari untuk mencegah orang lain melihat catatan keuangan Anda.",
                 style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp, lineHeight = 16.sp),
                 color = GhostWhite.copy(alpha = 0.55f)
             )
@@ -357,7 +357,7 @@ fun SecuritySettingsSection(
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "Kunci Sidik Jari / Biometrik",
+                        text = "Kunci Sidik Jari",
                         style = MaterialTheme.typography.bodyMedium.copy(
                             fontWeight = FontWeight.Bold,
                             color = if (isBiometricAllowed) GhostWhite else GhostWhite.copy(alpha = 0.4f)
@@ -367,7 +367,7 @@ fun SecuritySettingsSection(
                         text = if (isBiometricAllowed) {
                             "Gunakan sensor sidik jari perangkat untuk masuk dengan cepat"
                         } else {
-                            "PIN harus aktif terlebih dahulu untuk mengaktifkan Biometrik"
+                            "PIN harus aktif terlebih dahulu untuk mengaktifkan Kunci Sidik Jari"
                         },
                         style = MaterialTheme.typography.bodySmall,
                         color = if (isBiometricAllowed) GhostWhite.copy(alpha = 0.5f) else GhostWhite.copy(alpha = 0.25f)

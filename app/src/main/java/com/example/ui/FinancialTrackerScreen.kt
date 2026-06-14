@@ -38,6 +38,10 @@ import com.example.data.FinancialRecord
 import com.example.ui.theme.*
 import com.example.R
 import java.util.*
+import androidx.compose.animation.core.*
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.graphicsLayer
 
 enum class TrackerTab {
     BERANDA,
@@ -625,17 +629,10 @@ fun FinancialTrackerScreen(
                     .testTag("startup_screen"),
                 contentAlignment = Alignment.Center
             ) {
-                // Ambient glowing backgrounds mirroring standard app themes
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(
-                            Brush.radialGradient(
-                                colors = listOf(NeonViolet.copy(alpha = 0.16f), Color.Transparent),
-                                radius = 800f
-                            )
-                        )
-                )
+                // Ambient atmospheric radial glow spots matching the main dashboard background perfectly
+                Box(modifier = Modifier.fillMaxSize().background(Brush.radialGradient(colors = listOf(SteelBlueGlow.copy(alpha = 0.12f), Color.Transparent), center = Offset(500f, 300f), radius = 1000f)))
+                Box(modifier = Modifier.fillMaxSize().background(Brush.radialGradient(colors = listOf(SteelBlueGlow.copy(alpha = 0.08f), Color.Transparent), center = Offset(100f, 1600f), radius = 1200f)))
+                Box(modifier = Modifier.fillMaxSize().background(Brush.radialGradient(colors = listOf(NeonViolet.copy(alpha = 0.08f), Color.Transparent), center = Offset(1500f, 1000f), radius = 900f)))
 
                 Column(
                     modifier = Modifier
@@ -680,7 +677,7 @@ fun FinancialTrackerScreen(
                             fontSize = 11.sp,
                             lineHeight = 18.sp
                         ),
-                        color = SteelBlue,
+                        color = GhostWhite, // High-contrast contrasting beautiful text on steel blue bg
                         textAlign = TextAlign.Center,
                         modifier = Modifier
                             .fillMaxWidth(0.85f)
@@ -688,14 +685,80 @@ fun FinancialTrackerScreen(
                             .testTag("startup_tagline")
                     )
 
-                    // Compact premium launcher loading scale indicator
-                    CircularProgressIndicator(
-                        color = NeonViolet,
-                        strokeWidth = 2.5.dp,
-                        modifier = Modifier
-                            .size(28.dp)
-                            .testTag("startup_loader")
+                    // Modern premium custom rotating loader
+                    val infiniteTransition = rememberInfiniteTransition(label = "startup_loader_anim")
+                    val rotation by infiniteTransition.animateFloat(
+                        initialValue = 0f,
+                        targetValue = 360f,
+                        animationSpec = infiniteRepeatable(
+                            animation = tween(1200, easing = LinearEasing),
+                            repeatMode = RepeatMode.Restart
+                        ),
+                        label = "rotation"
                     )
+                    val scale by infiniteTransition.animateFloat(
+                        initialValue = 0.82f,
+                        targetValue = 1.22f,
+                        animationSpec = infiniteRepeatable(
+                            animation = tween(1000, easing = FastOutSlowInEasing),
+                            repeatMode = RepeatMode.Reverse
+                        ),
+                        label = "scale"
+                    )
+                    val pulseAlpha by infiniteTransition.animateFloat(
+                        initialValue = 0.4f,
+                        targetValue = 1.0f,
+                        animationSpec = infiniteRepeatable(
+                            animation = tween(1000, easing = FastOutSlowInEasing),
+                            repeatMode = RepeatMode.Reverse
+                        ),
+                        label = "pulseAlpha"
+                    )
+
+                    Box(
+                        modifier = Modifier
+                            .size(50.dp)
+                            .testTag("startup_loader"),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        // Pulsing background core
+                        Box(
+                            modifier = Modifier
+                                .size(18.dp)
+                                .graphicsLayer(scaleX = scale, scaleY = scale, alpha = pulseAlpha)
+                                .background(SteelBlue.copy(alpha = 0.35f), shape = CircleShape)
+                        )
+                        Box(
+                            modifier = Modifier
+                                .size(9.dp)
+                                .background(GhostWhite, shape = CircleShape)
+                        )
+
+                        // Spinning outer split-arc ring
+                        Canvas(
+                            modifier = Modifier
+                                .size(48.dp)
+                                .graphicsLayer(rotationZ = rotation)
+                        ) {
+                            val strokeWidth = 3.dp.toPx()
+                            // Main arc using steel blue highlights
+                            drawArc(
+                                color = GhostWhite,
+                                startAngle = 0f,
+                                sweepAngle = 110f,
+                                useCenter = false,
+                                style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
+                            )
+                            // Supporting transparent arc
+                            drawArc(
+                                color = SteelBlue,
+                                startAngle = 180f,
+                                sweepAngle = 110f,
+                                useCenter = false,
+                                style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
+                            )
+                        }
+                    }
                 }
             }
         }
