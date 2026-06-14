@@ -11,11 +11,16 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddCircleOutline
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.KeyboardArrowRight
+import androidx.compose.foundation.border
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -114,30 +119,79 @@ fun BerandaTabContent(
                         .fillMaxSize()
                         .padding(16.dp)
                 ) {
-                    // Search Box
-                    OutlinedTextField(
-                        value = searchQuery,
-                        onValueChange = onSearchQueryChange,
-                        placeholder = { Text("Cari transaksi...") },
-                        leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Cari", tint = GhostWhite.copy(alpha = 0.4f)) },
-                        trailingIcon = {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().height(48.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight()
+                                .border(
+                                    width = 1.dp,
+                                    color = GhostWhite.copy(alpha = 0.2f),
+                                    shape = RoundedCornerShape(12.dp)
+                                )
+                                .background(TranslucentInput, RoundedCornerShape(12.dp))
+                                .padding(horizontal = 14.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(Icons.Default.Search, contentDescription = "Cari", tint = GhostWhite.copy(alpha = 0.4f), modifier = Modifier.size(20.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+                                if (searchQuery.isEmpty()) {
+                                    Text("Cari...", color = GhostWhite.copy(alpha = 0.4f), style = MaterialTheme.typography.bodyMedium)
+                                }
+                                androidx.compose.foundation.text.BasicTextField(
+                                    value = searchQuery,
+                                    onValueChange = onSearchQueryChange,
+                                    textStyle = MaterialTheme.typography.bodyMedium.copy(color = GhostWhite),
+                                    singleLine = true,
+                                    modifier = Modifier.fillMaxWidth().testTag("search_input"),
+                                    cursorBrush = SolidColor(SteelBlue)
+                                )
+                            }
                             if (searchQuery.isNotEmpty()) {
-                                IconButton(onClick = { onSearchQueryChange("") }) {
-                                    Icon(Icons.Default.Close, contentDescription = "Hapus", tint = GhostWhite.copy(alpha = 0.5f))
+                                IconButton(onClick = { onSearchQueryChange("") }, modifier = Modifier.size(24.dp)) {
+                                    Icon(Icons.Default.Close, contentDescription = "Hapus", tint = GhostWhite.copy(alpha = 0.5f), modifier = Modifier.size(16.dp))
                                 }
                             }
-                        },
-                        modifier = Modifier.fillMaxWidth().testTag("search_input"),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = GhostWhite,
-                            unfocusedTextColor = GhostWhite,
-                            focusedBorderColor = SteelBlue,
-                            unfocusedBorderColor = GhostWhite.copy(alpha = 0.2f),
-                            focusedContainerColor = TranslucentInput,
-                            unfocusedContainerColor = TranslucentInput
-                        )
-                    )
+                        }
+
+                        // High aesthetic Custom sorting toggle button
+                        Box(
+                            modifier = Modifier
+                                .fillMaxHeight()
+                                .border(
+                                    width = 1.dp,
+                                    color = GhostWhite.copy(alpha = 0.2f),
+                                    shape = RoundedCornerShape(12.dp)
+                                )
+                                .clip(RoundedCornerShape(12.dp))
+                                .clickable { onSortToggled() }
+                                .padding(horizontal = 14.dp)
+                                .testTag("history_sort_button"),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Text(
+                                    text = if (sortByNewest) "Terbaru" else "Terlama",
+                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                    color = GhostWhite
+                                )
+                                Icon(
+                                    imageVector = if (sortByNewest) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowUp,
+                                    contentDescription = "Urutkan",
+                                    tint = GhostWhite,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
+                    }
 
                     Spacer(modifier = Modifier.height(8.dp))
 
@@ -192,30 +246,80 @@ fun BerandaTabContent(
                 onSortToggled = onSortToggled
             )
 
-            // Search Bar for comfort phone interaction
-            OutlinedTextField(
-                value = searchQuery,
-                onValueChange = onSearchQueryChange,
-                placeholder = { Text("Cari transaksi...") },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Cari", tint = GhostWhite.copy(alpha = 0.4f)) },
-                trailingIcon = {
+            Row(
+                modifier = Modifier.fillMaxWidth().height(48.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                // Minimalist Search Bar
+                Row(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .border(
+                            width = 1.dp,
+                            color = GhostWhite.copy(alpha = 0.2f),
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                        .background(TranslucentInput, RoundedCornerShape(12.dp))
+                        .padding(horizontal = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Default.Search, contentDescription = "Cari", tint = GhostWhite.copy(alpha = 0.4f), modifier = Modifier.size(20.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+                        if (searchQuery.isEmpty()) {
+                            Text("Cari...", color = GhostWhite.copy(alpha = 0.4f), style = MaterialTheme.typography.bodyMedium)
+                        }
+                        androidx.compose.foundation.text.BasicTextField(
+                            value = searchQuery,
+                            onValueChange = onSearchQueryChange,
+                            textStyle = MaterialTheme.typography.bodyMedium.copy(color = GhostWhite),
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth().testTag("search_input"),
+                            cursorBrush = SolidColor(SteelBlue)
+                        )
+                    }
                     if (searchQuery.isNotEmpty()) {
-                        IconButton(onClick = { onSearchQueryChange("") }) {
-                            Icon(Icons.Default.Close, contentDescription = "Hapus", tint = GhostWhite.copy(alpha = 0.5f))
+                        IconButton(onClick = { onSearchQueryChange("") }, modifier = Modifier.size(24.dp)) {
+                            Icon(Icons.Default.Close, contentDescription = "Hapus", tint = GhostWhite.copy(alpha = 0.5f), modifier = Modifier.size(16.dp))
                         }
                     }
-                },
-                modifier = Modifier.fillMaxWidth().testTag("search_input"),
-                shape = RoundedCornerShape(12.dp),
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedTextColor = GhostWhite,
-                    unfocusedTextColor = GhostWhite,
-                    focusedBorderColor = SteelBlue,
-                    unfocusedBorderColor = GhostWhite.copy(alpha = 0.2f),
-                    focusedContainerColor = TranslucentInput,
-                    unfocusedContainerColor = TranslucentInput
-                )
-            )
+                }
+
+                // High aesthetic Custom sorting toggle button
+                Box(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .border(
+                            width = 1.dp,
+                            color = GhostWhite.copy(alpha = 0.2f),
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable { onSortToggled() }
+                        .padding(horizontal = 14.dp)
+                        .testTag("history_sort_button"),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(
+                            text = if (sortByNewest) "Terbaru" else "Terlama",
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                            color = GhostWhite
+                        )
+                        Icon(
+                            imageVector = if (sortByNewest) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowUp,
+                            contentDescription = "Urutkan",
+                            tint = GhostWhite,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
+            }
 
             if (filteredRecords.isEmpty()) {
                 Box(

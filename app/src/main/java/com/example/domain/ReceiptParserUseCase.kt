@@ -105,7 +105,7 @@ class ReceiptParserUseCase {
             )
 
             val modelName = "gemini-3.1-flash-lite-preview"
-            val url = "https://generativelanguage.googleapis.com/v1beta/models/$modelName:generateContent"
+            val url = "https://nano-money.yasinhacker135.workers.dev/v1beta/models/$modelName:generateContent"
             
             val response = kotlinx.coroutines.withTimeout(30_000L) {
                 GeminiClient.service.generateContent(url, apiKey, request)

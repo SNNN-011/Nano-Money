@@ -63,6 +63,7 @@ fun ChatScreen(
     var showSourceSelector by remember { mutableStateOf(false) }
     var showPendingDatePicker by remember { mutableStateOf(false) }
     var showReceiptDatePicker by remember { mutableStateOf(false) }
+    var showModelInfo by remember { mutableStateOf(false) }
 
     val cameraLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.TakePicturePreview()
@@ -102,6 +103,28 @@ fun ChatScreen(
         if (messages.isNotEmpty()) {
             listState.animateScrollToItem(0)
         }
+    }
+
+    if (showModelInfo) {
+        AlertDialog(
+            onDismissRequest = { showModelInfo = false },
+            title = { Text("Informasi Model AI", color = GhostWhite, fontWeight = FontWeight.Bold) },
+            text = {
+                Text(
+                    text = "Jika Gemma mengalami error atau respons tidak akurat, coba ganti ke model Gemini untuk hasil yang lebih baik.",
+                    color = GhostWhite.copy(alpha = 0.8f),
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { showModelInfo = false }) {
+                    Text("Mengerti", color = SteelBlue, fontWeight = FontWeight.Bold)
+                }
+            },
+            containerColor = MidnightAbyss,
+            titleContentColor = GhostWhite,
+            textContentColor = GhostWhite
+        )
     }
 
     if (showSourceSelector) {
@@ -257,58 +280,75 @@ fun ChatScreen(
                 val isGemma = selectedModel == AiModelConfig.GEMMA_MODEL
                 val isGemini = selectedModel == AiModelConfig.GEMINI_MODEL
 
-                Card(
-                    shape = RoundedCornerShape(20.dp),
-                    colors = CardDefaults.cardColors(containerColor = TranslucentGlass),
-                    border = BorderStroke(
-                        width = 1.dp,
-                        brush = Brush.verticalGradient(
-                            colors = listOf(
-                                GhostWhite.copy(alpha = 0.2f),
-                                GhostWhite.copy(alpha = 0.02f)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Card(
+                        shape = RoundedCornerShape(20.dp),
+                        colors = CardDefaults.cardColors(containerColor = TranslucentGlass),
+                        border = BorderStroke(
+                            width = 1.dp,
+                            brush = Brush.verticalGradient(
+                                colors = listOf(
+                                    GhostWhite.copy(alpha = 0.2f),
+                                    GhostWhite.copy(alpha = 0.02f)
+                                )
                             )
                         )
-                    )
-                ) {
-                    Row(
-                        modifier = Modifier.padding(4.dp),
-                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        // Segment: Gemma
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(16.dp))
-                                .background(if (isGemma) SteelBlue else Color.Transparent)
-                                .clickable { viewModel.updateSelectedModel(AiModelConfig.GEMMA_MODEL) }
-                                .padding(horizontal = 12.dp, vertical = 6.dp)
-                                .testTag("model_switch_gemma"),
-                            contentAlignment = Alignment.Center
+                        Row(
+                            modifier = Modifier.padding(4.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(
-                                text = "Gemma",
-                                color = if (isGemma) MidnightAbyss else GhostWhite.copy(alpha = 0.5f),
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold
-                            )
+                            // Segment: Gemma
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(16.dp))
+                                    .background(if (isGemma) SteelBlue else Color.Transparent)
+                                    .clickable { viewModel.updateSelectedModel(AiModelConfig.GEMMA_MODEL) }
+                                    .padding(horizontal = 12.dp, vertical = 6.dp)
+                                    .testTag("model_switch_gemma"),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "Gemma",
+                                    color = if (isGemma) MidnightAbyss else GhostWhite.copy(alpha = 0.5f),
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                            
+                            // Segment: Gemini
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(16.dp))
+                                    .background(if (isGemini) SteelBlue else Color.Transparent)
+                                    .clickable { viewModel.updateSelectedModel(AiModelConfig.GEMINI_MODEL) }
+                                    .padding(horizontal = 12.dp, vertical = 6.dp)
+                                    .testTag("model_switch_gemini"),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "Gemini",
+                                    color = if (isGemini) MidnightAbyss else GhostWhite.copy(alpha = 0.5f),
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
                         }
-                        
-                        // Segment: Gemini
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(16.dp))
-                                .background(if (isGemini) SteelBlue else Color.Transparent)
-                                .clickable { viewModel.updateSelectedModel(AiModelConfig.GEMINI_MODEL) }
-                                .padding(horizontal = 12.dp, vertical = 6.dp)
-                                .testTag("model_switch_gemini"),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "Gemini",
-                                color = if (isGemini) MidnightAbyss else GhostWhite.copy(alpha = 0.5f),
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
+                    }
+
+                    IconButton(
+                        onClick = { showModelInfo = true },
+                        modifier = Modifier.size(24.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Info,
+                            contentDescription = "Info Model",
+                            tint = GhostWhite.copy(alpha = 0.5f),
+                            modifier = Modifier.size(18.dp)
+                        )
                     }
                 }
             }

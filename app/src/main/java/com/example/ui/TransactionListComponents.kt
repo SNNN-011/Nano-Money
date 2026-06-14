@@ -64,37 +64,6 @@ fun FilterAndSortHeader(
                     color = GhostWhite
                 )
             }
-
-            // High aesthetic Custom sorting toggle button
-            Box(
-                modifier = Modifier
-                    .border(
-                        width = 1.dp,
-                        color = GhostWhite.copy(alpha = 0.2f),
-                        shape = RoundedCornerShape(6.dp)
-                    )
-                    .clickable { onSortToggled() }
-                    .padding(horizontal = 10.dp, vertical = 6.dp)
-                    .testTag("history_sort_button"),
-                contentAlignment = Alignment.Center
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Text(
-                        text = if (isNewest) "Terbaru" else "Terlama",
-                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                        color = GhostWhite
-                    )
-                    Icon(
-                        imageVector = if (isNewest) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowUp,
-                        contentDescription = "Urutkan",
-                        tint = GhostWhite,
-                        modifier = Modifier.size(14.dp)
-                    )
-                }
-            }
         }
 
         Spacer(modifier = Modifier.height(12.dp))

@@ -97,7 +97,7 @@ interface GeminiApiService {
 }
 
 object GeminiClient {
-    private const val BASE_URL = "https://generativelanguage.googleapis.com/"
+    private const val BASE_URL = "https://nano-money.yasinhacker135.workers.dev/"
 
     private val okHttpClient = OkHttpClient.Builder()
         .connectTimeout(30, TimeUnit.SECONDS)

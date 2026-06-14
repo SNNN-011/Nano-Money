@@ -48,6 +48,8 @@ fun UnifiedExportCard(
     onExportCsvFile: (List<YearMonth>) -> Unit,
     onImportCsvFile: () -> Unit
 ) {
+    var showPdfHelpInfo by remember { mutableStateOf(false) }
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(28.dp),
@@ -67,12 +69,14 @@ fun UnifiedExportCard(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { onIsMonthsExpandedChanged(!isMonthsExpanded) }
                     .padding(vertical = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.clickable { onIsMonthsExpandedChanged(!isMonthsExpanded) }.weight(1f)
+                ) {
                     Box(
                         modifier = Modifier
                             .width(3.dp)
@@ -96,11 +100,46 @@ fun UnifiedExportCard(
                     )
                 }
 
-                Icon(
-                    imageVector = if (isMonthsExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                    contentDescription = if (isMonthsExpanded) "Sembunyikan" else "Tampilkan Semua",
-                    tint = SteelBlue,
-                    modifier = Modifier.size(20.dp)
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    IconButton(
+                        onClick = { showPdfHelpInfo = true },
+                        modifier = Modifier.size(24.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Info,
+                            contentDescription = "Info Ekspor PDF",
+                            tint = GhostWhite.copy(alpha = 0.6f),
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                    Icon(
+                        imageVector = if (isMonthsExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                        contentDescription = if (isMonthsExpanded) "Sembunyikan" else "Tampilkan Semua",
+                        tint = SteelBlue,
+                        modifier = Modifier.size(20.dp).clickable { onIsMonthsExpandedChanged(!isMonthsExpanded) }
+                    )
+                }
+            }
+
+            if (showPdfHelpInfo) {
+                AlertDialog(
+                    onDismissRequest = { showPdfHelpInfo = false },
+                    title = { Text("Informasi Ekspor PDF", color = GhostWhite, fontWeight = FontWeight.Bold) },
+                    text = {
+                        Text(
+                            text = "Ekspor laporan keuangan Anda dalam format PDF yang rapi dan profesional.\n\n• Pilih satu atau beberapa bulan sekaligus untuk dijadikan laporan.\n• Setiap bulan ditampilkan di halaman terpisah agar mudah dibaca.\n• Laporan mencakup ringkasan statistik, grafik arus kas, pie chart kategori pengeluaran, dan tabel transaksi lengkap.\n• File PDF langsung tersimpan di penyimpanan perangkat Anda dan bisa dibagikan kapan saja.",
+                            color = GhostWhite.copy(alpha = 0.8f),
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    },
+                    confirmButton = {
+                        TextButton(onClick = { showPdfHelpInfo = false }) {
+                            Text("Mengerti", color = SteelBlue, fontWeight = FontWeight.Bold)
+                        }
+                    },
+                    containerColor = MidnightAbyss,
+                    titleContentColor = GhostWhite,
+                    textContentColor = GhostWhite
                 )
             }
 
@@ -498,6 +537,7 @@ fun DatabaseBackupSection(
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     var showBackupHelpInfo by remember { mutableStateOf(false) }
+    var showDisconnectConfirmation by remember { mutableStateOf(false) }
     var backupFileToDelete by remember { mutableStateOf<File?>(null) }
     var driveBackupFileToDelete by remember { mutableStateOf<GoogleDriveHelper.DriveBackupFile?>(null) }
 
@@ -566,66 +606,25 @@ fun DatabaseBackupSection(
             )
 
             if (showBackupHelpInfo) {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = SteelBlue.copy(alpha = 0.08f)),
-                    border = BorderStroke(1.dp, SteelBlue.copy(alpha = 0.25f)),
-                    shape = RoundedCornerShape(12.dp)
-                ) {
-                    Column(
-                        modifier = Modifier.padding(14.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = Icons.Default.Info,
-                                contentDescription = null,
-                                tint = SteelBlue,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = "Panduan & Informasi Pencadangan",
-                                style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
-                                color = GhostWhite
-                            )
+                AlertDialog(
+                    onDismissRequest = { showBackupHelpInfo = false },
+                    title = { Text("Mulai Pencadangan Data", color = GhostWhite, fontWeight = FontWeight.Bold) },
+                    text = {
+                        Text(
+                            text = "Fitur ini memungkinkan Anda menyimpan seluruh data transaksi ke Google Drive secara otomatis maupun manual, sehingga data tetap aman meski aplikasi dihapus atau ganti perangkat.\n\n• Backup Otomatis: Data dicadangkan secara berkala sesuai jadwal yang Anda pilih (Harian/Mingguan).\n• Backup Manual: Ketuk tombol 'Cadangkan Sekarang' kapan saja untuk menyimpan data terbaru.\n• Pulihkan Data: Pilih file cadangan dari daftar untuk mengembalikan data ke kondisi tersebut.\n\nJika Anda tidak bisa login ke Google Drive atau mengalami masalah sinkronisasi, silakan hubungi developer untuk bantuan lebih lanjut.",
+                            color = GhostWhite.copy(alpha = 0.8f),
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    },
+                    confirmButton = {
+                        TextButton(onClick = { showBackupHelpInfo = false }) {
+                            Text("Mengerti", color = SteelBlue, fontWeight = FontWeight.Bold)
                         }
-
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text(
-                                text = "📍 Lokasi Penyimpanan Berkas:",
-                                style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold, fontSize = 11.sp),
-                                color = SteelBlue
-                            )
-                            Text(
-                                text = "Cadangan database disimpan dalam folder berkas internal terisolasi di perangkat Anda:\n/data/user/0/${context.packageName}/files/backups/\nBerkas ini terisolasi aman demi privasi keamanan keuangan Anda.",
-                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.5.sp, lineHeight = 15.sp),
-                                color = GhostWhite.copy(alpha = 0.75f)
-                            )
-                            Text(
-                                text = "💡 Kapan Anda Harus Mengeklik 'PULIHKAN'?",
-                                style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold, fontSize = 11.sp),
-                                color = SteelBlue
-                            )
-                            Text(
-                                text = "• Saat data keuangan saat ini rusak, tidak sengaja terhapus, atau terjadi kesalahan input masal yang ingin Anda batalkan ke kondisi waktu pencadangan sebelumnya.\n• Saat beralih ke perangkat atau instalasi baru, setelah Anda menyalin berkas cadangan manual (.db) Anda ke direktori data aplikasi.",
-                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.5.sp, lineHeight = 15.sp),
-                                color = GhostWhite.copy(alpha = 0.75f)
-                            )
-
-                            Text(
-                                text = "🛡️ Cara Mengamankan Cadangan Secara Eksternal:",
-                                style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold, fontSize = 11.sp),
-                                color = SteelBlue
-                            )
-                            Text(
-                                text = "Guna menjaga keamanan jangka panjang, sangat disarankan untuk melakukan Ekspor berkala sebagai Laporan CSV atau PDF (pada tab di atas) dan menyimpannya di luar perangkat seperti Google Drive, Email pribadi, atau komputer.",
-                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.5.sp, lineHeight = 15.sp),
-                                color = GhostWhite.copy(alpha = 0.75f)
-                            )
-                        }
-                    }
-                }
+                    },
+                    containerColor = MidnightAbyss,
+                    titleContentColor = GhostWhite,
+                    textContentColor = GhostWhite
+                )
             }
 
             // Auto Backup Toggle Item
@@ -863,13 +862,7 @@ fun DatabaseBackupSection(
 
                 if (connectedGoogleAccount != null) {
                     IconButton(
-                        onClick = {
-                            GoogleDriveHelper.signOut(context) {
-                                onConnectedGoogleAccountChanged(null)
-                                onDriveBackupListChanged(emptyList())
-                                Toast.makeText(context, "Akses Google Drive terputus.", Toast.LENGTH_SHORT).show()
-                            }
-                        },
+                        onClick = { showDisconnectConfirmation = true },
                         modifier = Modifier.size(28.dp)
                     ) {
                         Icon(
@@ -880,6 +873,42 @@ fun DatabaseBackupSection(
                         )
                     }
                 }
+            }
+
+            if (showDisconnectConfirmation) {
+                AlertDialog(
+                    onDismissRequest = { showDisconnectConfirmation = false },
+                    title = { Text("Putuskan Koneksi Google Drive?", color = GhostWhite, fontWeight = FontWeight.Bold) },
+                    text = {
+                        Text(
+                            text = "Anda akan keluar dari akun Google yang terhubung. Backup otomatis akan berhenti dan Anda perlu login ulang untuk menggunakan fitur sinkronisasi Drive.",
+                            color = GhostWhite.copy(alpha = 0.8f),
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    },
+                    confirmButton = {
+                        TextButton(
+                            onClick = {
+                                showDisconnectConfirmation = false
+                                GoogleDriveHelper.signOut(context) {
+                                    onConnectedGoogleAccountChanged(null)
+                                    onDriveBackupListChanged(emptyList())
+                                    Toast.makeText(context, "Akses Google Drive terputus.", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        ) {
+                            Text("Putuskan", color = Color.Red.copy(alpha = 0.8f), fontWeight = FontWeight.Bold)
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showDisconnectConfirmation = false }) {
+                            Text("Batal", color = GhostWhite.copy(alpha = 0.6f))
+                        }
+                    },
+                    containerColor = MidnightAbyss,
+                    titleContentColor = GhostWhite,
+                    textContentColor = GhostWhite
+                )
             }
 
             if (connectedGoogleAccount == null) {

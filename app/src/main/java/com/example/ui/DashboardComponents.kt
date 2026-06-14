@@ -15,6 +15,7 @@ import androidx.compose.material.icons.filled.Autorenew
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material3.*
@@ -43,6 +44,7 @@ fun DashboardStatsSection(
     modifier: Modifier = Modifier
 ) {
     var balanceVisible by remember { mutableStateOf(true) }
+    var showRutinInfo by remember { mutableStateOf(false) }
 
     val displayBalance = if (balanceVisible) {
         FormatUtils.formatRupiah(currentBalance)
@@ -117,35 +119,51 @@ fun DashboardStatsSection(
                     }
                 }
 
-                // Minimalist premium-styled Rutin button next to SALDO TOTAL
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(SteelBlue.copy(alpha = 0.12f))
-                        .border(1.dp, SteelBlue.copy(alpha = 0.3f), RoundedCornerShape(20.dp))
-                        .clickable { onRecurringClick() }
-                        .padding(horizontal = 10.dp, vertical = 6.dp)
-                        .testTag("recurring_transactions_inline_button"),
-                    contentAlignment = Alignment.Center
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    IconButton(
+                        onClick = { showRutinInfo = true },
+                        modifier = Modifier.size(24.dp)
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Autorenew,
-                            contentDescription = null,
-                            tint = SteelBlue,
-                            modifier = Modifier.size(13.dp)
+                            imageVector = Icons.Default.Info,
+                            contentDescription = "Info Transaksi Rutin",
+                            tint = GhostWhite.copy(alpha = 0.5f),
+                            modifier = Modifier.size(16.dp)
                         )
-                        Text(
-                            text = "Rutin",
-                            style = MaterialTheme.typography.labelMedium.copy(
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 11.sp
-                            ),
-                            color = SteelBlue
-                        )
+                    }
+                    Spacer(modifier = Modifier.width(4.dp))
+                    // Minimalist premium-styled Rutin button next to SALDO TOTAL
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(SteelBlue.copy(alpha = 0.12f))
+                            .border(1.dp, SteelBlue.copy(alpha = 0.3f), RoundedCornerShape(20.dp))
+                            .clickable { onRecurringClick() }
+                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                            .testTag("recurring_transactions_inline_button"),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Autorenew,
+                                contentDescription = null,
+                                tint = SteelBlue,
+                                modifier = Modifier.size(13.dp)
+                            )
+                            Text(
+                                text = "Rutin",
+                                style = MaterialTheme.typography.labelMedium.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 11.sp
+                                ),
+                                color = SteelBlue
+                            )
+                        }
                     }
                 }
             }
@@ -471,6 +489,28 @@ fun DashboardStatsSection(
                 }
             }
         }
+    }
+
+    if (showRutinInfo) {
+        AlertDialog(
+            onDismissRequest = { showRutinInfo = false },
+            title = { Text("Transaksi Rutin", color = GhostWhite, fontWeight = FontWeight.Bold) },
+            text = {
+                Text(
+                    text = "Transaksi Rutin memungkinkan Anda membuat transaksi yang otomatis tercatat setiap bulan tanpa perlu input manual.\n\nContoh penggunaan:\n• Gaji masuk setiap tanggal 1\n• Cicilan atau tagihan rutin setiap bulan\n• Uang jajan mingguan\n\nTransaksi akan otomatis ditambahkan ke catatan sesuai tanggal dan frekuensi yang Anda tentukan.",
+                    color = GhostWhite.copy(alpha = 0.8f),
+                    style = MaterialTheme.typography.bodyMedium
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { showRutinInfo = false }) {
+                    Text("Mengerti", color = SteelBlue, fontWeight = FontWeight.Bold)
+                }
+            },
+            containerColor = MidnightAbyss,
+            titleContentColor = GhostWhite,
+            textContentColor = GhostWhite
+        )
     }
 }
 
