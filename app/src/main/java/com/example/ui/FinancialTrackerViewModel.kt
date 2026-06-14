@@ -774,6 +774,119 @@ class FinancialTrackerViewModel(
 
         y += 75f
 
+        // --- SECTION BANNER: ANALISIS DAN ANGGARAN ---
+        paint.color = android.graphics.Color.parseColor("#0F172A")
+        paint.textSize = 11f
+        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        canvas.drawText("ANALISIS GRAFIK ARUS KAS & ANGGARAN", 40f, y, paint)
+
+        y += 10f
+
+        // Outer white analytics card
+        paint.color = android.graphics.Color.parseColor("#F1F5F9")
+        canvas.drawRect(40f, y, 555f, y + 130f, paint)
+
+        // Card border
+        paint.color = android.graphics.Color.parseColor("#CBD5E1")
+        paint.style = Paint.Style.STROKE
+        paint.strokeWidth = 1f
+        canvas.drawRect(40f, y, 555f, y + 130f, paint)
+        paint.style = Paint.Style.FILL
+
+        // 1. CASHFLOW VISUALIZATION BAR CHART
+        paint.color = android.graphics.Color.parseColor("#1E293B")
+        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        paint.textSize = 8.5f
+        canvas.drawText("Perbandingan Pemasukan vs Pengeluaran:", 55f, y + 20f, paint)
+
+        val totalFlow = totalIn + totalOut
+        val inRatio = if (totalFlow > 0) (totalIn / totalFlow).toFloat() else 0.5f
+        val outRatio = if (totalFlow > 0) (totalOut / totalFlow).toFloat() else 0.5f
+
+        // Green track (Income percentage)
+        val barTopY1 = y + 27f
+        paint.color = android.graphics.Color.parseColor("#D1FAE5") // Light Green track
+        canvas.drawRect(55f, barTopY1, 260f, barTopY1 + 10f, paint)
+        
+        paint.color = android.graphics.Color.parseColor("#10B981") // Green-500 fill
+        val inWidth = 205f * inRatio
+        canvas.drawRect(55f, barTopY1, 55f + inWidth, barTopY1 + 10f, paint)
+
+        // Labels
+        paint.color = android.graphics.Color.parseColor("#065F46")
+        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        paint.textSize = 7.5f
+        val inPercentText = String.format("%.0f%%", inRatio * 100)
+        canvas.drawText("Pemasukan: $inPercentText", 55f, barTopY1 + 22f, paint)
+
+        // Red track (Expense percentage)
+        val barTopY2 = y + 27f
+        paint.color = android.graphics.Color.parseColor("#FEE2E2") // Light Red track
+        canvas.drawRect(290f, barTopY2, 495f, barTopY2 + 10f, paint)
+        
+        paint.color = android.graphics.Color.parseColor("#EF4444") // Red-500 fill
+        val outWidth = 205f * outRatio
+        canvas.drawRect(290f, barTopY2, 290f + outWidth, barTopY2 + 10f, paint)
+
+        // Labels
+        paint.color = android.graphics.Color.parseColor("#991B1B")
+        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        paint.textSize = 7.5f
+        val outPercentText = String.format("%.0f%%", outRatio * 100)
+        canvas.drawText("Pengeluaran: $outPercentText", 290f, barTopY2 + 22f, paint)
+
+        // 2. BUDGET REPORTING
+        val activeLimit = monthlyBudgetLimit.value
+        val numMonths = if (selectedMonths.isNotEmpty()) selectedMonths.size else 1
+        val budgetForPeriod = activeLimit
+
+        paint.color = android.graphics.Color.parseColor("#1E293B")
+        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        paint.textSize = 8.5f
+        canvas.drawText("Laporan Realisasi Anggaran Bulanan:", 55f, y + 68f, paint)
+
+        val budgetTextY = y + 80f
+        if (activeLimit <= 0.0) {
+            paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.ITALIC)
+            paint.color = android.graphics.Color.parseColor("#64748B")
+            paint.textSize = 8f
+            canvas.drawText("Batas anggaran bulanan belum diatur di aplikasi. Untuk melacak realisasi anggaran,", 55f, budgetTextY, paint)
+            canvas.drawText("silakan buka menu Atur Anggaran pada Dashboard Nano Money.", 55f, budgetTextY + 11f, paint)
+        } else {
+            // Draw budget progress bar
+            val budgetRatio = (totalOut / budgetForPeriod).coerceAtMost(1.0).toFloat()
+            val overBudget = totalOut > budgetForPeriod
+
+            paint.color = android.graphics.Color.parseColor("#E2E8F0") // Light track
+            canvas.drawRect(55f, budgetTextY, 495f, budgetTextY + 10f, paint)
+
+            val fillColor = if (overBudget) "#DC2626" else "#4F46E5" // Red-600 vs Indigo-600
+            paint.color = android.graphics.Color.parseColor(fillColor)
+            val fillWidth = 440f * budgetRatio
+            canvas.drawRect(55f, budgetTextY, 55f + fillWidth, budgetTextY + 10f, paint)
+
+            // Budget meta-text
+            paint.color = android.graphics.Color.parseColor("#334155")
+            paint.textSize = 8f
+            paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+            canvas.drawText("Anggaran: ${FormatUtils.formatRupiah(budgetForPeriod)}", 55f, budgetTextY + 22f, paint)
+            canvas.drawText("Terpakai: ${FormatUtils.formatRupiah(totalOut)}", 210f, budgetTextY + 22f, paint)
+
+            val remainingBudget = budgetForPeriod - totalOut
+            if (overBudget) {
+                paint.color = android.graphics.Color.parseColor("#DC2626")
+                paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                val overAmt = Math.abs(remainingBudget)
+                canvas.drawText("Overbudget! Melebihi ${FormatUtils.formatRupiah(overAmt)} ⚠️", 360f, budgetTextY + 22f, paint)
+            } else {
+                paint.color = android.graphics.Color.parseColor("#15803D")
+                paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                canvas.drawText("Sisa: ${FormatUtils.formatRupiah(remainingBudget)} ✅", 360f, budgetTextY + 22f, paint)
+            }
+        }
+
+        y += 150f
+
         // Table title
         paint.color = android.graphics.Color.parseColor("#0F172A")
         paint.textSize = 11f

@@ -11,6 +11,9 @@ import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.zip.ZipEntry
+import java.util.zip.ZipInputStream
+import java.util.zip.ZipOutputStream
 
 object BackupHelper {
     private const val MAX_AUTO_BACKUPS = 5
@@ -90,9 +93,25 @@ object BackupHelper {
             val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
             val backupFile = File(backupDir, "$prefix$timestamp.db")
 
-            dbFile.inputStream().use { input ->
-                backupFile.outputStream().use { output ->
-                    input.copyTo(output)
+            // Pack both database file and shared preferences XMLs into a single ZIP-formatted archive
+            ZipOutputStream(backupFile.outputStream()).use { zos ->
+                // A. Add database file entry
+                zos.putNextEntry(ZipEntry("database/financial_tracker_database"))
+                dbFile.inputStream().use { input ->
+                    input.copyTo(zos)
+                }
+                zos.closeEntry()
+
+                // B. Add all available shared preferences XML entries
+                val sharedPrefsDir = File(context.filesDir.parentFile ?: context.dataDir, "shared_prefs")
+                if (sharedPrefsDir.exists() && sharedPrefsDir.isDirectory) {
+                    sharedPrefsDir.listFiles { _, name -> name.endsWith(".xml") }?.forEach { xmlFile ->
+                        zos.putNextEntry(ZipEntry("shared_prefs/${xmlFile.name}"))
+                        xmlFile.inputStream().use { input ->
+                            input.copyTo(zos)
+                        }
+                        zos.closeEntry()
+                    }
                 }
             }
 
@@ -100,7 +119,7 @@ object BackupHelper {
                 cleanOldAutoBackups(context)
             }
 
-            Log.d("BackupHelper", "Database successfully backed up to ${backupFile.absolutePath}")
+            Log.d("BackupHelper", "Settings and database successfully backed up to ${backupFile.absolutePath}")
             BackupResult.Success(backupFile.name)
         } catch (e: Exception) {
             Log.e("BackupHelper", "Error during backup: ${e.message}", e)
@@ -147,20 +166,62 @@ object BackupHelper {
             if (walFile.exists()) walFile.delete()
             if (shmFile.exists()) shmFile.delete()
 
-            // 3. Copy backup file over to the real database file
-            backupFile.inputStream().use { input ->
-                dbFile.outputStream().use { output ->
-                    input.copyTo(output)
+            // 3. Extract from ZIP or copy database file directly if it's legacy non-zip format
+            if (isZipFile(backupFile)) {
+                ZipInputStream(backupFile.inputStream()).use { zis ->
+                    var entry = zis.nextEntry
+                    while (entry != null) {
+                        if (!entry.isDirectory) {
+                            if (entry.name == "database/financial_tracker_database") {
+                                dbFile.parentFile?.mkdirs()
+                                dbFile.outputStream().use { output ->
+                                    zis.copyTo(output)
+                                }
+                            } else if (entry.name.startsWith("shared_prefs/")) {
+                                val fileName = entry.name.substringAfter("shared_prefs/")
+                                val sharedPrefsDir = File(context.filesDir.parentFile ?: context.dataDir, "shared_prefs")
+                                if (!sharedPrefsDir.exists()) {
+                                    sharedPrefsDir.mkdirs()
+                                }
+                                val targetPrefFile = File(sharedPrefsDir, fileName)
+                                targetPrefFile.outputStream().use { output ->
+                                    zis.copyTo(output)
+                                }
+                            }
+                        }
+                        zis.closeEntry()
+                        entry = zis.nextEntry
+                    }
                 }
+                Log.d("BackupHelper", "Database and settings successfully restored from ZIP backup ${backupFile.name}")
+            } else {
+                // Backwards compatible legacy restore: copy file directly
+                backupFile.inputStream().use { input ->
+                    dbFile.outputStream().use { output ->
+                        input.copyTo(output)
+                    }
+                }
+                Log.d("BackupHelper", "Database successfully restored from legacy backup ${backupFile.name}")
             }
 
-            Log.d("BackupHelper", "Database successfully restored from ${backupFile.name}")
-            
             // 4. Restart the screen activity or the complete application to load restored data smoothly
             restartApplication(context)
             true
         } catch (e: Exception) {
             Log.e("BackupHelper", "Error during restore: ${e.message}", e)
+            false
+        }
+    }
+
+    private fun isZipFile(file: File): Boolean {
+        if (!file.exists() || file.length() < 4) return false
+        return try {
+            file.inputStream().use { input ->
+                val bytes = ByteArray(4)
+                val read = input.read(bytes)
+                read == 4 && bytes[0] == 0x50.toByte() && bytes[1] == 0x4B.toByte() && bytes[2] == 0x03.toByte() && bytes[3] == 0x04.toByte()
+            }
+        } catch (e: Exception) {
             false
         }
     }
