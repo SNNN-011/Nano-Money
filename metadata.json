@@ -1,0 +1,6 @@
+{
+  "name": "Nano Money",
+  "description": "An elegant and professional Financial Tracker application with local SQLite Room persistence, real-time metrics, transaction CRUD operations, filtering, and flexible import/export capabilities.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
