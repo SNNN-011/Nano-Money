@@ -11,9 +11,11 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.example.MainActivity
 import com.example.util.BackupHelper
+import com.example.util.GoogleDriveHelper
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import java.io.File
 
 class BackupReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
@@ -24,6 +26,24 @@ class BackupReceiver : BroadcastReceiver() {
                 when (val result = BackupHelper.performBackup(context, isAuto = true)) {
                     is BackupHelper.BackupResult.Success -> {
                         Log.d("BackupReceiver", "Pencadangan otomatis sukses: ${result.fileName}")
+                        
+                        // Silently upload to Google Drive if account is connected
+                        if (GoogleDriveHelper.getSignedInAccount(context) != null) {
+                            try {
+                                val backupDir = BackupHelper.getBackupDirectory(context)
+                                val backupFile = File(backupDir, result.fileName)
+                                when (val uploadRes = GoogleDriveHelper.uploadBackupToDrive(context, backupFile)) {
+                                    is GoogleDriveHelper.DriveResult.Success -> {
+                                        Log.d("BackupReceiver", "Unggah otomatis cadangan ke Google Drive sukses: fileId=${uploadRes.data}")
+                                    }
+                                    is GoogleDriveHelper.DriveResult.Error -> {
+                                        Log.e("BackupReceiver", "Gagal mengunggah otomatis cadangan ke Google Drive: ${uploadRes.message}")
+                                    }
+                                }
+                            } catch (uploadException: Exception) {
+                                Log.e("BackupReceiver", "Terganggu saat mencoba mengunggah otomatis ke Google Drive", uploadException)
+                            }
+                        }
                     }
                     is BackupHelper.BackupResult.Error -> {
                         Log.e("BackupReceiver", "Pencadangan otomatis gagal: ${result.message}")

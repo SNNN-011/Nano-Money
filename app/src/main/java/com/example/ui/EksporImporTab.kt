@@ -2,6 +2,8 @@ package com.example.ui
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import android.content.Context
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -18,6 +20,17 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Info
 import com.example.util.BackupHelper
 import com.example.util.BackupScheduler
+import com.example.util.GoogleDriveHelper
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.common.api.ApiException
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.material.icons.filled.Cloud
+import androidx.compose.material.icons.filled.CloudDone
+import androidx.compose.material.icons.filled.CloudDownload
+import androidx.compose.material.icons.filled.CloudUpload
+import androidx.compose.material.icons.filled.CloudOff
+import androidx.compose.material.icons.filled.Sync
 import java.io.File
 import kotlinx.coroutines.launch
 import androidx.compose.material3.*
@@ -591,6 +604,62 @@ fun EksporImporTabContent(
             var backupList by remember { mutableStateOf(emptyList<File>()) }
             var selectedBackupToRestore by remember { mutableStateOf<File?>(null) }
 
+            // Google Drive Integration States
+            var connectedGoogleAccount by remember { mutableStateOf(GoogleDriveHelper.getSignedInAccount(context)) }
+            var isDriveProcessing by remember { mutableStateOf(false) }
+            var driveBackupList by remember { mutableStateOf<List<GoogleDriveHelper.DriveBackupFile>>(emptyList()) }
+            var selectedDriveBackupToRestore by remember { mutableStateOf<GoogleDriveHelper.DriveBackupFile?>(null) }
+            var selectedLocalBackupToUpload by remember { mutableStateOf<File?>(null) }
+            var driveErrorDetailMessage by remember { mutableStateOf<String?>(null) }
+
+            val googleSignInLauncher = rememberLauncherForActivityResult(
+                contract = ActivityResultContracts.StartActivityForResult()
+            ) { result ->
+                val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
+                try {
+                    val account = task.getResult(ApiException::class.java)
+                    connectedGoogleAccount = account
+                    Toast.makeText(context, "Berhasil menghubungkan Google Drive!", Toast.LENGTH_SHORT).show()
+                } catch (e: ApiException) {
+                    val statusCode = e.statusCode
+                    android.util.Log.e("GoogleDrive", "Google Sign-In failed: StatusCode=$statusCode", e)
+                    if (statusCode == 12501) {
+                        Toast.makeText(context, "Batal menghubungkan Google Drive.", Toast.LENGTH_SHORT).show()
+                    } else {
+                        Toast.makeText(context, "Gagal masuk: ${e.localizedMessage ?: statusCode}", Toast.LENGTH_LONG).show()
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.e("GoogleDrive", "Google Sign-In error", e)
+                    Toast.makeText(context, "Kesalahan: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
+                }
+            }
+
+            // Sync Google Drive list
+            LaunchedEffect(connectedGoogleAccount) {
+                if (connectedGoogleAccount != null) {
+                    isDriveProcessing = true
+                    when (val result = GoogleDriveHelper.listBackupsFromDrive(context)) {
+                        is GoogleDriveHelper.DriveResult.Success -> {
+                            driveBackupList = result.data
+                        }
+                        is GoogleDriveHelper.DriveResult.Error -> {
+                            android.util.Log.e("GoogleDrive", "Gagal memuat daftar Drive: ${result.message}")
+                            driveErrorDetailMessage = result.message
+                            if (result.recoverableIntent != null) {
+                                try {
+                                    context.startActivity(result.recoverableIntent)
+                                } catch (e: Exception) {
+                                    android.util.Log.e("GoogleDrive", "Failed to launch auth recovery", e)
+                                }
+                            }
+                        }
+                    }
+                    isDriveProcessing = false
+                } else {
+                    driveBackupList = emptyList()
+                }
+            }
+
             // Fetch backups when entered
             LaunchedEffect(Unit) {
                 backupList = BackupHelper.getBackups(context)
@@ -896,6 +965,20 @@ fun EksporImporTabContent(
                                         horizontalArrangement = Arrangement.spacedBy(4.dp),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
+                                        if (connectedGoogleAccount != null) {
+                                            IconButton(
+                                                onClick = { selectedLocalBackupToUpload = file },
+                                                modifier = Modifier.size(28.dp)
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.CloudUpload,
+                                                    contentDescription = "Unggah ke Google Drive",
+                                                    tint = SteelBlue,
+                                                    modifier = Modifier.size(16.dp)
+                                                )
+                                            }
+                                        }
+
                                         PremiumButton(
                                             text = "PULIHKAN",
                                             onClick = { selectedBackupToRestore = file },
@@ -923,6 +1006,255 @@ fun EksporImporTabContent(
                                                 tint = Color.Red.copy(alpha = 0.7f),
                                                 modifier = Modifier.size(16.dp)
                                             )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Google Drive Cloud Sync Section
+                    HorizontalDivider(color = GhostWhite.copy(alpha = 0.08f))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = if (connectedGoogleAccount != null) Icons.Default.CloudDone else Icons.Default.Cloud,
+                                contentDescription = null,
+                                tint = if (connectedGoogleAccount != null) SteelBlue else GhostWhite.copy(alpha = 0.6f),
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = if (connectedGoogleAccount != null) "Terhubung Cloud ☁️" else "Sinkronisasi Google Drive",
+                                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold, fontSize = 14.sp),
+                                color = GhostWhite
+                            )
+                        }
+
+                        if (connectedGoogleAccount != null) {
+                            IconButton(
+                                onClick = {
+                                    GoogleDriveHelper.signOut(context) {
+                                        connectedGoogleAccount = null
+                                        driveBackupList = emptyList()
+                                        Toast.makeText(context, "Akses Google Drive terputus.", Toast.LENGTH_SHORT).show()
+                                    }
+                                },
+                                modifier = Modifier.size(28.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.CloudOff,
+                                    contentDescription = "Putuskan Google Drive",
+                                    tint = Color.Red.copy(alpha = 0.7f),
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
+                    }
+
+                    if (connectedGoogleAccount == null) {
+                        Text(
+                            text = "Hubungkan akun Google Drive Anda untuk secara manual atau otomatis mengunggah cadangan database Anda. Cadangan eksternal terisolasi ini dijamin aman dan aman dari uninstall.",
+                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp, lineHeight = 16.sp),
+                            color = GhostWhite.copy(alpha = 0.55f)
+                        )
+
+                        PremiumButton(
+                            text = "HUBUNGKAN GOOGLE DRIVE",
+                            onClick = {
+                                val client = GoogleDriveHelper.getGoogleSignInClient(context)
+                                googleSignInLauncher.launch(client.signInIntent)
+                            },
+                            isActive = true,
+                            icon = Icons.Default.Cloud,
+                            modifier = Modifier.fillMaxWidth().testTag("connect_google_drive_button")
+                        )
+                    } else {
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = "Akun: ${connectedGoogleAccount?.email ?: "Terhubung"}",
+                                style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold, color = SteelBlue),
+                                modifier = Modifier.padding(bottom = 2.dp)
+                            )
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                PremiumButton(
+                                    text = "UNGGAH MANUAL LOKAL TERBARU",
+                                    onClick = {
+                                        coroutineScope.launch {
+                                            isDriveProcessing = true
+                                            val latestLocal = BackupHelper.getBackups(context).firstOrNull()
+                                            if (latestLocal != null) {
+                                                when (val uploaded = GoogleDriveHelper.uploadBackupToDrive(context, latestLocal)) {
+                                                    is GoogleDriveHelper.DriveResult.Success -> {
+                                                        Toast.makeText(context, "Sukses mengunggah cadangan terbaru ke Drive!", Toast.LENGTH_LONG).show()
+                                                        // Reload list
+                                                        val listRes = GoogleDriveHelper.listBackupsFromDrive(context)
+                                                        if (listRes is GoogleDriveHelper.DriveResult.Success) {
+                                                            driveBackupList = listRes.data
+                                                        }
+                                                    }
+                                                    is GoogleDriveHelper.DriveResult.Error -> {
+                                                        driveErrorDetailMessage = uploaded.message
+                                                    }
+                                                }
+                                            } else {
+                                                Toast.makeText(context, "Silakan buat cadangan lokal terlebih dahulu sebelum mengunggah.", Toast.LENGTH_LONG).show()
+                                            }
+                                            isDriveProcessing = false
+                                        }
+                                    },
+                                    isActive = !isDriveProcessing,
+                                    icon = Icons.Default.CloudUpload,
+                                    modifier = Modifier.weight(1f)
+                                )
+
+                                IconButton(
+                                    onClick = {
+                                        coroutineScope.launch {
+                                            isDriveProcessing = true
+                                            when (val listRes = GoogleDriveHelper.listBackupsFromDrive(context)) {
+                                                is GoogleDriveHelper.DriveResult.Success -> {
+                                                    driveBackupList = listRes.data
+                                                    Toast.makeText(context, "Berhasil memuat daftar cadangan Google Drive.", Toast.LENGTH_SHORT).show()
+                                                }
+                                                is GoogleDriveHelper.DriveResult.Error -> {
+                                                    driveErrorDetailMessage = listRes.message
+                                                }
+                                            }
+                                            isDriveProcessing = false
+                                        }
+                                    },
+                                    modifier = Modifier.size(40.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Sync,
+                                        contentDescription = "Muat Ulang Drive",
+                                        tint = GhostWhite,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(4.dp))
+
+                            Text(
+                                text = "Salinan di Google Drive (${driveBackupList.size}):",
+                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                                color = GhostWhite
+                            )
+
+                            if (isDriveProcessing) {
+                                Box(
+                                    modifier = Modifier.fillMaxWidth().height(60.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    CircularProgressIndicator(color = SteelBlue, modifier = Modifier.size(30.dp))
+                                }
+                            } else if (driveBackupList.isEmpty()) {
+                                Text(
+                                    text = "Belum ada berkas cadangan di Google Drive Anda. Ketuk tombol unggah untuk menyinkronkan data Anda.",
+                                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                                    color = GhostWhite.copy(alpha = 0.35f)
+                                )
+                            } else {
+                                Column(
+                                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    driveBackupList.forEach { driveFile ->
+                                        val sizeInKb = driveFile.sizeBytes / 1024
+                                        val displayTime = driveFile.createdTime?.substringBefore("T") ?: ""
+
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .background(GhostWhite.copy(alpha = 0.04f), shape = RoundedCornerShape(8.dp))
+                                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.SpaceBetween
+                                        ) {
+                                            Column(modifier = Modifier.weight(1f)) {
+                                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .background(SteelBlue.copy(alpha = 0.2f), shape = RoundedCornerShape(4.dp))
+                                                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                                                    ) {
+                                                        Text(
+                                                            text = "Cloud",
+                                                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp, fontWeight = FontWeight.Bold),
+                                                            color = SteelBlue
+                                                        )
+                                                    }
+                                                    Spacer(modifier = Modifier.width(6.dp))
+                                                    Text(
+                                                        text = "$sizeInKb KB $displayTime",
+                                                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
+                                                        color = GhostWhite.copy(alpha = 0.4f)
+                                                    )
+                                                }
+                                                Spacer(modifier = Modifier.height(2.dp))
+                                                Text(
+                                                    text = driveFile.name,
+                                                    style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
+                                                    color = GhostWhite
+                                                )
+                                            }
+
+                                            Row(
+                                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                PremiumButton(
+                                                    text = "RESTORE",
+                                                    onClick = { selectedDriveBackupToRestore = driveFile },
+                                                    isActive = true,
+                                                    fillMaxWidth = false,
+                                                    horizontalPadding = 10.dp,
+                                                    verticalPadding = 4.dp
+                                                )
+
+                                                IconButton(
+                                                    onClick = {
+                                                        coroutineScope.launch {
+                                                            isDriveProcessing = true
+                                                            when (val del = GoogleDriveHelper.deleteBackupFromDrive(context, driveFile.id)) {
+                                                                is GoogleDriveHelper.DriveResult.Success -> {
+                                                                    Toast.makeText(context, "Cadangan berhasil dihapus dari Google Drive.", Toast.LENGTH_SHORT).show()
+                                                                    driveBackupList = GoogleDriveHelper.listBackupsFromDrive(context).let {
+                                                                        if (it is GoogleDriveHelper.DriveResult.Success) it.data else emptyList()
+                                                                    }
+                                                                }
+                                                                is GoogleDriveHelper.DriveResult.Error -> {
+                                                                    driveErrorDetailMessage = del.message
+                                                                }
+                                                            }
+                                                            isDriveProcessing = false
+                                                        }
+                                                    },
+                                                    modifier = Modifier.size(28.dp)
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Default.Delete,
+                                                        contentDescription = "Hapus Cadangan Drive",
+                                                        tint = Color.Red.copy(alpha = 0.7f),
+                                                        modifier = Modifier.size(16.dp)
+                                                    )
+                                                }
+                                            }
                                         }
                                     }
                                 }
@@ -984,6 +1316,263 @@ fun EksporImporTabContent(
                                 horizontalPadding = 8.dp,
                                 verticalPadding = 6.dp
                             )
+                        }
+                    }
+                )
+            }
+
+            // Google Drive Upload Local Backup Dialog
+            if (selectedLocalBackupToUpload != null) {
+                AlertDialog(
+                    onDismissRequest = { selectedLocalBackupToUpload = null },
+                    containerColor = MidnightAbyss,
+                    title = {
+                        Text(
+                            text = "Unggah ke Google Drive",
+                            color = GhostWhite,
+                            fontWeight = FontWeight.Bold
+                        )
+                    },
+                    text = {
+                        Text(
+                            text = "Apakah Anda yakin ingin mengunggah berkas cadangan '${selectedLocalBackupToUpload?.name}' ke Google Drive Anda? Berkas ini akan tersimpan aman dari kehilangan lokal.",
+                            color = GhostWhite.copy(alpha = 0.8f),
+                            fontSize = 13.sp,
+                            lineHeight = 18.sp
+                        )
+                    },
+                    confirmButton = {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            PremiumButton(
+                                text = "Batal",
+                                onClick = { selectedLocalBackupToUpload = null },
+                                isActive = false,
+                                modifier = Modifier.weight(1f),
+                                horizontalPadding = 8.dp,
+                                verticalPadding = 6.dp
+                            )
+                            PremiumButton(
+                                text = "UNGGAH",
+                                onClick = {
+                                    val localFile = selectedLocalBackupToUpload
+                                    selectedLocalBackupToUpload = null
+                                    if (localFile != null) {
+                                        coroutineScope.launch {
+                                            isDriveProcessing = true
+                                            when (val res = GoogleDriveHelper.uploadBackupToDrive(context, localFile)) {
+                                                is GoogleDriveHelper.DriveResult.Success -> {
+                                                    Toast.makeText(context, "Sukses mengunggah cadangan ke Google Drive!", Toast.LENGTH_SHORT).show()
+                                                    val listRes = GoogleDriveHelper.listBackupsFromDrive(context)
+                                                    if (listRes is GoogleDriveHelper.DriveResult.Success) {
+                                                        driveBackupList = listRes.data
+                                                    }
+                                                }
+                                                is GoogleDriveHelper.DriveResult.Error -> {
+                                                    driveErrorDetailMessage = res.message
+                                                }
+                                            }
+                                            isDriveProcessing = false
+                                        }
+                                    }
+                                },
+                                isActive = true,
+                                modifier = Modifier.weight(1.2f),
+                                horizontalPadding = 8.dp,
+                                verticalPadding = 6.dp
+                            )
+                        }
+                    }
+                )
+            }
+
+            // Google Drive Cloud Backup Restore Dialog
+            if (selectedDriveBackupToRestore != null) {
+                AlertDialog(
+                    onDismissRequest = { selectedDriveBackupToRestore = null },
+                    containerColor = MidnightAbyss,
+                    title = {
+                        Text(
+                            text = "Pulihkan dari Google Drive",
+                            color = GhostWhite,
+                            fontWeight = FontWeight.Bold
+                        )
+                    },
+                    text = {
+                        Text(
+                            text = "Perhatian: Mengunduh dan memulihkan berkas dari Google Drive akan menimpa seluruh database lokal aktif Anda dangan data cadangan cloud ini.\n\nAplikasi akan mengunduh berkas, menuliskannya, dan secara otomatis memuat ulang saat pemulihan berhasil. Apakah Anda ingin melanjutkan?",
+                            color = GhostWhite.copy(alpha = 0.8f),
+                            fontSize = 13.sp,
+                            lineHeight = 18.sp
+                        )
+                    },
+                    confirmButton = {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            PremiumButton(
+                                text = "Batal",
+                                onClick = { selectedDriveBackupToRestore = null },
+                                isActive = false,
+                                modifier = Modifier.weight(1f),
+                                horizontalPadding = 8.dp,
+                                verticalPadding = 6.dp
+                            )
+                            PremiumButton(
+                                text = "UNDUH & PULIHKAN",
+                                onClick = {
+                                    val driveFile = selectedDriveBackupToRestore
+                                    selectedDriveBackupToRestore = null
+                                    if (driveFile != null) {
+                                        coroutineScope.launch {
+                                            isDriveProcessing = true
+                                            val localTargetDir = BackupHelper.getBackupDirectory(context)
+                                            val localTempFile = File(localTargetDir, "temp_cloud_restore_${driveFile.name}")
+                                            
+                                            when (val downloadRes = GoogleDriveHelper.downloadBackupFromDrive(context, driveFile.id, localTempFile)) {
+                                                is GoogleDriveHelper.DriveResult.Success -> {
+                                                    val successRestore = BackupHelper.restoreBackup(context, localTempFile)
+                                                    localTempFile.delete()
+                                                    if (successRestore) {
+                                                        Toast.makeText(context, "Database berhasil dipulihkan dari Cloud!", Toast.LENGTH_LONG).show()
+                                                    } else {
+                                                        Toast.makeText(context, "Gagal menimpa database dengan berkas hasil unduhan.", Toast.LENGTH_LONG).show()
+                                                    }
+                                                }
+                                                is GoogleDriveHelper.DriveResult.Error -> {
+                                                    driveErrorDetailMessage = downloadRes.message
+                                                }
+                                            }
+                                            isDriveProcessing = false
+                                        }
+                                    }
+                                },
+                                isActive = true,
+                                modifier = Modifier.weight(1.5f),
+                                horizontalPadding = 8.dp,
+                                verticalPadding = 6.dp
+                            )
+                        }
+                    }
+                )
+            }
+
+            // Google Drive Error Detail Alert Dialog
+            if (driveErrorDetailMessage != null) {
+                val errorMsg = driveErrorDetailMessage ?: ""
+                val extractedUrl = remember(errorMsg) { 
+                    errorMsg.split(" ", "\n", "\t").firstOrNull { it.startsWith("http://") || it.startsWith("https://") } 
+                }
+
+                AlertDialog(
+                    onDismissRequest = { driveErrorDetailMessage = null },
+                    containerColor = MidnightAbyss,
+                    title = {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.Info,
+                                contentDescription = null,
+                                tint = Color(0xFFE57373), // Red accent
+                                modifier = Modifier.size(24.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Masalah Google Drive",
+                                color = GhostWhite,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    },
+                    text = {
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Text(
+                                text = "Berikut detail masalah yang terjadi saat memproses Google Drive Anda:",
+                                color = GhostWhite.copy(alpha = 0.8f),
+                                fontSize = 13.sp
+                            )
+
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(Color.Black.copy(alpha = 0.4f), shape = RoundedCornerShape(8.dp))
+                                    .border(1.dp, GhostWhite.copy(alpha = 0.08f), shape = RoundedCornerShape(8.dp))
+                                    .padding(10.dp)
+                            ) {
+                                Text(
+                                    text = errorMsg,
+                                    style = MaterialTheme.typography.bodySmall.copy(
+                                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                        fontSize = 11.sp,
+                                        lineHeight = 15.sp
+                                    ),
+                                    color = Color(0xFFFFCC80) // Light orange text
+                                )
+                            }
+
+                            if (errorMsg.contains("is disabled") || errorMsg.contains("has not been used")) {
+                                Text(
+                                    text = "💡 Petunjuk: Layanan Google Drive API belum diaktifkan di Google Cloud Project dari aplikasi ini. Salin atau ketuk tombol di bawah untuk membukanya dan mengaktifkan tombol 'Enable Google Drive API' di konsol pengembang Google.",
+                                    color = SteelBlue,
+                                    fontSize = 11.sp,
+                                    lineHeight = 15.sp,
+                                    fontWeight = FontWeight.Medium
+                                )
+                            }
+                        }
+                    },
+                    confirmButton = {
+                        Column(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            if (extractedUrl != null) {
+                                PremiumButton(
+                                    text = "BUKA TAUTAN GOOGLE CONSOLE",
+                                    onClick = {
+                                        try {
+                                            val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(extractedUrl))
+                                            context.startActivity(intent)
+                                        } catch (e: Exception) {
+                                            Toast.makeText(context, "Gagal membuka web browser.", Toast.LENGTH_SHORT).show()
+                                        }
+                                    },
+                                    isActive = true,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalPadding = 8.dp,
+                                    verticalPadding = 8.dp
+                                )
+                            }
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                PremiumButton(
+                                    text = "Salin Detail Error",
+                                    onClick = {
+                                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                                        val clip = android.content.ClipData.newPlainText("GoogleDriveError", errorMsg)
+                                        clipboard.setPrimaryClip(clip)
+                                        Toast.makeText(context, "Detail error disalin ke papan klip!", Toast.LENGTH_SHORT).show()
+                                    },
+                                    isActive = false,
+                                    modifier = Modifier.weight(1f),
+                                    horizontalPadding = 8.dp,
+                                    verticalPadding = 6.dp
+                                )
+
+                                PremiumButton(
+                                    text = "Tutup",
+                                    onClick = { driveErrorDetailMessage = null },
+                                    isActive = true,
+                                    modifier = Modifier.weight(1f),
+                                    horizontalPadding = 8.dp,
+                                    verticalPadding = 6.dp
+                                )
+                            }
                         }
                     }
                 )
