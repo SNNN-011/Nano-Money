@@ -157,7 +157,7 @@ class TransactionParserUseCase {
 
             for (model in modelsToTry) {
                 try {
-                    val url = "https://nano-money.yasinhacker135.workers.dev/v1beta/models/$model:generateContent"
+                    val url = GeminiClient.getFullUrl("v1beta/models/$model:generateContent")
                     val response = kotlinx.coroutines.withTimeout(30_000L) {
                         GeminiClient.service.generateContent(url, apiKey, request)
                     }

@@ -97,7 +97,11 @@ interface GeminiApiService {
 }
 
 object GeminiClient {
-    private const val BASE_URL = "https://nano-money.yasinhacker135.workers.dev/"
+    private val BASE_URL = try {
+        com.example.BuildConfig.GEMINI_BASE_URL.trim().replace("\"", "").ifEmpty { "https://your-cloudflare-worker-url.workers.dev/" }
+    } catch (e: Throwable) {
+        "https://your-cloudflare-worker-url.workers.dev/"
+    }
 
     private val okHttpClient = OkHttpClient.Builder()
         .connectTimeout(30, TimeUnit.SECONDS)
@@ -106,11 +110,19 @@ object GeminiClient {
         .build()
 
     val service: GeminiApiService by lazy {
+        val cleanBase = if (BASE_URL.endsWith("/")) BASE_URL else "$BASE_URL/"
         val retrofit = Retrofit.Builder()
-            .baseUrl(BASE_URL)
+            .baseUrl(cleanBase)
             .client(okHttpClient)
             .addConverterFactory(MoshiConverterFactory.create())
             .build()
         retrofit.create(GeminiApiService::class.java)
+    }
+
+    fun getFullUrl(path: String): String {
+        val base = BASE_URL.trim()
+        val cleanBase = if (base.endsWith("/")) base else "$base/"
+        val cleanPath = if (path.startsWith("/")) path.substring(1) else path
+        return cleanBase + cleanPath
     }
 }
