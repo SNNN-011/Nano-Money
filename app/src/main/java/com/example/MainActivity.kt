@@ -45,9 +45,14 @@ class MainActivity : FragmentActivity() {
           color = MaterialTheme.colorScheme.background
         ) {
           val context = androidx.compose.ui.platform.LocalContext.current
-          val securityPrefs = remember { context.getSharedPreferences("app_security_prefs", android.content.Context.MODE_PRIVATE) }
+          val securityStatus = remember { com.example.util.SecurityUtil.checkSecurityStatus(context) }
           
-          LaunchedEffect(Unit) {
+          if (securityStatus != com.example.util.SecurityUtil.SecurityStatus.SAFE) {
+            com.example.ui.SecurityViolationScreen(securityStatus = securityStatus)
+          } else {
+            val securityPrefs = remember { context.getSharedPreferences("app_security_prefs", android.content.Context.MODE_PRIVATE) }
+            
+            LaunchedEffect(Unit) {
               val isAutoBackup = securityPrefs.getBoolean("auto_backup_enabled", false)
               val autoBackupInterval = securityPrefs.getString("auto_backup_interval", "daily") ?: "daily"
               val autoBackupHour = securityPrefs.getInt("auto_backup_hour", 2)
@@ -296,6 +301,7 @@ class MainActivity : FragmentActivity() {
                 FinancialTrackerScreen(application = application, showStartupSplash = false)
             }
           }
+         }
         }
       }
     }

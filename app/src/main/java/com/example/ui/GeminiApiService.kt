@@ -127,6 +127,35 @@ object GeminiClient {
                 requestBuilder.header("X-Worker-Secret", WORKER_SECRET_KEY)
             }
             
+            try {
+                val timestamp = System.currentTimeMillis().toString()
+                val method = originalRequest.method
+                val pathAndQuery = originalRequest.url.encodedPath + 
+                        (originalRequest.url.encodedQuery?.let { "?$it" } ?: "")
+                
+                val bodyString = if (originalRequest.body != null) {
+                    val buffer = okio.Buffer()
+                    originalRequest.body?.writeTo(buffer)
+                    buffer.readUtf8()
+                } else {
+                    ""
+                }
+                
+                val messageToSign = "$timestamp\n$method\n$pathAndQuery\n$bodyString"
+                val signingKey = WORKER_SECRET_KEY.ifEmpty { "com.example.geminiapp" }
+                
+                val hmacSha256 = javax.crypto.Mac.getInstance("HmacSHA256")
+                val secretKey = javax.crypto.spec.SecretKeySpec(signingKey.toByteArray(Charsets.UTF_8), "HmacSHA256")
+                hmacSha256.init(secretKey)
+                val signatureBytes = hmacSha256.doFinal(messageToSign.toByteArray(Charsets.UTF_8))
+                val signature = android.util.Base64.encodeToString(signatureBytes, android.util.Base64.NO_WRAP)
+                
+                requestBuilder.header("X-Signature-Timestamp", timestamp)
+                requestBuilder.header("X-Signature", signature)
+            } catch (e: Throwable) {
+                android.util.Log.e("GeminiClient", "Failed to sign request", e)
+            }
+            
             chain.proceed(requestBuilder.build())
         }
     }.build()
