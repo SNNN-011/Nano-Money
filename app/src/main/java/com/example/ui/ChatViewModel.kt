@@ -172,13 +172,11 @@ class ChatViewModel(
         _messages.value = listWithTyping
 
         viewModelScope.launch {
-            val apiKey = try { BuildConfig.GEMINI_API_KEY } catch (e: Throwable) { "" } ?: ""
-            val isApiKeyMissing = apiKey.isEmpty() || apiKey == "MY_GEMINI_API_KEY" || apiKey == "GEMINI_API_KEY"
-            
-            if (isApiKeyMissing) {
-                removeTypingIndicator()
-                addAiMessage("API Key Gemini belum diatur atau masih menggunakan placeholder. Silakan masukkan API Key Anda ke panel 'Secrets' di AI Studio dengan nama key 'GEMINI_API_KEY' agar fitur AI dapat berfungsi.")
-                return@launch
+            val apiKeyRaw = try { BuildConfig.GEMINI_API_KEY } catch (e: Throwable) { "" } ?: ""
+            val apiKey = if (apiKeyRaw.isEmpty() || apiKeyRaw == "MY_GEMINI_API_KEY" || apiKeyRaw == "GEMINI_API_KEY") {
+                "CF_PROXY_KEY"
+            } else {
+                apiKeyRaw
             }
 
             val resultStatus = receiptUseCase.parseReceipt(
@@ -310,13 +308,11 @@ class ChatViewModel(
         viewModelScope.launch {
             val modelName = _selectedModel.value
 
-            val apiKey = try { BuildConfig.GEMINI_API_KEY } catch (e: Throwable) { "" } ?: ""
-            val isApiKeyMissing = apiKey.isEmpty() || apiKey == "MY_GEMINI_API_KEY" || apiKey == "GEMINI_API_KEY"
-            
-            if (isApiKeyMissing) {
-                removeTypingIndicator()
-                addAiMessage("API Key Gemini belum diatur atau masih menggunakan placeholder. Silakan masukkan API Key Anda ke panel 'Secrets' di AI Studio dengan nama key 'GEMINI_API_KEY' agar fitur AI dapat berfungsi.")
-                return@launch
+            val apiKeyRaw = try { BuildConfig.GEMINI_API_KEY } catch (e: Throwable) { "" } ?: ""
+            val apiKey = if (apiKeyRaw.isEmpty() || apiKeyRaw == "MY_GEMINI_API_KEY" || apiKeyRaw == "GEMINI_API_KEY") {
+                "CF_PROXY_KEY"
+            } else {
+                apiKeyRaw
             }
 
             val pendingContext = _pendingClarificationContext.value

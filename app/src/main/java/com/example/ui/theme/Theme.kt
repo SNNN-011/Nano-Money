@@ -33,6 +33,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.foundation.text.selection.LocalTextSelectionColors
+import androidx.compose.foundation.text.selection.TextSelectionColors
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
 
 private val DarkColorScheme = darkColorScheme(
     primary = NeonViolet,
@@ -59,11 +63,22 @@ fun MyApplicationTheme(
 ) {
     val colorScheme = DarkColorScheme
 
-    MaterialTheme(
-        colorScheme = colorScheme,
-        typography = Typography,
-        content = content
-    )
+    val customTextSelectionColors = remember {
+        TextSelectionColors(
+            handleColor = SteelBlue,
+            backgroundColor = SteelBlue.copy(alpha = 0.4f)
+        )
+    }
+
+    CompositionLocalProvider(
+        LocalTextSelectionColors provides customTextSelectionColors
+    ) {
+        MaterialTheme(
+            colorScheme = colorScheme,
+            typography = Typography,
+            content = content
+        )
+    }
 }
 
 @Composable

@@ -890,10 +890,34 @@ fun DatabaseBackupSection(
             // Choose Backup Schedule (Interval and Time) under a single collapsible header if auto backup is enabled
             if (isAutoBackupEnabled) {
                 val securityPrefs = remember { context.getSharedPreferences("security_prefs", android.content.Context.MODE_PRIVATE) }
-                val lastLocalTime = remember { securityPrefs.getLong("last_auto_backup_local_time", 0L) }
-                val lastLocalStatus = remember { securityPrefs.getString("last_auto_backup_local_status", "Belum ada riwayat") }
-                val lastDriveTime = remember { securityPrefs.getLong("last_auto_backup_drive_time", 0L) }
-                val lastDriveStatus = remember { securityPrefs.getString("last_auto_backup_drive_status", "Belum ada riwayat") }
+                
+                var lastLocalTime by remember { mutableStateOf(securityPrefs.getLong("last_auto_backup_local_time", 0L)) }
+                var lastLocalStatus by remember { mutableStateOf(securityPrefs.getString("last_auto_backup_local_status", "Belum ada riwayat") ?: "Belum ada riwayat") }
+                var lastDriveTime by remember { mutableStateOf(securityPrefs.getLong("last_auto_backup_drive_time", 0L)) }
+                var lastDriveStatus by remember { mutableStateOf(securityPrefs.getString("last_auto_backup_drive_status", "Belum ada riwayat") ?: "Belum ada riwayat") }
+
+                DisposableEffect(securityPrefs) {
+                    val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { prefs, key ->
+                        when (key) {
+                            "last_auto_backup_local_time" -> {
+                                lastLocalTime = prefs.getLong(key, 0L)
+                            }
+                            "last_auto_backup_local_status" -> {
+                                lastLocalStatus = prefs.getString(key, "Belum ada riwayat") ?: "Belum ada riwayat"
+                            }
+                            "last_auto_backup_drive_time" -> {
+                                lastDriveTime = prefs.getLong(key, 0L)
+                            }
+                            "last_auto_backup_drive_status" -> {
+                                lastDriveStatus = prefs.getString(key, "Belum ada riwayat") ?: "Belum ada riwayat"
+                            }
+                        }
+                    }
+                    securityPrefs.registerOnSharedPreferenceChangeListener(listener)
+                    onDispose {
+                        securityPrefs.unregisterOnSharedPreferenceChangeListener(listener)
+                    }
+                }
 
                 fun formatTimestamp(timestamp: Long): String {
                     if (timestamp == 0L) return "Belum pernah"

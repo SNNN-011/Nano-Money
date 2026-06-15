@@ -72,6 +72,7 @@ class MainActivity : FragmentActivity() {
           val needsLock = isPinEnabled || isBiometricEnabled
           var isAppUnlocked by remember { mutableStateOf(!needsLock) }
           var showPermissionDialog by remember { mutableStateOf(!securityPrefs.getBoolean("permission_dialog_shown", false)) }
+          var isLaunching by remember { mutableStateOf(true) }
           
           val permissionLauncher = rememberLauncherForActivityResult(
               contract = ActivityResultContracts.RequestMultiplePermissions()
@@ -80,7 +81,12 @@ class MainActivity : FragmentActivity() {
               showPermissionDialog = false
           }
           
-          if (!isAppUnlocked) {
+          if (isLaunching) {
+            com.example.ui.StartupScreen(
+                visible = true,
+                onFinished = { isLaunching = false }
+            )
+          } else if (!isAppUnlocked) {
             LockScreenOverlay(
               context = context,
               savedPin = savedPin,
@@ -287,7 +293,7 @@ class MainActivity : FragmentActivity() {
                     }
                 }
             } else {
-                FinancialTrackerScreen(application = application)
+                FinancialTrackerScreen(application = application, showStartupSplash = false)
             }
           }
         }
