@@ -103,10 +103,26 @@ object GeminiClient {
         "https://your-cloudflare-worker-url.workers.dev/"
     }
 
+    private val WORKER_SECRET_KEY = try {
+        com.example.BuildConfig.WORKER_SECRET_KEY.trim().replace("\"", "")
+    } catch (e: Throwable) {
+        ""
+    }
+
     private val okHttpClient = OkHttpClient.Builder()
         .connectTimeout(30, TimeUnit.SECONDS)
         .readTimeout(30, TimeUnit.SECONDS)
         .writeTimeout(30, TimeUnit.SECONDS)
+        .addInterceptor { chain ->
+            val originalRequest = chain.request()
+            val requestBuilder = originalRequest.newBuilder()
+            
+            if (WORKER_SECRET_KEY.isNotEmpty()) {
+                requestBuilder.header("X-Worker-Secret", WORKER_SECRET_KEY)
+            }
+            
+            chain.proceed(requestBuilder.build())
+        }
         .build()
 
     val service: GeminiApiService by lazy {

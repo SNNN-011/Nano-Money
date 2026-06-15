@@ -5,17 +5,30 @@
 # For more details, see
 #   http://developer.android.com/guide/developing/tools/proguard.html
 
-# If your project uses WebView with JS, uncomment the following
-# and specify the fully qualified class name to the JavaScript interface
-# class:
-#-keepclassmembers class fqcn.of.javascript.interface.for.webview {
-#   public *;
-#}
+# Preserve annotations, signatures, and line numbers of stack traces for debugging
+-keepattributes *Annotation*,Signature,InnerClasses,EnclosingMethod,SourceFile,LineNumberTable
 
-# Uncomment this to preserve the line number information for
-# debugging stack traces.
-#-keepattributes SourceFile,LineNumberTable
+# Keep our BuildConfig so that our dynamic endpoint URLs and secret keys are available
+-keep class com.example.BuildConfig { *; }
 
-# If you keep the line number information, uncomment this to
-# hide the original source file name.
-#-renamesourcefileattribute SourceFile
+# Keep our Moshi model classes and generated adapters from being stripped or broken
+-keep @com.squareup.moshi.JsonClass class * { *; }
+-keep class *JsonAdapter { *; }
+-keepclassmembers class * {
+    @com.squareup.moshi.Json *;
+}
+
+# Keep our database entities and repository data structures
+-keep class com.example.data.** { *; }
+-keep class com.example.domain.** { *; }
+
+# Retrofit keep rules
+-keepclassmembers class * {
+    @retrofit2.http.* <methods>;
+}
+-dontwarn retrofit2.**
+
+# OkHttp/Okio keep rules
+-dontwarn okio.**
+-dontwarn javax.annotation.**
+-dontwarn org.conscrypt.**
