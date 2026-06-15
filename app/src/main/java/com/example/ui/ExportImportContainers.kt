@@ -7,7 +7,10 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -17,9 +20,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -516,6 +522,10 @@ fun DatabaseBackupSection(
     onAutoBackupEnabledChanged: (Boolean) -> Unit,
     autoBackupInterval: String,
     onAutoBackupIntervalChanged: (String) -> Unit,
+    autoBackupHour: Int,
+    onAutoBackupHourChanged: (Int) -> Unit,
+    autoBackupMinute: Int,
+    onAutoBackupMinuteChanged: (Int) -> Unit,
     backupList: List<File>,
     onBackupListChanged: (List<File>) -> Unit,
     connectedGoogleAccount: GoogleSignInAccount?,
@@ -651,7 +661,7 @@ fun DatabaseBackupSection(
                     checked = isAutoBackupEnabled,
                     onCheckedChange = { checked ->
                         onAutoBackupEnabledChanged(checked)
-                        BackupScheduler.schedulePeriodicBackup(context, checked, autoBackupInterval)
+                        BackupScheduler.schedulePeriodicBackup(context, checked, autoBackupInterval, autoBackupHour, autoBackupMinute)
                         Toast.makeText(context, if (checked) "Pencadangan otomatis aktif!" else "Pencadangan otomatis mati!", Toast.LENGTH_SHORT).show()
                     }
                 )
@@ -679,7 +689,7 @@ fun DatabaseBackupSection(
                             text = "HARIAN",
                             onClick = {
                                 onAutoBackupIntervalChanged("daily")
-                                BackupScheduler.schedulePeriodicBackup(context, true, "daily")
+                                BackupScheduler.schedulePeriodicBackup(context, true, "daily", autoBackupHour, autoBackupMinute)
                                 Toast.makeText(context, "Siklus pencadangan diatur: Harian", Toast.LENGTH_SHORT).show()
                             },
                             isActive = autoBackupInterval == "daily",
@@ -691,7 +701,7 @@ fun DatabaseBackupSection(
                             text = "MINGGUAN",
                             onClick = {
                                 onAutoBackupIntervalChanged("weekly")
-                                BackupScheduler.schedulePeriodicBackup(context, true, "weekly")
+                                BackupScheduler.schedulePeriodicBackup(context, true, "weekly", autoBackupHour, autoBackupMinute)
                                 Toast.makeText(context, "Siklus pencadangan diatur: Mingguan", Toast.LENGTH_SHORT).show()
                             },
                             isActive = autoBackupInterval == "weekly",
@@ -699,6 +709,186 @@ fun DatabaseBackupSection(
                             horizontalPadding = 12.dp,
                             verticalPadding = 6.dp
                         )
+                    }
+                }
+
+                // Choose custom backup time (Hour and Minute Picker) with up/down arrows & manual typing
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Waktu Pencadangan",
+                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                            color = GhostWhite
+                        )
+                        Text(
+                            text = "Pukul " + String.format("%02d:%02d", autoBackupHour, autoBackupMinute) + " WIB",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = GhostWhite.copy(alpha = 0.5f)
+                        )
+                    }
+
+                    // Interactive Custom Picker
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        // Hour controls
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            IconButton(
+                                onClick = {
+                                    val newHour = (autoBackupHour + 1) % 24
+                                    onAutoBackupHourChanged(newHour)
+                                    BackupScheduler.schedulePeriodicBackup(context, true, autoBackupInterval, newHour, autoBackupMinute)
+                                },
+                                modifier = Modifier.size(28.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.KeyboardArrowUp,
+                                    contentDescription = "Tambah Jam",
+                                    tint = SteelBlue,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+
+                            // Editable Hour Box
+                            var hourTextState by remember(autoBackupHour) { mutableStateOf(String.format("%02d", autoBackupHour)) }
+                            BasicTextField(
+                                value = hourTextState,
+                                onValueChange = { input ->
+                                    val filtered = input.filter { it.isDigit() }.take(2)
+                                    hourTextState = filtered
+                                    if (filtered.isNotEmpty()) {
+                                        val num = filtered.toIntOrNull()
+                                        if (num != null && num in 0..23) {
+                                            onAutoBackupHourChanged(num)
+                                            BackupScheduler.schedulePeriodicBackup(context, true, autoBackupInterval, num, autoBackupMinute)
+                                        }
+                                    }
+                                },
+                                textStyle = MaterialTheme.typography.titleMedium.copy(
+                                    color = GhostWhite,
+                                    fontWeight = FontWeight.Bold,
+                                    textAlign = TextAlign.Center
+                                ),
+                                keyboardOptions = KeyboardOptions(
+                                    keyboardType = KeyboardType.Number,
+                                    imeAction = ImeAction.Done
+                                ),
+                                singleLine = true,
+                                cursorBrush = SolidColor(SteelBlue),
+                                modifier = Modifier
+                                    .width(44.dp)
+                                    .height(36.dp)
+                                    .background(MidnightAbyss, shape = RoundedCornerShape(8.dp))
+                                    .border(1.dp, GhostWhite.copy(alpha = 0.2f), shape = RoundedCornerShape(8.dp))
+                                    .wrapContentHeight(Alignment.CenterVertically)
+                            )
+
+                            IconButton(
+                                onClick = {
+                                    val newHour = if (autoBackupHour - 1 < 0) 23 else autoBackupHour - 1
+                                    onAutoBackupHourChanged(newHour)
+                                    BackupScheduler.schedulePeriodicBackup(context, true, autoBackupInterval, newHour, autoBackupMinute)
+                                },
+                                modifier = Modifier.size(28.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.KeyboardArrowDown,
+                                    contentDescription = "Kurang Jam",
+                                    tint = SteelBlue,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+                        }
+
+                        // Colon separator
+                        Text(
+                            text = ":",
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                            color = GhostWhite,
+                            modifier = Modifier.padding(bottom = 2.dp)
+                        )
+
+                        // Minute controls
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center
+                        ) {
+                            IconButton(
+                                onClick = {
+                                    val newMin = (autoBackupMinute + 1) % 60
+                                    onAutoBackupMinuteChanged(newMin)
+                                    BackupScheduler.schedulePeriodicBackup(context, true, autoBackupInterval, autoBackupHour, newMin)
+                                },
+                                modifier = Modifier.size(28.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.KeyboardArrowUp,
+                                    contentDescription = "Tambah Menit",
+                                    tint = SteelBlue,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+
+                            // Editable Minute Box
+                            var minuteTextState by remember(autoBackupMinute) { mutableStateOf(String.format("%02d", autoBackupMinute)) }
+                            BasicTextField(
+                                value = minuteTextState,
+                                onValueChange = { input ->
+                                    val filtered = input.filter { it.isDigit() }.take(2)
+                                    minuteTextState = filtered
+                                    if (filtered.isNotEmpty()) {
+                                        val num = filtered.toIntOrNull()
+                                        if (num != null && num in 0..59) {
+                                            onAutoBackupMinuteChanged(num)
+                                            BackupScheduler.schedulePeriodicBackup(context, true, autoBackupInterval, autoBackupHour, num)
+                                        }
+                                    }
+                                },
+                                textStyle = MaterialTheme.typography.titleMedium.copy(
+                                    color = GhostWhite,
+                                    fontWeight = FontWeight.Bold,
+                                    textAlign = TextAlign.Center
+                                ),
+                                keyboardOptions = KeyboardOptions(
+                                    keyboardType = KeyboardType.Number,
+                                    imeAction = ImeAction.Done
+                                ),
+                                singleLine = true,
+                                cursorBrush = SolidColor(SteelBlue),
+                                modifier = Modifier
+                                    .width(44.dp)
+                                    .height(36.dp)
+                                    .background(MidnightAbyss, shape = RoundedCornerShape(8.dp))
+                                    .border(1.dp, GhostWhite.copy(alpha = 0.2f), shape = RoundedCornerShape(8.dp))
+                                    .wrapContentHeight(Alignment.CenterVertically)
+                            )
+
+                            IconButton(
+                                onClick = {
+                                    val newMin = if (autoBackupMinute - 1 < 0) 59 else autoBackupMinute - 1
+                                    onAutoBackupMinuteChanged(newMin)
+                                    BackupScheduler.schedulePeriodicBackup(context, true, autoBackupInterval, autoBackupHour, newMin)
+                                },
+                                modifier = Modifier.size(28.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.KeyboardArrowDown,
+                                    contentDescription = "Kurang Menit",
+                                    tint = SteelBlue,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -713,7 +903,29 @@ fun DatabaseBackupSection(
                         when (val result = BackupHelper.performBackup(context, isAuto = false)) {
                             is BackupHelper.BackupResult.Success -> {
                                 onBackupListChanged(BackupHelper.getBackups(context))
-                                Toast.makeText(context, "Database berhasil dicadangkan: ${result.fileName}", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, "Database berhasil dicadangkan secara lokal!", Toast.LENGTH_SHORT).show()
+                                
+                                // Jika akun Google terhubung, unggah juga ke Drive otomatis
+                                if (connectedGoogleAccount != null) {
+                                    Toast.makeText(context, "Mengunggah cadangan ke Google Drive...", Toast.LENGTH_SHORT).show()
+                                    onIsDriveProcessingChanged(true)
+                                    val backupDir = BackupHelper.getBackupDirectory(context)
+                                    val backupFile = java.io.File(backupDir, result.fileName)
+                                    when (val uploadRes = GoogleDriveHelper.uploadBackupToDrive(context, backupFile)) {
+                                        is GoogleDriveHelper.DriveResult.Success -> {
+                                            Toast.makeText(context, "Berhasil disinkronkan ke Google Drive!", Toast.LENGTH_LONG).show()
+                                            val listRes = GoogleDriveHelper.listBackupsFromDrive(context)
+                                            if (listRes is GoogleDriveHelper.DriveResult.Success) {
+                                                onDriveBackupListChanged(listRes.data)
+                                            }
+                                        }
+                                        is GoogleDriveHelper.DriveResult.Error -> {
+                                            Toast.makeText(context, "Gagal mengunggah ke Drive: ${uploadRes.message}", Toast.LENGTH_LONG).show()
+                                            onDriveErrorDetailMessageChange(uploadRes.message)
+                                        }
+                                    }
+                                    onIsDriveProcessingChanged(false)
+                                }
                             }
                             is BackupHelper.BackupResult.Error -> {
                                 Toast.makeText(context, "Gagal mencadangkan database: ${result.message}", Toast.LENGTH_LONG).show()

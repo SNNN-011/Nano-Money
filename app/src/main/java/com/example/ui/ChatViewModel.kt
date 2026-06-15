@@ -25,6 +25,7 @@ sealed class ChatMessage {
         val record: FinancialRecord? = null
     ) : ChatMessage()
     object TypingIndicator : ChatMessage()
+    object ScanningReceiptIndicator : ChatMessage()
 }
 
 class ChatViewModel(
@@ -161,13 +162,13 @@ class ChatViewModel(
     private val receiptUseCase = com.example.domain.ReceiptParserUseCase()
 
     fun scanReceipt(bitmap: Bitmap) {
-        // Tampilkan typing indicator
+        // Tampilkan scanning receipt indicator
         val currentList = _messages.value.toMutableList()
         currentList.add(ChatMessage.UserImageMessage(bitmap))
         _messages.value = currentList
 
         val listWithTyping = _messages.value.toMutableList()
-        listWithTyping.add(ChatMessage.TypingIndicator)
+        listWithTyping.add(ChatMessage.ScanningReceiptIndicator)
         _messages.value = listWithTyping
 
         viewModelScope.launch {
@@ -446,7 +447,7 @@ class ChatViewModel(
 
     private fun removeTypingIndicator() {
         val current = _messages.value.toMutableList()
-        current.removeAll { it is ChatMessage.TypingIndicator }
+        current.removeAll { it is ChatMessage.TypingIndicator || it is ChatMessage.ScanningReceiptIndicator }
         _messages.value = current
     }
 

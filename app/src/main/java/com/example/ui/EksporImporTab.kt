@@ -149,6 +149,8 @@ fun EksporImporTabContent(
     // Backup & Cloud sync states
     var isAutoBackupEnabled by remember { mutableStateOf(securityPrefs.getBoolean("auto_backup_enabled", false)) }
     var autoBackupInterval by remember { mutableStateOf(securityPrefs.getString("auto_backup_interval", "daily") ?: "daily") }
+    var autoBackupHour by remember { mutableStateOf(securityPrefs.getInt("auto_backup_hour", 2)) }
+    var autoBackupMinute by remember { mutableStateOf(securityPrefs.getInt("auto_backup_minute", 0)) }
     var backupList by remember { mutableStateOf(emptyList<File>()) }
     var selectedBackupToRestore by remember { mutableStateOf<File?>(null) }
 
@@ -297,9 +299,25 @@ fun EksporImporTabContent(
             // Database Backups and Google Drive sync card
             DatabaseBackupSection(
                 isAutoBackupEnabled = isAutoBackupEnabled,
-                onAutoBackupEnabledChanged = { isAutoBackupEnabled = it },
+                onAutoBackupEnabledChanged = { enabled ->
+                    isAutoBackupEnabled = enabled
+                    securityPrefs.edit().putBoolean("auto_backup_enabled", enabled).apply()
+                },
                 autoBackupInterval = autoBackupInterval,
-                onAutoBackupIntervalChanged = { autoBackupInterval = it },
+                onAutoBackupIntervalChanged = { interval ->
+                    autoBackupInterval = interval
+                    securityPrefs.edit().putString("auto_backup_interval", interval).apply()
+                },
+                autoBackupHour = autoBackupHour,
+                onAutoBackupHourChanged = { hour ->
+                    autoBackupHour = hour
+                    securityPrefs.edit().putInt("auto_backup_hour", hour).apply()
+                },
+                autoBackupMinute = autoBackupMinute,
+                onAutoBackupMinuteChanged = { minute ->
+                    autoBackupMinute = minute
+                    securityPrefs.edit().putInt("auto_backup_minute", minute).apply()
+                },
                 backupList = backupList,
                 onBackupListChanged = { backupList = it },
                 connectedGoogleAccount = connectedGoogleAccount,

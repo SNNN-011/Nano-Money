@@ -10,7 +10,7 @@ import com.example.receiver.BackupReceiver
 import java.util.Calendar
 
 object BackupScheduler {
-    fun schedulePeriodicBackup(context: Context, enabled: Boolean, interval: String) {
+    fun schedulePeriodicBackup(context: Context, enabled: Boolean, interval: String, hour: Int = 2, minute: Int = 0) {
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
         val intent = Intent(context, BackupReceiver::class.java)
         
@@ -29,9 +29,9 @@ object BackupScheduler {
         
         val calendar = Calendar.getInstance().apply {
             timeInMillis = System.currentTimeMillis()
-            // Schedule database backup for 02:00 AM (during the night) to make it unobtrusive
-            set(Calendar.HOUR_OF_DAY, 2)
-            set(Calendar.MINUTE, 0)
+            // Schedule database backup for custom hour and minute
+            set(Calendar.HOUR_OF_DAY, hour)
+            set(Calendar.MINUTE, minute)
             set(Calendar.SECOND, 0)
             set(Calendar.MILLISECOND, 0)
             
@@ -55,7 +55,7 @@ object BackupScheduler {
                 repeatInterval,
                 pendingIntent
             )
-            Log.d("BackupScheduler", "Pencadangan otomatis diatur: $interval mulai pukul 02:00 AM")
+            Log.d("BackupScheduler", "Pencadangan otomatis diatur: $interval mulai pukul ${String.format("%02d:%02d", hour, minute)}")
         } catch (e: Exception) {
             Log.e("BackupScheduler", "Gagal mengatur alarm pencadangan: ${e.message}", e)
         }

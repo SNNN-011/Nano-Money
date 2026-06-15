@@ -108,7 +108,7 @@ fun ChatScreen(
     if (showModelInfo) {
         AlertDialog(
             onDismissRequest = { showModelInfo = false },
-            title = { Text("Informasi Model AI", color = GhostWhite, fontWeight = FontWeight.Bold) },
+            title = { Text("Informasi AI", color = GhostWhite, fontWeight = FontWeight.Bold) },
             text = {
                 Text(
                     text = "Jika Gemma mengalami error atau respons tidak akurat, coba ganti ke model Gemini untuk hasil yang lebih baik.",
@@ -383,6 +383,9 @@ fun ChatScreen(
                         }
                         is ChatMessage.TypingIndicator -> {
                             TypingIndicatorRow()
+                        }
+                        is ChatMessage.ScanningReceiptIndicator -> {
+                            ScanningReceiptIndicatorRow()
                         }
                     }
                 }
@@ -739,7 +742,7 @@ fun ChatScreen(
                                     )
                                     Spacer(modifier = Modifier.height(2.dp))
                                     Text(
-                                        text = "${receipt.grouped.size} kelompok transaksi  •  Total: ${FormatUtils.formatRupiah(receipt.total)}",
+                                        text = "${receipt.grouped.size} kategori transaksi  •  Total: ${FormatUtils.formatRupiah(receipt.total)}",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = GhostWhite.copy(alpha = 0.6f)
                                     )
@@ -1019,7 +1022,7 @@ fun ChatScreen(
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     PremiumButton(
-                        text = "Ya, Simpan Kelompok",
+                        text = "Ya, Simpan",
                         onClick = { viewModel.confirmPendingReceipt() },
                         modifier = Modifier.weight(1f),
                         isActive = true,

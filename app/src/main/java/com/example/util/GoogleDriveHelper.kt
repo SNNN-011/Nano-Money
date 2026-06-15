@@ -81,8 +81,15 @@ object GoogleDriveHelper {
     suspend fun fetchAccessToken(context: Context): DriveResult<String> = withContext(Dispatchers.IO) {
         val account = getSignedInAccount(context) ?: return@withContext DriveResult.Error("Belum terhubung dengan akun Google. Silakan hubungkan akun terlebih dahulu.")
         try {
-            // GoogleAuthUtil.getToken requires a raw android.accounts.Account
-            val sysAccount = account.account ?: return@withContext DriveResult.Error("Akun Google tidak valid.")
+            // GoogleAuthUtil.getToken requires a raw android.accounts.Account.
+            // On newer Android/Play Services versions, account.account can be null as a privacy measure,
+            // but account.email is available because we requested 'requestEmail()'.
+            val sysAccount = account.account ?: if (!account.email.isNullOrEmpty()) {
+                android.accounts.Account(account.email!!, "com.google")
+            } else {
+                null
+            } ?: return@withContext DriveResult.Error("Akun Google tidak valid atau email tidak terakses.")
+            
             val scopeString = "oauth2:$DRIVE_SCOPE"
             
             val token = GoogleAuthUtil.getToken(context, sysAccount, scopeString)

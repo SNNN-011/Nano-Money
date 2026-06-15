@@ -17,6 +17,10 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.material.icons.filled.ReceiptLong
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
@@ -346,5 +350,175 @@ fun TypingIndicatorBubble() {
         Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(GhostWhite.copy(alpha = dot1Alpha)))
         Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(GhostWhite.copy(alpha = dot2Alpha)))
         Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(GhostWhite.copy(alpha = dot3Alpha)))
+    }
+}
+
+@Composable
+fun ScanningReceiptIndicatorRow() {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 12.dp)
+            .testTag("scanning_receipt_indicator"),
+        contentAlignment = Alignment.CenterStart
+    ) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth(0.95f)
+                .clip(RoundedCornerShape(topStart = 4.dp, topEnd = 24.dp, bottomStart = 24.dp, bottomEnd = 24.dp)),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF13111C)),
+            border = BorderStroke(
+                width = 1.dp,
+                brush = Brush.verticalGradient(
+                    colors = listOf(
+                        SteelBlue.copy(alpha = 0.50f),
+                        SteelBlue.copy(alpha = 0.10f)
+                    )
+                )
+            )
+        ) {
+            val transition = rememberInfiniteTransition(label = "scanning_receipt")
+            
+            // Pulsing scale for active AI scanner icon
+            val iconScale by transition.animateFloat(
+                initialValue = 0.9f,
+                targetValue = 1.1f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(1000, easing = FastOutSlowInEasing),
+                    repeatMode = RepeatMode.Reverse
+                ),
+                label = "scanner_icon_scale"
+            )
+            
+            // Rotating high-tech scanning ring effect
+            val ringRotation by transition.animateFloat(
+                initialValue = 0f,
+                targetValue = 360f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(2500, easing = LinearEasing),
+                    repeatMode = RepeatMode.Restart
+                ),
+                label = "scanner_ring_rotation"
+            )
+
+            // Sweep of neon laser line
+            val laserOffset by transition.animateFloat(
+                initialValue = -25f,
+                targetValue = 25f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(1500, easing = FastOutSlowInEasing),
+                    repeatMode = RepeatMode.Reverse
+                ),
+                label = "scanner_laser_offset"
+            )
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Futuristic Glowing Scanner Graphic
+                Box(
+                    modifier = Modifier
+                        .size(56.dp)
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(Color(0xFF221A3B)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    // Moving scan line (laser) drawn behind/above
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(2.dp)
+                            .offset(y = laserOffset.dp)
+                            .background(
+                                brush = Brush.horizontalGradient(
+                                    colors = listOf(
+                                        Color.Transparent,
+                                        SteelBlue,
+                                        Color.Transparent
+                                    )
+                                )
+                            )
+                    )
+                    
+                    // Rotating futuristic frame
+                    Box(
+                        modifier = Modifier
+                            .size(46.dp)
+                            .drawBehind {
+                                drawArc(
+                                    brush = Brush.sweepGradient(
+                                        colors = listOf(
+                                            SteelBlue.copy(alpha = 0.1f),
+                                            SteelBlue,
+                                            SteelBlue.copy(alpha = 0.7f),
+                                            SteelBlue.copy(alpha = 0.1f)
+                                        )
+                                    ),
+                                    startAngle = ringRotation,
+                                    sweepAngle = 280f,
+                                    useCenter = false,
+                                    style = androidx.compose.ui.graphics.drawscope.Stroke(
+                                        width = 2.dp.toPx()
+                                    )
+                                )
+                            }
+                    )
+                    
+                    // Pulsing main receipt list icon
+                    Icon(
+                        imageVector = Icons.Default.ReceiptLong,
+                        contentDescription = "Fitur OCR / Membaca Struk",
+                        tint = SteelBlue,
+                        modifier = Modifier
+                            .size(24.dp)
+                            .scale(iconScale)
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(14.dp))
+
+                // Reassuring copy and mini progress bar
+                Column(
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Text(
+                            text = "Memproses struk belanja Anda...",
+                            style = MaterialTheme.typography.titleSmall.copy(
+                                fontWeight = FontWeight.Bold,
+                                color = GhostWhite,
+                                fontSize = 14.sp,
+                                letterSpacing = 0.1.sp
+                            )
+                        )
+                        Icon(
+                            imageVector = Icons.Default.AutoAwesome,
+                            contentDescription = "Kecerdasan Buatan",
+                            tint = SteelBlue,
+                            modifier = Modifier
+                                .size(14.dp)
+                                .scale(iconScale)
+                        )
+                    }
+                    
+                    Spacer(modifier = Modifier.height(4.dp))
+                    
+                    Text(
+                        text = "Membaca nominal belanja, tanggal & rincian transaksi menggunakan AI. Mohon tidak menutup layar ini ya 😊",
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            fontSize = 11.sp, 
+                            lineHeight = 15.sp,
+                            color = GhostWhite.copy(alpha = 0.65f)
+                        )
+                    )
+                }
+            }
+        }
     }
 }
