@@ -1,62 +1,61 @@
-package com.example.receiver
+package com.example.worker
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
-import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import androidx.work.CoroutineWorker
+import androidx.work.WorkerParameters
 import com.example.MainActivity
 import com.example.util.BackupHelper
 import com.example.util.GoogleDriveHelper
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
 import java.io.File
 
-class BackupReceiver : BroadcastReceiver() {
-    override fun onReceive(context: Context, intent: Intent) {
-        Log.d("BackupReceiver", "Memulai pencadangan otomatis...")
-        val pendingResult = goAsync()
-        CoroutineScope(Dispatchers.IO).launch {
-            try {
-                when (val result = BackupHelper.performBackup(context, isAuto = true)) {
-                    is BackupHelper.BackupResult.Success -> {
-                        Log.d("BackupReceiver", "Pencadangan otomatis sukses: ${result.fileName}")
-                        
-                        // Silently upload to Google Drive if account is connected
-                        if (GoogleDriveHelper.getSignedInAccount(context) != null) {
-                            try {
-                                val backupDir = BackupHelper.getBackupDirectory(context)
-                                val backupFile = File(backupDir, result.fileName)
-                                when (val uploadRes = GoogleDriveHelper.uploadBackupToDrive(context, backupFile)) {
-                                    is GoogleDriveHelper.DriveResult.Success -> {
-                                        Log.d("BackupReceiver", "Unggah otomatis cadangan ke Google Drive sukses: fileId=${uploadRes.data}")
-                                    }
-                                    is GoogleDriveHelper.DriveResult.Error -> {
-                                        Log.e("BackupReceiver", "Gagal mengunggah otomatis cadangan ke Google Drive: ${uploadRes.message}")
-                                    }
+class BackupWorker(
+    context: Context,
+    workerParams: WorkerParameters
+) : CoroutineWorker(context, workerParams) {
+
+    override suspend fun doWork(): Result {
+        Log.d("BackupWorker", "Memulai pencadangan otomatis via WorkManager...")
+        val context = applicationContext
+        try {
+            when (val result = BackupHelper.performBackup(context, isAuto = true)) {
+                is BackupHelper.BackupResult.Success -> {
+                    Log.d("BackupWorker", "Pencadangan otomatis sukses: ${result.fileName}")
+                    
+                    // Silently upload to Google Drive if account is connected
+                    if (GoogleDriveHelper.getSignedInAccount(context) != null) {
+                        try {
+                            val backupDir = BackupHelper.getBackupDirectory(context)
+                            val backupFile = File(backupDir, result.fileName)
+                            when (val uploadRes = GoogleDriveHelper.uploadBackupToDrive(context, backupFile)) {
+                                is GoogleDriveHelper.DriveResult.Success -> {
+                                    Log.d("BackupWorker", "Unggah otomatis cadangan ke Google Drive sukses: fileId=${uploadRes.data}")
                                 }
-                            } catch (uploadException: Exception) {
-                                Log.e("BackupReceiver", "Terganggu saat mencoba mengunggah otomatis ke Google Drive", uploadException)
+                                is GoogleDriveHelper.DriveResult.Error -> {
+                                    Log.e("BackupWorker", "Gagal mengunggah otomatis cadangan ke Google Drive: ${uploadRes.message}")
+                                }
                             }
+                        } catch (uploadException: Exception) {
+                            Log.e("BackupWorker", "Terganggu saat mencoba mengunggah otomatis ke Google Drive", uploadException)
                         }
                     }
-                    is BackupHelper.BackupResult.Error -> {
-                        Log.e("BackupReceiver", "Pencadangan otomatis gagal: ${result.message}")
-                        showFailureNotification(context, result.message)
-                    }
                 }
-            } catch (e: Exception) {
-                Log.e("BackupReceiver", "Gagal melakukan pencadangan otomatis: ${e.message}")
-                showFailureNotification(context, e.localizedMessage ?: e.toString())
-            } finally {
-                pendingResult.finish()
+                is BackupHelper.BackupResult.Error -> {
+                    Log.e("BackupWorker", "Pencadangan otomatis gagal: ${result.message}")
+                    showFailureNotification(context, result.message)
+                }
             }
+        } catch (e: Exception) {
+            Log.e("BackupWorker", "Gagal melakukan pencadangan otomatis: ${e.message}")
+            showFailureNotification(context, e.localizedMessage ?: e.toString())
         }
+        return Result.success()
     }
 
     private fun showFailureNotification(context: Context, errorMessage: String) {

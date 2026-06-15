@@ -32,10 +32,6 @@
         <receiver
             android:name=".receiver.ReminderReceiver"
             android:exported="false" />
-
-        <receiver
-            android:name=".receiver.BackupReceiver"
-            android:exported="false" />
     </application>
 
 </manifest>

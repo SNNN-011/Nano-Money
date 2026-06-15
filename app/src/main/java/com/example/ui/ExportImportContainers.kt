@@ -19,6 +19,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.Spring
@@ -446,6 +449,10 @@ fun NotificationReminderSection(
     reminderMinute: Int,
     onReminderMinuteChanged: (Int) -> Unit
 ) {
+    val context = LocalContext.current
+    var tempHour by remember(reminderHour) { mutableStateOf(reminderHour) }
+    var tempMinute by remember(reminderMinute) { mutableStateOf(reminderMinute) }
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
@@ -527,8 +534,7 @@ fun NotificationReminderSection(
                         ) {
                             IconButton(
                                 onClick = {
-                                    val newHour = (reminderHour + 1) % 24
-                                    onReminderHourChanged(newHour)
+                                    tempHour = (tempHour + 1) % 24
                                 },
                                 modifier = Modifier.size(22.dp)
                             ) {
@@ -541,7 +547,7 @@ fun NotificationReminderSection(
                             }
 
                             // Editable Hour Box
-                            var hourTextState by remember(reminderHour) { mutableStateOf(String.format("%02d", reminderHour)) }
+                            var hourTextState by remember(tempHour) { mutableStateOf(String.format("%02d", tempHour)) }
                             BasicTextField(
                                 value = hourTextState,
                                 onValueChange = { input ->
@@ -550,7 +556,7 @@ fun NotificationReminderSection(
                                     if (filtered.isNotEmpty()) {
                                         val num = filtered.toIntOrNull()
                                         if (num != null && num in 0..23) {
-                                            onReminderHourChanged(num)
+                                            tempHour = num
                                         }
                                     }
                                 },
@@ -575,8 +581,7 @@ fun NotificationReminderSection(
 
                             IconButton(
                                 onClick = {
-                                    val newHour = if (reminderHour - 1 < 0) 23 else reminderHour - 1
-                                    onReminderHourChanged(newHour)
+                                    tempHour = if (tempHour - 1 < 0) 23 else tempHour - 1
                                 },
                                 modifier = Modifier.size(22.dp)
                             ) {
@@ -604,8 +609,7 @@ fun NotificationReminderSection(
                         ) {
                             IconButton(
                                 onClick = {
-                                    val newMin = (reminderMinute + 1) % 60
-                                    onReminderMinuteChanged(newMin)
+                                    tempMinute = (tempMinute + 1) % 60
                                 },
                                 modifier = Modifier.size(22.dp)
                             ) {
@@ -618,7 +622,7 @@ fun NotificationReminderSection(
                             }
 
                             // Editable Minute Box
-                            var minuteTextState by remember(reminderMinute) { mutableStateOf(String.format("%02d", reminderMinute)) }
+                            var minuteTextState by remember(tempMinute) { mutableStateOf(String.format("%02d", tempMinute)) }
                             BasicTextField(
                                 value = minuteTextState,
                                 onValueChange = { input ->
@@ -627,7 +631,7 @@ fun NotificationReminderSection(
                                     if (filtered.isNotEmpty()) {
                                         val num = filtered.toIntOrNull()
                                         if (num != null && num in 0..59) {
-                                            onReminderMinuteChanged(num)
+                                            tempMinute = num
                                         }
                                     }
                                 },
@@ -652,8 +656,7 @@ fun NotificationReminderSection(
 
                             IconButton(
                                 onClick = {
-                                    val newMin = if (reminderMinute - 1 < 0) 59 else reminderMinute - 1
-                                    onReminderMinuteChanged(newMin)
+                                    tempMinute = if (tempMinute - 1 < 0) 59 else tempMinute - 1
                                 },
                                 modifier = Modifier.size(22.dp)
                             ) {
@@ -674,6 +677,42 @@ fun NotificationReminderSection(
                         onReminderToggle(checked)
                     }
                 )
+            }
+
+            if (isReminderEnabled) {
+                val hasChanges = tempHour != reminderHour || tempMinute != reminderMinute
+                Button(
+                    onClick = {
+                        onReminderHourChanged(tempHour)
+                        onReminderMinuteChanged(tempMinute)
+                        com.example.util.NotificationScheduler.scheduleDailyReminder(context, true, tempHour, tempMinute)
+                        Toast.makeText(context, "Pengingat berhasil diatur ke pukul ${String.format("%02d:%02d", tempHour, tempMinute)} WIB!", Toast.LENGTH_SHORT).show()
+                    },
+                    modifier = Modifier.fillMaxWidth().height(38.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (hasChanges) SteelBlue else TranslucentGlass,
+                        contentColor = if (hasChanges) MidnightAbyss else GhostWhite
+                    ),
+                    shape = RoundedCornerShape(12.dp),
+                    border = if (!hasChanges) BorderStroke(1.dp, GhostWhite.copy(alpha = 0.15f)) else null,
+                    contentPadding = PaddingValues(0.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Icon(
+                            imageVector = if (hasChanges) Icons.Default.Check else Icons.Default.NotificationsActive,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = if (hasChanges) "TERAPKAN PERUBAHAN WAKTU" else "JADWAL AKTIF (Pukul ${String.format("%02d:%02d", reminderHour, reminderMinute)} WIB)",
+                            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp)
+                        )
+                    }
+                }
             }
         }
     }
@@ -713,6 +752,8 @@ fun DatabaseBackupSection(
     var showDisconnectConfirmation by remember { mutableStateOf(false) }
     var backupFileToDelete by remember { mutableStateOf<File?>(null) }
     var driveBackupFileToDelete by remember { mutableStateOf<GoogleDriveHelper.DriveBackupFile?>(null) }
+    var tempBackupHour by remember(autoBackupHour) { mutableStateOf(autoBackupHour) }
+    var tempBackupMinute by remember(autoBackupMinute) { mutableStateOf(autoBackupMinute) }
 
     Card(
         modifier = Modifier.fillMaxWidth().testTag("database_backup_card"),
@@ -877,280 +918,309 @@ fun DatabaseBackupSection(
 
                     // Collapsed content show Interval and Waktu side by side
                     if (showJadwalCollapse) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(MidnightAbyss.copy(alpha = 0.3f), shape = RoundedCornerShape(12.dp))
-                                .border(1.dp, GhostWhite.copy(alpha = 0.08f), shape = RoundedCornerShape(12.dp))
-                                .padding(10.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.fillMaxWidth()
                         ) {
-                            // Left Side: Siklus Pencadangan Switch (Daily / Weekly Group) with smooth animations
-                            Column(
-                                modifier = Modifier.weight(1.2f),
-                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(MidnightAbyss.copy(alpha = 0.3f), shape = RoundedCornerShape(12.dp))
+                                    .border(1.dp, GhostWhite.copy(alpha = 0.08f), shape = RoundedCornerShape(12.dp))
+                                    .padding(10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Text(
-                                    text = "Siklus",
-                                    style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
-                                    color = GhostWhite.copy(alpha = 0.7f)
-                                )
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(32.dp)
-                                        .background(MidnightAbyss, shape = RoundedCornerShape(16.dp))
-                                        .border(1.dp, GhostWhite.copy(alpha = 0.15f), shape = RoundedCornerShape(16.dp))
-                                        .clip(RoundedCornerShape(16.dp))
-                                        .clickable {
-                                            val newInterval = if (autoBackupInterval == "daily") "weekly" else "daily"
-                                            onAutoBackupIntervalChanged(newInterval)
-                                            BackupScheduler.schedulePeriodicBackup(context, true, newInterval, autoBackupHour, autoBackupMinute)
-                                            Toast.makeText(
-                                                context, 
-                                                "Siklus pencadangan diatur: ${if (newInterval == "daily") "Harian" else "Mingguan"}", 
-                                                Toast.LENGTH_SHORT
-                                            ).show()
-                                        }
+                                // Left Side: Siklus Pencadangan Switch (Daily / Weekly Group) with smooth animations
+                                Column(
+                                    modifier = Modifier.weight(1.2f),
+                                    verticalArrangement = Arrangement.spacedBy(4.dp)
                                 ) {
-                                    // Animated sliding thumb background
-                                    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-                                        val width = maxWidth
-                                        val thumbWidth = width / 2
-                                        val targetOffset = if (autoBackupInterval == "weekly") thumbWidth else 0.dp
-                                        val animatedOffset by animateDpAsState(
-                                            targetValue = targetOffset,
-                                            animationSpec = spring(stiffness = Spring.StiffnessLow),
-                                            label = "thumbOffset"
-                                        )
-
-                                        Box(
-                                            modifier = Modifier
-                                                .offset(x = animatedOffset)
-                                                .width(thumbWidth)
-                                                .fillMaxHeight()
-                                                .padding(2.dp)
-                                                .background(
-                                                    brush = Brush.verticalGradient(
-                                                        colors = listOf(SteelBlue, SteelBlue.copy(alpha = 0.7f))
-                                                    ),
-                                                    shape = RoundedCornerShape(14.dp)
-                                                )
-                                                .border(0.5.dp, GhostWhite.copy(alpha = 0.25f), shape = RoundedCornerShape(14.dp))
-                                        )
-                                    }
-
-                                    // Foreground text elements layer
-                                    Row(
-                                        modifier = Modifier.fillMaxSize(),
-                                        verticalAlignment = Alignment.CenterVertically
+                                    Text(
+                                        text = "Siklus",
+                                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
+                                        color = GhostWhite.copy(alpha = 0.7f)
+                                    )
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(32.dp)
+                                            .background(MidnightAbyss, shape = RoundedCornerShape(16.dp))
+                                            .border(1.dp, GhostWhite.copy(alpha = 0.15f), shape = RoundedCornerShape(16.dp))
+                                            .clip(RoundedCornerShape(16.dp))
+                                            .clickable {
+                                                val newInterval = if (autoBackupInterval == "daily") "weekly" else "daily"
+                                                onAutoBackupIntervalChanged(newInterval)
+                                                BackupScheduler.schedulePeriodicBackup(context, true, newInterval, autoBackupHour, autoBackupMinute)
+                                                Toast.makeText(
+                                                    context, 
+                                                    "Siklus pencadangan diatur: ${if (newInterval == "daily") "Harian" else "Mingguan"}", 
+                                                    Toast.LENGTH_SHORT
+                                                ).show()
+                                            }
                                     ) {
-                                        Box(
-                                            modifier = Modifier.weight(1f),
-                                            contentAlignment = Alignment.Center
-                                        ) {
-                                            val textColor by animateColorAsState(
-                                                targetValue = if (autoBackupInterval == "daily") MidnightAbyss else GhostWhite.copy(alpha = 0.5f),
-                                                label = "dailyTextColor"
+                                        // Animated sliding thumb background
+                                        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+                                            val width = maxWidth
+                                            val thumbWidth = width / 2
+                                            val targetOffset = if (autoBackupInterval == "weekly") thumbWidth else 0.dp
+                                            val animatedOffset by animateDpAsState(
+                                                targetValue = targetOffset,
+                                                animationSpec = spring(stiffness = Spring.StiffnessLow),
+                                                label = "thumbOffset"
                                             )
-                                            Text(
-                                                text = "HARIAN",
-                                                style = MaterialTheme.typography.bodySmall.copy(
-                                                    fontWeight = FontWeight.Bold,
-                                                    fontSize = 10.sp
-                                                ),
-                                                color = textColor
+
+                                            Box(
+                                                modifier = Modifier
+                                                    .offset(x = animatedOffset)
+                                                    .width(thumbWidth)
+                                                    .fillMaxHeight()
+                                                    .padding(2.dp)
+                                                    .background(
+                                                        brush = Brush.verticalGradient(
+                                                            colors = listOf(SteelBlue, SteelBlue.copy(alpha = 0.7f))
+                                                        ),
+                                                        shape = RoundedCornerShape(14.dp)
+                                                    )
+                                                    .border(0.5.dp, GhostWhite.copy(alpha = 0.25f), shape = RoundedCornerShape(14.dp))
                                             )
                                         }
-                                        Box(
-                                            modifier = Modifier.weight(1f),
-                                            contentAlignment = Alignment.Center
+
+                                        // Foreground text elements layer
+                                        Row(
+                                            modifier = Modifier.fillMaxSize(),
+                                            verticalAlignment = Alignment.CenterVertically
                                         ) {
-                                            val textColor by animateColorAsState(
-                                                targetValue = if (autoBackupInterval == "weekly") MidnightAbyss else GhostWhite.copy(alpha = 0.5f),
-                                                label = "weeklyTextColor"
-                                            )
-                                            Text(
-                                                text = "MINGGUAN",
-                                                style = MaterialTheme.typography.bodySmall.copy(
+                                            Box(
+                                                modifier = Modifier.weight(1f),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                val textColor by animateColorAsState(
+                                                    targetValue = if (autoBackupInterval == "daily") MidnightAbyss else GhostWhite.copy(alpha = 0.5f),
+                                                    label = "dailyTextColor"
+                                                )
+                                                Text(
+                                                    text = "HARIAN",
+                                                    style = MaterialTheme.typography.bodySmall.copy(
+                                                        fontWeight = FontWeight.Bold,
+                                                        fontSize = 10.sp
+                                                    ),
+                                                    color = textColor
+                                                )
+                                            }
+                                            Box(
+                                                modifier = Modifier.weight(1f),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                val textColor by animateColorAsState(
+                                                    targetValue = if (autoBackupInterval == "weekly") MidnightAbyss else GhostWhite.copy(alpha = 0.5f),
+                                                    label = "weeklyTextColor"
+                                                )
+                                                Text(
+                                                    text = "MINGGUAN",
+                                                    style = MaterialTheme.typography.bodySmall.copy(
+                                                        fontWeight = FontWeight.Bold,
+                                                        fontSize = 10.sp
+                                                    ),
+                                                    color = textColor
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.width(12.dp))
+
+                                // Right Side: Time Picker (Hour & Minute with tiny arrows and direct keyboard input)
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Text(
+                                        text = "Sesi Mulai",
+                                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
+                                        color = GhostWhite.copy(alpha = 0.7f)
+                                    )
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(2.dp)
+                                    ) {
+                                        // Hour Input Column
+                                        Column(
+                                            horizontalAlignment = Alignment.CenterHorizontally,
+                                            verticalArrangement = Arrangement.Center
+                                        ) {
+                                            IconButton(
+                                                onClick = {
+                                                    tempBackupHour = (tempBackupHour + 1) % 24
+                                                },
+                                                modifier = Modifier.size(24.dp)
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.KeyboardArrowUp,
+                                                    contentDescription = "Tambah Jam",
+                                                    tint = SteelBlue,
+                                                    modifier = Modifier.size(20.dp)
+                                                )
+                                            }
+
+                                            // Editable Hour Box
+                                            var hourTextState by remember(tempBackupHour) { mutableStateOf(String.format("%02d", tempBackupHour)) }
+                                            BasicTextField(
+                                                value = hourTextState,
+                                                onValueChange = { input ->
+                                                    val filtered = input.filter { it.isDigit() }.take(2)
+                                                    hourTextState = filtered
+                                                    if (filtered.isNotEmpty()) {
+                                                        val num = filtered.toIntOrNull()
+                                                        if (num != null && num in 0..23) {
+                                                            tempBackupHour = num
+                                                        }
+                                                    }
+                                                },
+                                                textStyle = MaterialTheme.typography.bodyLarge.copy(
+                                                    color = GhostWhite,
                                                     fontWeight = FontWeight.Bold,
-                                                    fontSize = 10.sp
+                                                    textAlign = TextAlign.Center
                                                 ),
-                                                color = textColor
+                                                keyboardOptions = KeyboardOptions(
+                                                    keyboardType = KeyboardType.Number,
+                                                    imeAction = ImeAction.Done
+                                                ),
+                                                singleLine = true,
+                                                cursorBrush = SolidColor(SteelBlue),
+                                                modifier = Modifier
+                                                    .width(36.dp)
+                                                    .height(28.dp)
+                                                    .background(MidnightAbyss, shape = RoundedCornerShape(6.dp))
+                                                    .border(1.dp, GhostWhite.copy(alpha = 0.2f), shape = RoundedCornerShape(6.dp))
+                                                    .wrapContentHeight(Alignment.CenterVertically)
                                             )
+
+                                            IconButton(
+                                                onClick = {
+                                                    tempBackupHour = if (tempBackupHour - 1 < 0) 23 else tempBackupHour - 1
+                                                },
+                                                modifier = Modifier.size(24.dp)
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.KeyboardArrowDown,
+                                                    contentDescription = "Kurang Jam",
+                                                    tint = SteelBlue,
+                                                    modifier = Modifier.size(20.dp)
+                                                )
+                                            }
+                                        }
+
+                                        // Separator Colon
+                                        Text(
+                                            text = ":",
+                                            style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold),
+                                            color = GhostWhite,
+                                            modifier = Modifier.padding(bottom = 2.dp)
+                                        )
+
+                                        // Minute Input Column
+                                        Column(
+                                            horizontalAlignment = Alignment.CenterHorizontally,
+                                            verticalArrangement = Arrangement.Center
+                                        ) {
+                                            IconButton(
+                                                onClick = {
+                                                    tempBackupMinute = (tempBackupMinute + 1) % 60
+                                                },
+                                                modifier = Modifier.size(24.dp)
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.KeyboardArrowUp,
+                                                    contentDescription = "Tambah Menit",
+                                                    tint = SteelBlue,
+                                                    modifier = Modifier.size(20.dp)
+                                                )
+                                            }
+
+                                            // Editable Minute Box
+                                            var minuteTextState by remember(tempBackupMinute) { mutableStateOf(String.format("%02d", tempBackupMinute)) }
+                                            BasicTextField(
+                                                value = minuteTextState,
+                                                onValueChange = { input ->
+                                                    val filtered = input.filter { it.isDigit() }.take(2)
+                                                    minuteTextState = filtered
+                                                    if (filtered.isNotEmpty()) {
+                                                        val num = filtered.toIntOrNull()
+                                                        if (num != null && num in 0..59) {
+                                                            tempBackupMinute = num
+                                                        }
+                                                    }
+                                                },
+                                                textStyle = MaterialTheme.typography.bodyLarge.copy(
+                                                    color = GhostWhite,
+                                                    fontWeight = FontWeight.Bold,
+                                                    textAlign = TextAlign.Center
+                                                ),
+                                                keyboardOptions = KeyboardOptions(
+                                                    keyboardType = KeyboardType.Number,
+                                                    imeAction = ImeAction.Done
+                                                ),
+                                                singleLine = true,
+                                                cursorBrush = SolidColor(SteelBlue),
+                                                modifier = Modifier
+                                                    .width(36.dp)
+                                                    .height(28.dp)
+                                                    .background(MidnightAbyss, shape = RoundedCornerShape(6.dp))
+                                                    .border(1.dp, GhostWhite.copy(alpha = 0.2f), shape = RoundedCornerShape(6.dp))
+                                                    .wrapContentHeight(Alignment.CenterVertically)
+                                            )
+
+                                            IconButton(
+                                                onClick = {
+                                                    tempBackupMinute = if (tempBackupMinute - 1 < 0) 59 else tempBackupMinute - 1
+                                                },
+                                                modifier = Modifier.size(24.dp)
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.KeyboardArrowDown,
+                                                    contentDescription = "Kurang Menit",
+                                                    tint = SteelBlue,
+                                                    modifier = Modifier.size(20.dp)
+                                                )
+                                            }
                                         }
                                     }
                                 }
                             }
 
-                            Spacer(modifier = Modifier.width(12.dp))
-
-                            // Right Side: Time Picker (Hour & Minute with tiny arrows and direct keyboard input)
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.spacedBy(4.dp)
+                            val hasBackupChanges = tempBackupHour != autoBackupHour || tempBackupMinute != autoBackupMinute
+                            Button(
+                                onClick = {
+                                    onAutoBackupHourChanged(tempBackupHour)
+                                    onAutoBackupMinuteChanged(tempBackupMinute)
+                                    BackupScheduler.schedulePeriodicBackup(context, true, autoBackupInterval, tempBackupHour, tempBackupMinute)
+                                    Toast.makeText(context, "Jadwal pencadangan otomatis diatur ke pukul ${String.format("%02d:%02d", tempBackupHour, tempBackupMinute)} WIB!", Toast.LENGTH_SHORT).show()
+                                },
+                                modifier = Modifier.fillMaxWidth().height(38.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = if (hasBackupChanges) SteelBlue else TranslucentGlass,
+                                    contentColor = if (hasBackupChanges) MidnightAbyss else GhostWhite
+                                ),
+                                shape = RoundedCornerShape(12.dp),
+                                border = if (!hasBackupChanges) BorderStroke(1.dp, GhostWhite.copy(alpha = 0.15f)) else null,
+                                contentPadding = PaddingValues(0.dp)
                             ) {
-                                Text(
-                                    text = "Sesi Mulai",
-                                    style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
-                                    color = GhostWhite.copy(alpha = 0.7f)
-                                )
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(2.dp)
+                                    horizontalArrangement = Arrangement.Center
                                 ) {
-                                    // Hour Input Column
-                                    Column(
-                                        horizontalAlignment = Alignment.CenterHorizontally,
-                                        verticalArrangement = Arrangement.Center
-                                    ) {
-                                        IconButton(
-                                            onClick = {
-                                                val newHour = (autoBackupHour + 1) % 24
-                                                onAutoBackupHourChanged(newHour)
-                                                BackupScheduler.schedulePeriodicBackup(context, true, autoBackupInterval, newHour, autoBackupMinute)
-                                            },
-                                            modifier = Modifier.size(24.dp)
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Default.KeyboardArrowUp,
-                                                contentDescription = "Tambah Jam",
-                                                tint = SteelBlue,
-                                                modifier = Modifier.size(20.dp)
-                                            )
-                                        }
-
-                                        // Editable Hour Box
-                                        var hourTextState by remember(autoBackupHour) { mutableStateOf(String.format("%02d", autoBackupHour)) }
-                                        BasicTextField(
-                                            value = hourTextState,
-                                            onValueChange = { input ->
-                                                val filtered = input.filter { it.isDigit() }.take(2)
-                                                hourTextState = filtered
-                                                if (filtered.isNotEmpty()) {
-                                                    val num = filtered.toIntOrNull()
-                                                    if (num != null && num in 0..23) {
-                                                        onAutoBackupHourChanged(num)
-                                                        BackupScheduler.schedulePeriodicBackup(context, true, autoBackupInterval, num, autoBackupMinute)
-                                                    }
-                                                }
-                                            },
-                                            textStyle = MaterialTheme.typography.bodyLarge.copy(
-                                                color = GhostWhite,
-                                                fontWeight = FontWeight.Bold,
-                                                textAlign = TextAlign.Center
-                                            ),
-                                            keyboardOptions = KeyboardOptions(
-                                                keyboardType = KeyboardType.Number,
-                                                imeAction = ImeAction.Done
-                                            ),
-                                            singleLine = true,
-                                            cursorBrush = SolidColor(SteelBlue),
-                                            modifier = Modifier
-                                                .width(36.dp)
-                                                .height(28.dp)
-                                                .background(MidnightAbyss, shape = RoundedCornerShape(6.dp))
-                                                .border(1.dp, GhostWhite.copy(alpha = 0.2f), shape = RoundedCornerShape(6.dp))
-                                                .wrapContentHeight(Alignment.CenterVertically)
-                                        )
-
-                                        IconButton(
-                                            onClick = {
-                                                val newHour = if (autoBackupHour - 1 < 0) 23 else autoBackupHour - 1
-                                                onAutoBackupHourChanged(newHour)
-                                                BackupScheduler.schedulePeriodicBackup(context, true, autoBackupInterval, newHour, autoBackupMinute)
-                                            },
-                                            modifier = Modifier.size(24.dp)
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Default.KeyboardArrowDown,
-                                                contentDescription = "Kurang Jam",
-                                                tint = SteelBlue,
-                                                modifier = Modifier.size(20.dp)
-                                            )
-                                        }
-                                    }
-
-                                    // Separator Colon
-                                    Text(
-                                        text = ":",
-                                        style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Bold),
-                                        color = GhostWhite,
-                                        modifier = Modifier.padding(bottom = 2.dp)
+                                    Icon(
+                                        imageVector = if (hasBackupChanges) Icons.Default.Check else Icons.Default.DateRange,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(16.dp)
                                     )
-
-                                    // Minute Input Column
-                                    Column(
-                                        horizontalAlignment = Alignment.CenterHorizontally,
-                                        verticalArrangement = Arrangement.Center
-                                    ) {
-                                        IconButton(
-                                            onClick = {
-                                                val newMin = (autoBackupMinute + 1) % 60
-                                                onAutoBackupMinuteChanged(newMin)
-                                                BackupScheduler.schedulePeriodicBackup(context, true, autoBackupInterval, autoBackupHour, newMin)
-                                            },
-                                            modifier = Modifier.size(24.dp)
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Default.KeyboardArrowUp,
-                                                contentDescription = "Tambah Menit",
-                                                tint = SteelBlue,
-                                                modifier = Modifier.size(20.dp)
-                                            )
-                                        }
-
-                                        // Editable Minute Box
-                                        var minuteTextState by remember(autoBackupMinute) { mutableStateOf(String.format("%02d", autoBackupMinute)) }
-                                        BasicTextField(
-                                            value = minuteTextState,
-                                            onValueChange = { input ->
-                                                val filtered = input.filter { it.isDigit() }.take(2)
-                                                minuteTextState = filtered
-                                                if (filtered.isNotEmpty()) {
-                                                    val num = filtered.toIntOrNull()
-                                                    if (num != null && num in 0..59) {
-                                                        onAutoBackupMinuteChanged(num)
-                                                        BackupScheduler.schedulePeriodicBackup(context, true, autoBackupInterval, autoBackupHour, num)
-                                                    }
-                                                }
-                                            },
-                                            textStyle = MaterialTheme.typography.bodyLarge.copy(
-                                                color = GhostWhite,
-                                                fontWeight = FontWeight.Bold,
-                                                textAlign = TextAlign.Center
-                                            ),
-                                            keyboardOptions = KeyboardOptions(
-                                                keyboardType = KeyboardType.Number,
-                                                imeAction = ImeAction.Done
-                                            ),
-                                            singleLine = true,
-                                            cursorBrush = SolidColor(SteelBlue),
-                                            modifier = Modifier
-                                                .width(36.dp)
-                                                .height(28.dp)
-                                                .background(MidnightAbyss, shape = RoundedCornerShape(6.dp))
-                                                .border(1.dp, GhostWhite.copy(alpha = 0.2f), shape = RoundedCornerShape(6.dp))
-                                                .wrapContentHeight(Alignment.CenterVertically)
-                                        )
-
-                                        IconButton(
-                                            onClick = {
-                                                val newMin = if (autoBackupMinute - 1 < 0) 59 else autoBackupMinute - 1
-                                                onAutoBackupMinuteChanged(newMin)
-                                                BackupScheduler.schedulePeriodicBackup(context, true, autoBackupInterval, autoBackupHour, newMin)
-                                            },
-                                            modifier = Modifier.size(24.dp)
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Default.KeyboardArrowDown,
-                                                contentDescription = "Kurang Menit",
-                                                tint = SteelBlue,
-                                                modifier = Modifier.size(20.dp)
-                                            )
-                                        }
-                                    }
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = if (hasBackupChanges) "SIMPAN PERUBAHAN JADWAL" else "JADWAL AKTIF (Pukul ${String.format("%02d:%02d", autoBackupHour, autoBackupMinute)} WIB)",
+                                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp)
+                                    )
                                 }
                             }
                         }
