@@ -52,8 +52,9 @@ class MainActivity : FragmentActivity() {
               val autoBackupInterval = securityPrefs.getString("auto_backup_interval", "daily") ?: "daily"
               val autoBackupHour = securityPrefs.getInt("auto_backup_hour", 2)
               val autoBackupMinute = securityPrefs.getInt("auto_backup_minute", 0)
+              val autoBackupDayOfWeek = securityPrefs.getInt("auto_backup_day_of_week", java.util.Calendar.SUNDAY)
               com.example.util.BackupScheduler.schedulePeriodicBackup(
-                  context, isAutoBackup, autoBackupInterval, autoBackupHour, autoBackupMinute
+                  context, isAutoBackup, autoBackupInterval, autoBackupHour, autoBackupMinute, autoBackupDayOfWeek
               )
 
               val isReminderEnabled = securityPrefs.getBoolean("reminder_enabled", false)

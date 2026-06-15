@@ -728,6 +728,8 @@ fun DatabaseBackupSection(
     onAutoBackupHourChanged: (Int) -> Unit,
     autoBackupMinute: Int,
     onAutoBackupMinuteChanged: (Int) -> Unit,
+    autoBackupDayOfWeek: Int,
+    onAutoBackupDayOfWeekChanged: (Int) -> Unit,
     backupList: List<File>,
     onBackupListChanged: (List<File>) -> Unit,
     connectedGoogleAccount: GoogleSignInAccount?,
@@ -754,6 +756,20 @@ fun DatabaseBackupSection(
     var driveBackupFileToDelete by remember { mutableStateOf<GoogleDriveHelper.DriveBackupFile?>(null) }
     var tempBackupHour by remember(autoBackupHour) { mutableStateOf(autoBackupHour) }
     var tempBackupMinute by remember(autoBackupMinute) { mutableStateOf(autoBackupMinute) }
+    var tempBackupDayOfWeek by remember(autoBackupDayOfWeek) { mutableStateOf(autoBackupDayOfWeek) }
+
+    fun getDayNameIndonesian(dayOfWeek: Int): String {
+        return when (dayOfWeek) {
+            java.util.Calendar.SUNDAY -> "Minggu"
+            java.util.Calendar.MONDAY -> "Senin"
+            java.util.Calendar.TUESDAY -> "Selasa"
+            java.util.Calendar.WEDNESDAY -> "Rabu"
+            java.util.Calendar.THURSDAY -> "Kamis"
+            java.util.Calendar.FRIDAY -> "Jumat"
+            java.util.Calendar.SATURDAY -> "Sabtu"
+            else -> "Minggu"
+        }
+    }
 
     Card(
         modifier = Modifier.fillMaxWidth().testTag("database_backup_card"),
@@ -865,7 +881,7 @@ fun DatabaseBackupSection(
                     checked = isAutoBackupEnabled,
                     onCheckedChange = { checked ->
                         onAutoBackupEnabledChanged(checked)
-                        BackupScheduler.schedulePeriodicBackup(context, checked, autoBackupInterval, autoBackupHour, autoBackupMinute)
+                        BackupScheduler.schedulePeriodicBackup(context, checked, autoBackupInterval, autoBackupHour, autoBackupMinute, autoBackupDayOfWeek)
                         Toast.makeText(context, if (checked) "Pencadangan otomatis aktif!" else "Pencadangan otomatis mati!", Toast.LENGTH_SHORT).show()
                     }
                 )
@@ -873,6 +889,95 @@ fun DatabaseBackupSection(
 
             // Choose Backup Schedule (Interval and Time) under a single collapsible header if auto backup is enabled
             if (isAutoBackupEnabled) {
+                val securityPrefs = remember { context.getSharedPreferences("security_prefs", android.content.Context.MODE_PRIVATE) }
+                val lastLocalTime = remember { securityPrefs.getLong("last_auto_backup_local_time", 0L) }
+                val lastLocalStatus = remember { securityPrefs.getString("last_auto_backup_local_status", "Belum ada riwayat") }
+                val lastDriveTime = remember { securityPrefs.getLong("last_auto_backup_drive_time", 0L) }
+                val lastDriveStatus = remember { securityPrefs.getString("last_auto_backup_drive_status", "Belum ada riwayat") }
+
+                fun formatTimestamp(timestamp: Long): String {
+                    if (timestamp == 0L) return "Belum pernah"
+                    val sdf = java.text.SimpleDateFormat("dd MMM yyyy HH:mm", java.util.Locale("id", "ID"))
+                    return sdf.format(java.util.Date(timestamp))
+                }
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(GhostWhite.copy(alpha = 0.03f), shape = RoundedCornerShape(12.dp))
+                        .border(1.dp, GhostWhite.copy(alpha = 0.08f), shape = RoundedCornerShape(12.dp))
+                        .padding(12.dp)
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.Info,
+                                contentDescription = null,
+                                tint = SteelBlue,
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "Riwayat Pencadangan Otomatis",
+                                style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
+                                color = SteelBlue
+                            )
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Pencadangan Lokal:",
+                                    style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold, fontSize = 11.sp),
+                                    color = GhostWhite.copy(alpha = 0.7f)
+                                )
+                                Text(
+                                    text = lastLocalStatus ?: "Belum ada riwayat",
+                                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
+                                    color = if (lastLocalStatus != null && lastLocalStatus.startsWith("Sukses")) Color.Green.copy(alpha = 0.8f) else if (lastLocalStatus != null && lastLocalStatus.startsWith("Gagal")) Color.Red.copy(alpha = 0.8f) else GhostWhite.copy(alpha = 0.5f)
+                                )
+                            }
+                            Text(
+                                text = formatTimestamp(lastLocalTime),
+                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
+                                color = GhostWhite.copy(alpha = 0.4f)
+                            )
+                        }
+
+                        HorizontalDivider(color = GhostWhite.copy(alpha = 0.05f))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Mengunggah Cloud (Drive):",
+                                    style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold, fontSize = 11.sp),
+                                    color = GhostWhite.copy(alpha = 0.7f)
+                                )
+                                Text(
+                                    text = lastDriveStatus ?: "Belum ada riwayat",
+                                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
+                                    color = if (lastDriveStatus != null && lastDriveStatus.startsWith("Sukses")) Color.Green.copy(alpha = 0.8f) else if (lastDriveStatus != null && lastDriveStatus.startsWith("Gagal")) Color.Red.copy(alpha = 0.8f) else GhostWhite.copy(alpha = 0.5f)
+                                )
+                            }
+                            Text(
+                                text = formatTimestamp(lastDriveTime),
+                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
+                                color = GhostWhite.copy(alpha = 0.4f)
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(6.dp))
+
                 var showJadwalCollapse by remember { mutableStateOf(false) }
 
                 Column(
@@ -898,7 +1003,11 @@ fun DatabaseBackupSection(
                                     color = GhostWhite
                                 )
                                 Text(
-                                    text = "Setiap ${if (autoBackupInterval == "daily") "Hari" else "Minggu"} pukul ${String.format("%02d:%02d", autoBackupHour, autoBackupMinute)} WIB",
+                                    text = if (autoBackupInterval == "daily") {
+                                        "Setiap Hari pukul ${String.format("%02d:%02d", autoBackupHour, autoBackupMinute)} WIB"
+                                    } else {
+                                        "Setiap Hari ${getDayNameIndonesian(autoBackupDayOfWeek)} pukul ${String.format("%02d:%02d", autoBackupHour, autoBackupMinute)} WIB"
+                                    },
                                     style = MaterialTheme.typography.bodySmall,
                                     color = GhostWhite.copy(alpha = 0.5f)
                                 )
@@ -951,7 +1060,7 @@ fun DatabaseBackupSection(
                                             .clickable {
                                                 val newInterval = if (autoBackupInterval == "daily") "weekly" else "daily"
                                                 onAutoBackupIntervalChanged(newInterval)
-                                                BackupScheduler.schedulePeriodicBackup(context, true, newInterval, autoBackupHour, autoBackupMinute)
+                                                BackupScheduler.schedulePeriodicBackup(context, true, newInterval, autoBackupHour, autoBackupMinute, autoBackupDayOfWeek)
                                                 Toast.makeText(
                                                     context, 
                                                     "Siklus pencadangan diatur: ${if (newInterval == "daily") "Harian" else "Mingguan"}", 
@@ -1190,13 +1299,83 @@ fun DatabaseBackupSection(
                                 }
                             }
 
-                            val hasBackupChanges = tempBackupHour != autoBackupHour || tempBackupMinute != autoBackupMinute
+                            if (autoBackupInterval == "weekly") {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .background(MidnightAbyss.copy(alpha = 0.3f), shape = RoundedCornerShape(12.dp))
+                                        .border(1.dp, GhostWhite.copy(alpha = 0.08f), shape = RoundedCornerShape(12.dp))
+                                        .padding(10.dp),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Text(
+                                        text = "Hari Pencadangan Mingguan",
+                                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
+                                        color = GhostWhite.copy(alpha = 0.7f)
+                                    )
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        val daysList = listOf(
+                                            java.util.Calendar.MONDAY to "Sen",
+                                            java.util.Calendar.TUESDAY to "Sel",
+                                            java.util.Calendar.WEDNESDAY to "Rab",
+                                            java.util.Calendar.THURSDAY to "Kam",
+                                            java.util.Calendar.FRIDAY to "Jum",
+                                            java.util.Calendar.SATURDAY to "Sab",
+                                            java.util.Calendar.SUNDAY to "Min"
+                                        )
+                                        daysList.forEach { (dayVal, label) ->
+                                            val isSelected = tempBackupDayOfWeek == dayVal
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(36.dp)
+                                                    .background(
+                                                        color = if (isSelected) SteelBlue else MidnightAbyss,
+                                                        shape = RoundedCornerShape(18.dp)
+                                                    )
+                                                    .border(
+                                                        width = 1.dp,
+                                                        color = if (isSelected) SteelBlue else GhostWhite.copy(alpha = 0.15f),
+                                                        shape = RoundedCornerShape(18.dp)
+                                                    )
+                                                    .clickable {
+                                                        tempBackupDayOfWeek = dayVal
+                                                    },
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Text(
+                                                    text = label,
+                                                    style = MaterialTheme.typography.bodySmall.copy(
+                                                        fontWeight = FontWeight.Bold,
+                                                        fontSize = 11.sp
+                                                    ),
+                                                    color = if (isSelected) MidnightAbyss else GhostWhite
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            val hasBackupChanges = tempBackupHour != autoBackupHour || tempBackupMinute != autoBackupMinute || (autoBackupInterval == "weekly" && tempBackupDayOfWeek != autoBackupDayOfWeek)
                             Button(
                                 onClick = {
                                     onAutoBackupHourChanged(tempBackupHour)
                                     onAutoBackupMinuteChanged(tempBackupMinute)
-                                    BackupScheduler.schedulePeriodicBackup(context, true, autoBackupInterval, tempBackupHour, tempBackupMinute)
-                                    Toast.makeText(context, "Jadwal pencadangan otomatis diatur ke pukul ${String.format("%02d:%02d", tempBackupHour, tempBackupMinute)} WIB!", Toast.LENGTH_SHORT).show()
+                                    if (autoBackupInterval == "weekly") {
+                                        onAutoBackupDayOfWeekChanged(tempBackupDayOfWeek)
+                                    }
+                                    BackupScheduler.schedulePeriodicBackup(context, true, autoBackupInterval, tempBackupHour, tempBackupMinute, if (autoBackupInterval == "weekly") tempBackupDayOfWeek else autoBackupDayOfWeek)
+                                    val timeStr = String.format("%02d:%02d", tempBackupHour, tempBackupMinute)
+                                    val toastMsg = if (autoBackupInterval == "weekly") {
+                                        "Jadwal pencadangan otomatis diatur ke hari ${getDayNameIndonesian(tempBackupDayOfWeek)} pukul $timeStr WIB!"
+                                    } else {
+                                        "Jadwal pencadangan otomatis diatur ke pukul $timeStr WIB!"
+                                    }
+                                    Toast.makeText(context, toastMsg, Toast.LENGTH_SHORT).show()
                                 },
                                 modifier = Modifier.fillMaxWidth().height(38.dp),
                                 colors = ButtonDefaults.buttonColors(
@@ -1218,7 +1397,15 @@ fun DatabaseBackupSection(
                                     )
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Text(
-                                        text = if (hasBackupChanges) "SIMPAN PERUBAHAN JADWAL" else "JADWAL AKTIF (Pukul ${String.format("%02d:%02d", autoBackupHour, autoBackupMinute)} WIB)",
+                                        text = if (hasBackupChanges) {
+                                            "SIMPAN PERUBAHAN JADWAL"
+                                        } else {
+                                            if (autoBackupInterval == "weekly") {
+                                                "JADWAL AKTIF (${getDayNameIndonesian(autoBackupDayOfWeek)}, Pukul ${String.format("%02d:%02d", autoBackupHour, autoBackupMinute)} WIB)"
+                                            } else {
+                                                "JADWAL AKTIF (Pukul ${String.format("%02d:%02d", autoBackupHour, autoBackupMinute)} WIB)"
+                                            }
+                                        },
                                         style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp)
                                     )
                                 }

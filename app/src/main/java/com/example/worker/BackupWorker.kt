@@ -23,10 +23,16 @@ class BackupWorker(
     override suspend fun doWork(): Result {
         Log.d("BackupWorker", "Memulai pencadangan otomatis via WorkManager...")
         val context = applicationContext
+        val securityPrefs = context.getSharedPreferences("security_prefs", Context.MODE_PRIVATE)
+        val now = System.currentTimeMillis()
         try {
             when (val result = BackupHelper.performBackup(context, isAuto = true)) {
                 is BackupHelper.BackupResult.Success -> {
                     Log.d("BackupWorker", "Pencadangan otomatis sukses: ${result.fileName}")
+                    securityPrefs.edit()
+                        .putString("last_auto_backup_local_status", "Sukses (${result.fileName})")
+                        .putLong("last_auto_backup_local_time", now)
+                        .apply()
                     
                     // Silently upload to Google Drive if account is connected
                     if (GoogleDriveHelper.getSignedInAccount(context) != null) {
@@ -36,23 +42,48 @@ class BackupWorker(
                             when (val uploadRes = GoogleDriveHelper.uploadBackupToDrive(context, backupFile)) {
                                 is GoogleDriveHelper.DriveResult.Success -> {
                                     Log.d("BackupWorker", "Unggah otomatis cadangan ke Google Drive sukses: fileId=${uploadRes.data}")
+                                    securityPrefs.edit()
+                                        .putString("last_auto_backup_drive_status", "Sukses")
+                                        .putLong("last_auto_backup_drive_time", now)
+                                        .apply()
                                 }
                                 is GoogleDriveHelper.DriveResult.Error -> {
                                     Log.e("BackupWorker", "Gagal mengunggah otomatis cadangan ke Google Drive: ${uploadRes.message}")
+                                    securityPrefs.edit()
+                                        .putString("last_auto_backup_drive_status", "Gagal: ${uploadRes.message}")
+                                        .putLong("last_auto_backup_drive_time", now)
+                                        .apply()
                                 }
                             }
                         } catch (uploadException: Exception) {
                             Log.e("BackupWorker", "Terganggu saat mencoba mengunggah otomatis ke Google Drive", uploadException)
+                            securityPrefs.edit()
+                                .putString("last_auto_backup_drive_status", "Gagal: ${uploadException.localizedMessage}")
+                                .putLong("last_auto_backup_drive_time", now)
+                                .apply()
                         }
+                    } else {
+                        securityPrefs.edit()
+                            .putString("last_auto_backup_drive_status", "Tidak Aktif (Google Drive belum terhubung)")
+                            .putLong("last_auto_backup_drive_time", 0L)
+                            .apply()
                     }
                 }
                 is BackupHelper.BackupResult.Error -> {
                     Log.e("BackupWorker", "Pencadangan otomatis gagal: ${result.message}")
+                    securityPrefs.edit()
+                        .putString("last_auto_backup_local_status", "Gagal: ${result.message}")
+                        .putLong("last_auto_backup_local_time", now)
+                        .apply()
                     showFailureNotification(context, result.message)
                 }
             }
         } catch (e: Exception) {
             Log.e("BackupWorker", "Gagal melakukan pencadangan otomatis: ${e.message}")
+            securityPrefs.edit()
+                .putString("last_auto_backup_local_status", "Gagal: ${e.message}")
+                .putLong("last_auto_backup_local_time", now)
+                .apply()
             showFailureNotification(context, e.localizedMessage ?: e.toString())
         }
         return Result.success()

@@ -153,6 +153,7 @@ fun EksporImporTabContent(
     var autoBackupInterval by remember { mutableStateOf(securityPrefs.getString("auto_backup_interval", "daily") ?: "daily") }
     var autoBackupHour by remember { mutableStateOf(securityPrefs.getInt("auto_backup_hour", 2)) }
     var autoBackupMinute by remember { mutableStateOf(securityPrefs.getInt("auto_backup_minute", 0)) }
+    var autoBackupDayOfWeek by remember { mutableStateOf(securityPrefs.getInt("auto_backup_day_of_week", java.util.Calendar.SUNDAY)) }
     var backupList by remember { mutableStateOf(emptyList<File>()) }
     var selectedBackupToRestore by remember { mutableStateOf<File?>(null) }
 
@@ -335,6 +336,11 @@ fun EksporImporTabContent(
                 onAutoBackupMinuteChanged = { minute ->
                     autoBackupMinute = minute
                     securityPrefs.edit().putInt("auto_backup_minute", minute).commit()
+                },
+                autoBackupDayOfWeek = autoBackupDayOfWeek,
+                onAutoBackupDayOfWeekChanged = { dayOfWeek ->
+                    autoBackupDayOfWeek = dayOfWeek
+                    securityPrefs.edit().putInt("auto_backup_day_of_week", dayOfWeek).commit()
                 },
                 backupList = backupList,
                 onBackupListChanged = { backupList = it },

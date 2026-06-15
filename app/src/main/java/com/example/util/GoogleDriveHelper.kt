@@ -74,11 +74,13 @@ object GoogleDriveHelper {
         }
     }
 
+    private class UnauthorizedException(message: String) : Exception(message)
+
     /**
      * Securely fetches the OAuth2 access token for Google Drive calls.
      * Can trigger UserRecoverableAuthException which needs an activity intent.
      */
-    suspend fun fetchAccessToken(context: Context): DriveResult<String> = withContext(Dispatchers.IO) {
+    suspend fun fetchAccessToken(context: Context, forceRefresh: Boolean = false): DriveResult<String> = withContext(Dispatchers.IO) {
         val account = getSignedInAccount(context) ?: return@withContext DriveResult.Error("Belum terhubung dengan akun Google. Silakan hubungkan akun terlebih dahulu.")
         try {
             // GoogleAuthUtil.getToken requires a raw android.accounts.Account.
@@ -91,6 +93,16 @@ object GoogleDriveHelper {
             } ?: return@withContext DriveResult.Error("Akun Google tidak valid atau email tidak terakses.")
             
             val scopeString = "oauth2:$DRIVE_SCOPE"
+            
+            if (forceRefresh) {
+                try {
+                    val existingToken = GoogleAuthUtil.getToken(context, sysAccount, scopeString)
+                    GoogleAuthUtil.invalidateToken(context, existingToken)
+                    Log.d(TAG, "Token lama berhasil di-invalidasi karena forceRefresh=true")
+                } catch (e: Exception) {
+                    Log.w(TAG, "Selesai meng-invalidasi token kadaluarsa: ${e.message}")
+                }
+            }
             
             val token = GoogleAuthUtil.getToken(context, sysAccount, scopeString)
             DriveResult.Success(token)
@@ -117,6 +129,9 @@ object GoogleDriveHelper {
                 .build()
 
             val response = httpClient.newCall(request).execute()
+            if (response.code == 401) {
+                throw UnauthorizedException("Token expired")
+            }
             if (response.isSuccessful) {
                 val responseBody = response.body?.string() ?: "{}"
                 val json = JSONObject(responseBody)
@@ -142,6 +157,9 @@ object GoogleDriveHelper {
                 .build()
 
             val createResponse = httpClient.newCall(createRequest).execute()
+            if (createResponse.code == 401) {
+                throw UnauthorizedException("Token expired")
+            }
             if (createResponse.isSuccessful) {
                 val responseBody = createResponse.body?.string() ?: ""
                 val jsonResponse = JSONObject(responseBody)
@@ -153,6 +171,8 @@ object GoogleDriveHelper {
             } else {
                 Log.e(TAG, "Gagal membuat folder di Google Drive: HTTP ${createResponse.code}")
             }
+        } catch (unauthorized: UnauthorizedException) {
+            throw unauthorized
         } catch (e: Exception) {
             Log.e(TAG, "Kesalahan saat melacak atau membuat folder di Google Drive", e)
         }
@@ -177,6 +197,9 @@ object GoogleDriveHelper {
                 .build()
 
             val response = httpClient.newCall(request).execute()
+            if (response.code == 401) {
+                throw UnauthorizedException("Token expired")
+            }
             if (response.isSuccessful) {
                 val responseBody = response.body?.string() ?: "{}"
                 val json = JSONObject(responseBody)
@@ -185,10 +208,84 @@ object GoogleDriveHelper {
                     return filesArr.getJSONObject(0).getString("id")
                 }
             }
+        } catch (unauthorized: UnauthorizedException) {
+            throw unauthorized
         } catch (e: Exception) {
             Log.e(TAG, "Kesalahan saat melacak berkas duplikat di Google Drive", e)
         }
         return null
+    }
+
+    private fun uploadBackupToDriveInternal(token: String, backupFile: File, folderId: String?): DriveResult<String> {
+        // Check if file already exists with same name to overwrite it
+        val existingFileId = findExistingFileId(token, backupFile.name, folderId)
+        val fileIdToUpload: String
+
+        if (!existingFileId.isNullOrEmpty()) {
+            Log.i(TAG, "Ditemukan berkas cadangan dengan nama yang sama: $existingFileId. Menggunakan mode timpa (overwrite).")
+            fileIdToUpload = existingFileId
+        } else {
+            // Step 1: Create the file metadata in Google Drive inside the directory
+            val metadataJson = JSONObject().apply {
+                put("name", backupFile.name)
+                put("mimeType", "application/x-sqlite3")
+                if (!folderId.isNullOrEmpty()) {
+                    put("parents", JSONArray().apply { put(folderId) })
+                }
+            }.toString()
+
+            val metadataRequest = Request.Builder()
+                .url("https://www.googleapis.com/drive/v3/files")
+                .header("Authorization", "Bearer $token")
+                .header("Content-Type", "application/json; charset=UTF-8")
+                .post(metadataJson.toRequestBody("application/json".toMediaType()))
+                .build()
+
+            val metadataResponse = httpClient.newCall(metadataRequest).execute()
+            if (metadataResponse.code == 401) {
+                throw UnauthorizedException("Token expired")
+            }
+            if (!metadataResponse.isSuccessful) {
+                val errorBody = metadataResponse.body?.string() ?: ""
+                Log.e(TAG, "Gagal membuat metadata di Drive: Code=${metadataResponse.code}, Body=$errorBody")
+                val detailedMsg = extractErrorMessage(metadataResponse.code, errorBody)
+                return DriveResult.Error("Gagal membuat metadata berkas Google Drive: $detailedMsg")
+            }
+
+            val responseBody = metadataResponse.body?.string() ?: ""
+            val jsonResponse = JSONObject(responseBody)
+            val createdId = jsonResponse.optString("id")
+            if (createdId.isNullOrEmpty()) {
+                return DriveResult.Error("Gagal menarik ID berkas dari respons Google Drive.")
+            }
+            fileIdToUpload = createdId
+        }
+
+        // Step 2: Upload the raw SQLite binary data as the file's content (media) via PATCH (overwrites)
+        val mediaRequest = Request.Builder()
+            .url("https://www.googleapis.com/upload/drive/v3/files/$fileIdToUpload?uploadType=media")
+            .header("Authorization", "Bearer $token")
+            .header("Content-Type", "application/octet-stream")
+            .patch(backupFile.asRequestBody("application/octet-stream".toMediaType()))
+            .build()
+
+        val mediaResponse = httpClient.newCall(mediaRequest).execute()
+        if (mediaResponse.code == 401) {
+            throw UnauthorizedException("Token expired")
+        }
+        if (!mediaResponse.isSuccessful) {
+            val errorBody = mediaResponse.body?.string() ?: ""
+            Log.e(TAG, "Gagal mengunggah konten berkas ke Drive: Code=${mediaResponse.code}, Body=$errorBody")
+            // Clean up the empty metadata file ONLY if it was brand-newly created
+            if (existingFileId.isNullOrEmpty()) {
+                tryDeleteDriveFile(token, fileIdToUpload)
+            }
+            val detailedMsg = extractErrorMessage(mediaResponse.code, errorBody)
+            return DriveResult.Error("Gagal mentransfer data berkas cadangan ke Google Drive: $detailedMsg")
+        }
+
+        Log.d(TAG, "Berkas berhasil diunggah/diperbarui ke Google Drive: $fileIdToUpload")
+        return DriveResult.Success(fileIdToUpload)
     }
 
     /**
@@ -199,79 +296,29 @@ object GoogleDriveHelper {
             return@withContext DriveResult.Error("Berkas cadangan tidak ditemukan lokal.")
         }
 
-        val tokenResult = fetchAccessToken(context)
+        var tokenResult = fetchAccessToken(context)
         if (tokenResult is DriveResult.Error) {
             return@withContext tokenResult
         }
-        val token = (tokenResult as DriveResult.Success).data
+        var token = (tokenResult as DriveResult.Success).data
 
         try {
-            // Check folders and locate/create "NanoMoney_Backups" folder
             val folderId = getOrCreateFolderId(token)
-            
-            // Check if file already exists with same name to overwrite it
-            val existingFileId = findExistingFileId(token, backupFile.name, folderId)
-            val fileIdToUpload: String
-
-            if (!existingFileId.isNullOrEmpty()) {
-                Log.i(TAG, "Ditemukan berkas cadangan dengan nama yang sama: $existingFileId. Menggunakan mode timpa (overwrite).")
-                fileIdToUpload = existingFileId
-            } else {
-                // Step 1: Create the file metadata in Google Drive inside the directory
-                val metadataJson = JSONObject().apply {
-                    put("name", backupFile.name)
-                    put("mimeType", "application/x-sqlite3")
-                    if (!folderId.isNullOrEmpty()) {
-                        put("parents", JSONArray().apply { put(folderId) })
-                    }
-                }.toString()
-
-                val metadataRequest = Request.Builder()
-                    .url("https://www.googleapis.com/drive/v3/files")
-                    .header("Authorization", "Bearer $token")
-                    .header("Content-Type", "application/json; charset=UTF-8")
-                    .post(metadataJson.toRequestBody("application/json".toMediaType()))
-                    .build()
-
-                val metadataResponse = httpClient.newCall(metadataRequest).execute()
-                if (!metadataResponse.isSuccessful) {
-                    val errorBody = metadataResponse.body?.string() ?: ""
-                    Log.e(TAG, "Gagal membuat metadata di Drive: Code=${metadataResponse.code}, Body=$errorBody")
-                    val detailedMsg = extractErrorMessage(metadataResponse.code, errorBody)
-                    return@withContext DriveResult.Error("Gagal membuat metadata berkas Google Drive: $detailedMsg")
-                }
-
-                val responseBody = metadataResponse.body?.string() ?: ""
-                val jsonResponse = JSONObject(responseBody)
-                val createdId = jsonResponse.optString("id")
-                if (createdId.isNullOrEmpty()) {
-                    return@withContext DriveResult.Error("Gagal menarik ID berkas dari respons Google Drive.")
-                }
-                fileIdToUpload = createdId
+            uploadBackupToDriveInternal(token, backupFile, folderId)
+        } catch (unauthorized: UnauthorizedException) {
+            Log.w(TAG, "Koneksi Google Drive unauthorized (token expired). Mencoba menyegarkan token...")
+            tokenResult = fetchAccessToken(context, forceRefresh = true)
+            if (tokenResult is DriveResult.Error) {
+                return@withContext tokenResult
             }
-
-            // Step 2: Upload the raw SQLite binary data as the file's content (media) via PATCH (overwrites)
-            val mediaRequest = Request.Builder()
-                .url("https://www.googleapis.com/upload/drive/v3/files/$fileIdToUpload?uploadType=media")
-                .header("Authorization", "Bearer $token")
-                .header("Content-Type", "application/octet-stream")
-                .patch(backupFile.asRequestBody("application/octet-stream".toMediaType()))
-                .build()
-
-            val mediaResponse = httpClient.newCall(mediaRequest).execute()
-            if (!mediaResponse.isSuccessful) {
-                val errorBody = mediaResponse.body?.string() ?: ""
-                Log.e(TAG, "Gagal mengunggah konten berkas ke Drive: Code=${mediaResponse.code}, Body=$errorBody")
-                // Clean up the empty metadata file ONLY if it was brand-newly created
-                if (existingFileId.isNullOrEmpty()) {
-                    tryDeleteDriveFile(token, fileIdToUpload)
-                }
-                val detailedMsg = extractErrorMessage(mediaResponse.code, errorBody)
-                return@withContext DriveResult.Error("Gagal mentransfer data berkas cadangan ke Google Drive: $detailedMsg")
+            token = (tokenResult as DriveResult.Success).data
+            try {
+                val folderId = getOrCreateFolderId(token)
+                uploadBackupToDriveInternal(token, backupFile, folderId)
+            } catch (e: Exception) {
+                Log.e(TAG, "Gagal mengunggah cadangan setelah penyeleksian ulang token: ${e.message}", e)
+                DriveResult.Error("Gagal mengunggah berkas ke Google Drive: ${e.localizedMessage ?: "Kesalahan tidak diketahui."}")
             }
-
-            Log.d(TAG, "Berkas berhasil diunggah/diperbarui ke Google Drive: $fileIdToUpload")
-            DriveResult.Success(fileIdToUpload)
         } catch (e: Exception) {
             Log.e(TAG, "Kesalahan saat mengunggah cadangan ke Google Drive: ${e.message}", e)
             DriveResult.Error("Gagal mengunggah berkas: ${e.localizedMessage ?: "Kesalahan Jaringan."}")
@@ -281,53 +328,72 @@ object GoogleDriveHelper {
     /**
      * Lists database backup files (.db) that were uploaded from our app on Google Drive.
      */
+    private fun listBackupsFromDriveInternal(token: String): List<DriveBackupFile> {
+        val folderId = getOrCreateFolderId(token)
+        
+        // Build a query focusing specifically on our backups folder if found
+        val query = if (!folderId.isNullOrEmpty()) {
+            "name contains 'backup_' and name contains '.db' and '$folderId' in parents and trashed = false"
+        } else {
+            "name contains 'backup_' and name contains '.db' and trashed = false"
+        }
+        val url = "https://www.googleapis.com/drive/v3/files?q=${java.net.URLEncoder.encode(query, "UTF-8")}&fields=files(id,name,createdTime,size)&orderBy=createdTime desc"
+
+        val request = Request.Builder()
+            .url(url)
+            .header("Authorization", "Bearer $token")
+            .get()
+            .build()
+
+        val response = httpClient.newCall(request).execute()
+        if (response.code == 401) {
+            throw UnauthorizedException("Token expired")
+        }
+        if (!response.isSuccessful) {
+            val errorBody = response.body?.string() ?: ""
+            Log.e(TAG, "Gagal mencantumkan berkas dari Drive: Code=${response.code}, Body=$errorBody")
+            val detailedMsg = extractErrorMessage(response.code, errorBody)
+            throw Exception("Gagal membaca daftar cadangan dari Google Drive: $detailedMsg")
+        }
+
+        val responseBody = response.body?.string() ?: "{}"
+        val json = JSONObject(responseBody)
+        val jsonArray = json.optJSONArray("files") ?: JSONArray()
+        val list = mutableListOf<DriveBackupFile>()
+        
+        for (i in 0 until jsonArray.length()) {
+            val fileObj = jsonArray.getJSONObject(i)
+            val id = fileObj.getString("id")
+            val name = fileObj.getString("name")
+            val createdTime = fileObj.optString("createdTime", null)
+            val sizeBytes = fileObj.optLong("size", 0L)
+            list.add(DriveBackupFile(id, name, createdTime, sizeBytes))
+        }
+        return list
+    }
+
     suspend fun listBackupsFromDrive(context: Context): DriveResult<List<DriveBackupFile>> = withContext(Dispatchers.IO) {
-        val tokenResult = fetchAccessToken(context)
+        var tokenResult = fetchAccessToken(context)
         if (tokenResult is DriveResult.Error) {
             return@withContext tokenResult
         }
-        val token = (tokenResult as DriveResult.Success).data
+        var token = (tokenResult as DriveResult.Success).data
 
         try {
-            val folderId = getOrCreateFolderId(token)
-            
-            // Build a query focusing specifically on our backups folder if found
-            val query = if (!folderId.isNullOrEmpty()) {
-                "name contains 'backup_' and name contains '.db' and '$folderId' in parents and trashed = false"
-            } else {
-                "name contains 'backup_' and name contains '.db' and trashed = false"
+            DriveResult.Success(listBackupsFromDriveInternal(token))
+        } catch (unauthorized: UnauthorizedException) {
+            Log.w(TAG, "Daftar Google Drive unauthorized (token expired). Menyegarkan token...")
+            tokenResult = fetchAccessToken(context, forceRefresh = true)
+            if (tokenResult is DriveResult.Error) {
+                return@withContext tokenResult
             }
-            val url = "https://www.googleapis.com/drive/v3/files?q=${java.net.URLEncoder.encode(query, "UTF-8")}&fields=files(id,name,createdTime,size)&orderBy=createdTime desc"
-
-            val request = Request.Builder()
-                .url(url)
-                .header("Authorization", "Bearer $token")
-                .get()
-                .build()
-
-            val response = httpClient.newCall(request).execute()
-            if (!response.isSuccessful) {
-                val errorBody = response.body?.string() ?: ""
-                Log.e(TAG, "Gagal mencantumkan berkas dari Drive: Code=${response.code}, Body=$errorBody")
-                val detailedMsg = extractErrorMessage(response.code, errorBody)
-                return@withContext DriveResult.Error("Gagal membaca daftar cadangan dari Google Drive: $detailedMsg")
+            token = (tokenResult as DriveResult.Success).data
+            try {
+                DriveResult.Success(listBackupsFromDriveInternal(token))
+            } catch (e: Exception) {
+                Log.e(TAG, "Gagal memuat daftar dari Drive setelah penyegaran token: ${e.message}", e)
+                DriveResult.Error("Gagal memuat daftar Google Drive: ${e.localizedMessage ?: "Sesi terganggu."}")
             }
-
-            val responseBody = response.body?.string() ?: "{}"
-            val json = JSONObject(responseBody)
-            val jsonArray = json.optJSONArray("files") ?: JSONArray()
-            val list = mutableListOf<DriveBackupFile>()
-            
-            for (i in 0 until jsonArray.length()) {
-                val fileObj = jsonArray.getJSONObject(i)
-                val id = fileObj.getString("id")
-                val name = fileObj.getString("name")
-                val createdTime = fileObj.optString("createdTime", null)
-                val sizeBytes = fileObj.optLong("size", 0L)
-                list.add(DriveBackupFile(id, name, createdTime, sizeBytes))
-            }
-
-            DriveResult.Success(list)
         } catch (e: Exception) {
             Log.e(TAG, "Kesalahan saat mencantumkan berkas Google Drive: ${e.message}", e)
             DriveResult.Error("Gagal memuat daftar Google Drive: ${e.localizedMessage ?: "Kesalahan Jaringan."}")
@@ -337,48 +403,69 @@ object GoogleDriveHelper {
     /**
      * Download a backup from Google Drive and save it locally on the device (usually inside the downloads or backups folder).
      */
+    private fun downloadBackupFromDriveInternal(token: String, fileId: String, targetFile: File) {
+        // Ensure target parent directory exists
+        targetFile.parentFile?.let {
+            if (!it.exists()) it.mkdirs()
+        }
+
+        // Remove existing target file if any
+        if (targetFile.exists()) {
+            targetFile.delete()
+        }
+
+        val request = Request.Builder()
+            .url("https://www.googleapis.com/drive/v3/files/$fileId?alt=media")
+            .header("Authorization", "Bearer $token")
+            .get()
+            .build()
+
+        val response = httpClient.newCall(request).execute()
+        if (response.code == 401) {
+            throw UnauthorizedException("Token expired")
+        }
+        if (!response.isSuccessful) {
+            val errorBody = response.body?.string() ?: ""
+            Log.e(TAG, "Gagal mengunduh berkas dari Drive: Code=${response.code}, Body=$errorBody")
+            val detailedMsg = extractErrorMessage(response.code, errorBody)
+            throw Exception("Gagal mengunduh isi berkas dari Google Drive: $detailedMsg")
+        }
+
+        val networkStream = response.body?.byteStream() ?: throw Exception("Isi berkas kosong atau tidak dapat diakses.")
+        
+        FileOutputStream(targetFile).use { fileStream ->
+            networkStream.use { input ->
+                input.copyTo(fileStream)
+            }
+        }
+
+        Log.d(TAG, "Berkas dari Google Drive berhasil disimpan lokal: ${targetFile.absolutePath}")
+    }
+
     suspend fun downloadBackupFromDrive(context: Context, fileId: String, targetFile: File): DriveResult<File> = withContext(Dispatchers.IO) {
-        val tokenResult = fetchAccessToken(context)
+        var tokenResult = fetchAccessToken(context)
         if (tokenResult is DriveResult.Error) {
             return@withContext tokenResult
         }
-        val token = (tokenResult as DriveResult.Success).data
+        var token = (tokenResult as DriveResult.Success).data
 
         try {
-            // Ensure target parent directory exists
-            targetFile.parentFile?.let {
-                if (!it.exists()) it.mkdirs()
-            }
-
-            // Remove existing target file if any
-            if (targetFile.exists()) {
-                targetFile.delete()
-            }
-
-            val request = Request.Builder()
-                .url("https://www.googleapis.com/drive/v3/files/$fileId?alt=media")
-                .header("Authorization", "Bearer $token")
-                .get()
-                .build()
-
-            val response = httpClient.newCall(request).execute()
-            if (!response.isSuccessful) {
-                val errorBody = response.body?.string() ?: ""
-                Log.e(TAG, "Gagal mengunduh berkas dari Drive: Code=${response.code}, Body=$errorBody")
-                val detailedMsg = extractErrorMessage(response.code, errorBody)
-                return@withContext DriveResult.Error("Gagal mengunduh isi berkas dari Google Drive: $detailedMsg")
-            }
-
-            val networkStream = response.body?.byteStream() ?: return@withContext DriveResult.Error("Isi berkas kosong atau tidak dapat diakses.")
-            
-            FileOutputStream(targetFile).use { fileStream ->
-                networkStream.use { input ->
-                    input.copyTo(fileStream)
-                }
-            }
-
-            Log.d(TAG, "Berkas dari Google Drive berhasil disimpan lokal: ${targetFile.absolutePath}")
+            downloadBackupFromDriveInternal(token, fileId, targetFile)
             DriveResult.Success(targetFile)
+        } catch (unauthorized: UnauthorizedException) {
+            Log.w(TAG, "Unduhan Google Drive unauthorized (token expired). Menyegarkan token...")
+            tokenResult = fetchAccessToken(context, forceRefresh = true)
+            if (tokenResult is DriveResult.Error) {
+                return@withContext tokenResult
+            }
+            token = (tokenResult as DriveResult.Success).data
+            try {
+                downloadBackupFromDriveInternal(token, fileId, targetFile)
+                DriveResult.Success(targetFile)
+            } catch (e: Exception) {
+                Log.e(TAG, "Gagal mengunduh berkas setelah penyegaran token: ${e.message}", e)
+                DriveResult.Error("Gagal mengunduh berkas Google Drive: ${e.localizedMessage ?: "Sesi terganggu."}")
+            }
         } catch (e: Exception) {
             Log.e(TAG, "Kesalahan saat mengunduh berkas dari Google Drive: ${e.message}", e)
             DriveResult.Error("Gagal mengunduh berkas: ${e.localizedMessage ?: "Kesalahan Jaringan."}")
@@ -388,30 +475,51 @@ object GoogleDriveHelper {
     /**
      * Deletes a remote backup file from Google Drive.
      */
+    private fun deleteBackupFromDriveInternal(token: String, fileId: String) {
+        val request = Request.Builder()
+            .url("https://www.googleapis.com/drive/v3/files/$fileId")
+            .header("Authorization", "Bearer $token")
+            .delete()
+            .build()
+
+        val response = httpClient.newCall(request).execute()
+        if (response.code == 401) {
+            throw UnauthorizedException("Token expired")
+        }
+        if (!response.isSuccessful) {
+            val errorBody = response.body?.string() ?: ""
+            Log.e(TAG, "Gagal menghapus berkas di Drive: Code=${response.code}, Body=$errorBody")
+            val detailedMsg = extractErrorMessage(response.code, errorBody)
+            throw Exception("Gagal menghapus berkas di Google Drive: $detailedMsg")
+        }
+
+        Log.d(TAG, "Berkas di Google Drive berhasil dihapus: $fileId")
+    }
+
     suspend fun deleteBackupFromDrive(context: Context, fileId: String): DriveResult<Boolean> = withContext(Dispatchers.IO) {
-        val tokenResult = fetchAccessToken(context)
+        var tokenResult = fetchAccessToken(context)
         if (tokenResult is DriveResult.Error) {
             return@withContext tokenResult
         }
-        val token = (tokenResult as DriveResult.Success).data
+        var token = (tokenResult as DriveResult.Success).data
 
         try {
-            val request = Request.Builder()
-                .url("https://www.googleapis.com/drive/v3/files/$fileId")
-                .header("Authorization", "Bearer $token")
-                .delete()
-                .build()
-
-            val response = httpClient.newCall(request).execute()
-            if (!response.isSuccessful) {
-                val errorBody = response.body?.string() ?: ""
-                Log.e(TAG, "Gagal menghapus berkas di Drive: Code=${response.code}, Body=$errorBody")
-                val detailedMsg = extractErrorMessage(response.code, errorBody)
-                return@withContext DriveResult.Error("Gagal menghapus berkas di Google Drive: $detailedMsg")
-            }
-
-            Log.d(TAG, "Berkas di Google Drive berhasil dihapus: $fileId")
+            deleteBackupFromDriveInternal(token, fileId)
             DriveResult.Success(true)
+        } catch (unauthorized: UnauthorizedException) {
+            Log.w(TAG, "Penghapusan Google Drive unauthorized (token expired). Menyegarkan token...")
+            tokenResult = fetchAccessToken(context, forceRefresh = true)
+            if (tokenResult is DriveResult.Error) {
+                return@withContext tokenResult
+            }
+            token = (tokenResult as DriveResult.Success).data
+            try {
+                deleteBackupFromDriveInternal(token, fileId)
+                DriveResult.Success(true)
+            } catch (e: Exception) {
+                Log.e(TAG, "Gagal menghapus berkas setelah penyegaran token: ${e.message}", e)
+                DriveResult.Error("Gagal menghapus berkas di Google Drive: ${e.localizedMessage ?: "Sesi terganggu."}")
+            }
         } catch (e: Exception) {
             Log.e(TAG, "Kesalahan saat menghapus berkas Google Drive: ${e.message}", e)
             DriveResult.Error("Gagal menghapus berkas: ${e.localizedMessage ?: "Kesalahan Jaringan."}")
