@@ -103,15 +103,20 @@ object BackupHelper {
                 zos.closeEntry()
 
                 // B. Add all available shared preferences XML entries
-                val sharedPrefsDir = File(context.filesDir.parentFile ?: context.dataDir, "shared_prefs")
+                val dataDir = context.applicationContext.dataDir ?: context.filesDir.parentFile ?: context.dataDir
+                val sharedPrefsDir = File(dataDir, "shared_prefs")
+                Log.d("BackupHelper", "Memulai penyalinan Shared Preferences dari: ${sharedPrefsDir.absolutePath}")
                 if (sharedPrefsDir.exists() && sharedPrefsDir.isDirectory) {
                     sharedPrefsDir.listFiles { _, name -> name.endsWith(".xml") }?.forEach { xmlFile ->
+                        Log.d("BackupHelper", "Mencadangkan file preferensi: ${xmlFile.name}")
                         zos.putNextEntry(ZipEntry("shared_prefs/${xmlFile.name}"))
                         xmlFile.inputStream().use { input ->
                             input.copyTo(zos)
                         }
                         zos.closeEntry()
                     }
+                } else {
+                    Log.w("BackupHelper", "Folder shared_prefs tidak ditemukan atau bukan direktori: ${sharedPrefsDir.absolutePath}")
                 }
             }
 
@@ -179,7 +184,8 @@ object BackupHelper {
                                 }
                             } else if (entry.name.startsWith("shared_prefs/")) {
                                 val fileName = entry.name.substringAfter("shared_prefs/")
-                                val sharedPrefsDir = File(context.filesDir.parentFile ?: context.dataDir, "shared_prefs")
+                                val dataDir = context.applicationContext.dataDir ?: context.filesDir.parentFile ?: context.dataDir
+                                val sharedPrefsDir = File(dataDir, "shared_prefs")
                                 if (!sharedPrefsDir.exists()) {
                                     sharedPrefsDir.mkdirs()
                                 }

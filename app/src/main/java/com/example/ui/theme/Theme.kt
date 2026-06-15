@@ -96,7 +96,18 @@ fun PremiumButton(
             modifier = Modifier
                 .padding(4.dp)
                 .clip(RoundedCornerShape(16.dp))
-                .background(if (isActive) SteelBlue else Color.Transparent)
+                .then(
+                    if (isActive) {
+                        Modifier.background(
+                            brush = Brush.verticalGradient(
+                                colors = listOf(SteelBlue, SteelBlue.copy(alpha = 0.7f))
+                            ),
+                            shape = RoundedCornerShape(16.dp)
+                        )
+                    } else {
+                        Modifier.background(Color.Transparent)
+                    }
+                )
                 .clickable { onClick() }
                 .then(if (testTag.isNotEmpty()) Modifier.testTag(testTag) else Modifier),
             contentAlignment = Alignment.Center

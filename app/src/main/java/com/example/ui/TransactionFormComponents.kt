@@ -59,7 +59,18 @@ fun CategorySelectionChip(
             modifier = Modifier
                 .padding(4.dp)
                 .clip(RoundedCornerShape(16.dp))
-                .background(if (selected) SteelBlue else Color.Transparent)
+                .then(
+                    if (selected) {
+                        Modifier.background(
+                            brush = Brush.verticalGradient(
+                                colors = listOf(SteelBlue, SteelBlue.copy(alpha = 0.7f))
+                            ),
+                            shape = RoundedCornerShape(16.dp)
+                        )
+                    } else {
+                        Modifier.background(Color.Transparent)
+                    }
+                )
                 .clickable { onClick() }
                 .padding(horizontal = 16.dp, vertical = 10.dp),
             contentAlignment = Alignment.Center
@@ -181,7 +192,18 @@ fun TransactionFormCard(
                                 .weight(1f)
                                 .height(40.dp)
                                 .clip(RoundedCornerShape(16.dp))
-                                .background(if (incomeSelected) SteelBlue else Color.Transparent)
+                                .then(
+                                    if (incomeSelected) {
+                                        Modifier.background(
+                                            brush = Brush.verticalGradient(
+                                                colors = listOf(SteelBlue, SteelBlue.copy(alpha = 0.7f))
+                                            ),
+                                            shape = RoundedCornerShape(16.dp)
+                                        )
+                                    } else {
+                                        Modifier.background(Color.Transparent)
+                                    }
+                                )
                                 .clickable { onTypeChanged("income") }
                                 .testTag("form_type_income_radio"),
                             contentAlignment = Alignment.Center
@@ -200,7 +222,18 @@ fun TransactionFormCard(
                                 .weight(1f)
                                 .height(40.dp)
                                 .clip(RoundedCornerShape(16.dp))
-                                .background(if (expenseSelected) NeonRed else Color.Transparent)
+                                .then(
+                                    if (expenseSelected) {
+                                        Modifier.background(
+                                            brush = Brush.verticalGradient(
+                                                colors = listOf(NeonRed, NeonRed.copy(alpha = 0.7f))
+                                            ),
+                                            shape = RoundedCornerShape(16.dp)
+                                        )
+                                    } else {
+                                        Modifier.background(Color.Transparent)
+                                    }
+                                )
                                 .clickable { onTypeChanged("expense") }
                                 .testTag("form_type_expense_radio"),
                             contentAlignment = Alignment.Center

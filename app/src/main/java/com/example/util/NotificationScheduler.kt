@@ -9,7 +9,7 @@ import com.example.receiver.ReminderReceiver
 import java.util.Calendar
 
 object NotificationScheduler {
-    fun scheduleDailyReminder(context: Context, enabled: Boolean) {
+    fun scheduleDailyReminder(context: Context, enabled: Boolean, hour: Int, minute: Int) {
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
         val intent = Intent(context, ReminderReceiver::class.java)
         
@@ -21,13 +21,13 @@ object NotificationScheduler {
         val pendingIntent = PendingIntent.getBroadcast(context, 0, intent, pendingIntentFlags)
         
         if (enabled) {
-            scheduleDailyAlarm(context)
+            scheduleDailyAlarm(context, hour, minute)
         } else {
             alarmManager.cancel(pendingIntent)
         }
     }
     
-    fun scheduleDailyAlarm(context: Context) {
+    fun scheduleDailyAlarm(context: Context, hour: Int, minute: Int) {
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
         val intent = Intent(context, ReminderReceiver::class.java)
         
@@ -40,17 +40,24 @@ object NotificationScheduler {
         
         val calendar = Calendar.getInstance().apply {
             timeInMillis = System.currentTimeMillis()
-            set(Calendar.HOUR_OF_DAY, 20)
-            set(Calendar.MINUTE, 0)
+            set(Calendar.HOUR_OF_DAY, hour)
+            set(Calendar.MINUTE, minute)
             set(Calendar.SECOND, 0)
             set(Calendar.MILLISECOND, 0)
             
-            // If 8 PM is already passed today, set to tomorrow
+            // If the time is already passed today, set to tomorrow
             if (timeInMillis <= System.currentTimeMillis()) {
                 add(Calendar.DAY_OF_YEAR, 1)
             }
         }
         
         alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, calendar.timeInMillis, pendingIntent)
+    }
+    
+    fun scheduleDailyAlarm(context: Context) {
+        val prefs = context.getSharedPreferences("app_security_prefs", Context.MODE_PRIVATE)
+        val hour = prefs.getInt("reminder_hour", 20)
+        val minute = prefs.getInt("reminder_minute", 0)
+        scheduleDailyAlarm(context, hour, minute)
     }
 }

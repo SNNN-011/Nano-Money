@@ -305,7 +305,18 @@ fun ChatScreen(
                             Box(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(16.dp))
-                                    .background(if (isGemma) SteelBlue else Color.Transparent)
+                                    .then(
+                                        if (isGemma) {
+                                            Modifier.background(
+                                                brush = Brush.verticalGradient(
+                                                    colors = listOf(SteelBlue, SteelBlue.copy(alpha = 0.7f))
+                                                ),
+                                                shape = RoundedCornerShape(16.dp)
+                                            )
+                                        } else {
+                                            Modifier.background(Color.Transparent)
+                                        }
+                                    )
                                     .clickable { viewModel.updateSelectedModel(AiModelConfig.GEMMA_MODEL) }
                                     .padding(horizontal = 12.dp, vertical = 6.dp)
                                     .testTag("model_switch_gemma"),
@@ -323,7 +334,18 @@ fun ChatScreen(
                             Box(
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(16.dp))
-                                    .background(if (isGemini) SteelBlue else Color.Transparent)
+                                    .then(
+                                        if (isGemini) {
+                                            Modifier.background(
+                                                brush = Brush.verticalGradient(
+                                                    colors = listOf(SteelBlue, SteelBlue.copy(alpha = 0.7f))
+                                                ),
+                                                shape = RoundedCornerShape(16.dp)
+                                            )
+                                        } else {
+                                            Modifier.background(Color.Transparent)
+                                        }
+                                    )
                                     .clickable { viewModel.updateSelectedModel(AiModelConfig.GEMINI_MODEL) }
                                     .padding(horizontal = 12.dp, vertical = 6.dp)
                                     .testTag("model_switch_gemini"),

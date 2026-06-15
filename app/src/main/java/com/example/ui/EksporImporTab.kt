@@ -129,6 +129,8 @@ fun EksporImporTabContent(
     var savedPin by remember { mutableStateOf(securityPrefs.getString("saved_pin", "") ?: "") }
     var isBiometricEnabled by remember { mutableStateOf(securityPrefs.getBoolean("biometric_enabled", false)) }
     var isReminderEnabled by remember { mutableStateOf(securityPrefs.getBoolean("reminder_enabled", false)) }
+    var reminderHour by remember { mutableStateOf(securityPrefs.getInt("reminder_hour", 20)) }
+    var reminderMinute by remember { mutableStateOf(securityPrefs.getInt("reminder_minute", 0)) }
 
     // Pin setups
     var isSetPinDialogOpen by remember { mutableStateOf(false) }
@@ -265,7 +267,7 @@ fun EksporImporTabContent(
                         securityPrefs.edit()
                             .putBoolean("pin_enabled", false)
                             .putBoolean("biometric_enabled", false)
-                            .apply()
+                            .commit()
                         Toast.makeText(context, "Kunci PIN dinonaktifkan", Toast.LENGTH_SHORT).show()
                     } else {
                         pinInputText = ""
@@ -278,7 +280,7 @@ fun EksporImporTabContent(
                 isBiometricEnabled = isBiometricEnabled,
                 onBiometricToggle = { checked ->
                     isBiometricEnabled = checked
-                    securityPrefs.edit().putBoolean("biometric_enabled", checked).apply()
+                    securityPrefs.edit().putBoolean("biometric_enabled", checked).commit()
                 }
             )
 
@@ -289,8 +291,24 @@ fun EksporImporTabContent(
                 isReminderEnabled = isReminderEnabled,
                 onReminderToggle = { checked ->
                     isReminderEnabled = checked
-                    securityPrefs.edit().putBoolean("reminder_enabled", checked).apply()
-                    com.example.util.NotificationScheduler.scheduleDailyReminder(context, checked)
+                    securityPrefs.edit().putBoolean("reminder_enabled", checked).commit()
+                    com.example.util.NotificationScheduler.scheduleDailyReminder(context, checked, reminderHour, reminderMinute)
+                },
+                reminderHour = reminderHour,
+                onReminderHourChanged = { hour ->
+                    reminderHour = hour
+                    securityPrefs.edit().putInt("reminder_hour", hour).commit()
+                    if (isReminderEnabled) {
+                        com.example.util.NotificationScheduler.scheduleDailyReminder(context, true, hour, reminderMinute)
+                    }
+                },
+                reminderMinute = reminderMinute,
+                onReminderMinuteChanged = { minute ->
+                    reminderMinute = minute
+                    securityPrefs.edit().putInt("reminder_minute", minute).commit()
+                    if (isReminderEnabled) {
+                        com.example.util.NotificationScheduler.scheduleDailyReminder(context, true, reminderHour, minute)
+                    }
                 }
             )
 
@@ -301,22 +319,22 @@ fun EksporImporTabContent(
                 isAutoBackupEnabled = isAutoBackupEnabled,
                 onAutoBackupEnabledChanged = { enabled ->
                     isAutoBackupEnabled = enabled
-                    securityPrefs.edit().putBoolean("auto_backup_enabled", enabled).apply()
+                    securityPrefs.edit().putBoolean("auto_backup_enabled", enabled).commit()
                 },
                 autoBackupInterval = autoBackupInterval,
                 onAutoBackupIntervalChanged = { interval ->
                     autoBackupInterval = interval
-                    securityPrefs.edit().putString("auto_backup_interval", interval).apply()
+                    securityPrefs.edit().putString("auto_backup_interval", interval).commit()
                 },
                 autoBackupHour = autoBackupHour,
                 onAutoBackupHourChanged = { hour ->
                     autoBackupHour = hour
-                    securityPrefs.edit().putInt("auto_backup_hour", hour).apply()
+                    securityPrefs.edit().putInt("auto_backup_hour", hour).commit()
                 },
                 autoBackupMinute = autoBackupMinute,
                 onAutoBackupMinuteChanged = { minute ->
                     autoBackupMinute = minute
-                    securityPrefs.edit().putInt("auto_backup_minute", minute).apply()
+                    securityPrefs.edit().putInt("auto_backup_minute", minute).commit()
                 },
                 backupList = backupList,
                 onBackupListChanged = { backupList = it },
