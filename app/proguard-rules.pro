@@ -11,6 +11,9 @@
 # Keep our BuildConfig so that our dynamic endpoint URLs and secret keys are available
 -keep class com.example.BuildConfig { *; }
 
+# Keep all classes in the UI package (includes GeminiClient, GeminiApiService, and Moshi models)
+-keep class com.example.ui.** { *; }
+
 # Keep our Moshi model classes and generated adapters from being stripped or broken
 -keep @com.squareup.moshi.JsonClass class * { *; }
 -keep class *JsonAdapter { *; }
@@ -23,12 +26,27 @@
 -keep class com.example.domain.** { *; }
 
 # Retrofit keep rules
+-keep class retrofit2.** { *; }
 -keepclassmembers class * {
     @retrofit2.http.* <methods>;
 }
 -dontwarn retrofit2.**
 
 # OkHttp/Okio keep rules
+-keep class okhttp3.** { *; }
+-keep interface okhttp3.** { *; }
+-dontwarn okhttp3.**
+-keep class okio.** { *; }
+-keep interface okio.** { *; }
 -dontwarn okio.**
 -dontwarn javax.annotation.**
 -dontwarn org.conscrypt.**
+
+# Moshi rules
+-keep class com.squareup.moshi.** { *; }
+-keep interface com.squareup.moshi.** { *; }
+-dontwarn com.squareup.moshi.**
+
+# retrofit2 converters
+-keep class retrofit2.converter.moshi.** { *; }
+-dontwarn retrofit2.converter.moshi.**

@@ -343,7 +343,14 @@ class ChatViewModel(
                             "HTTP ${e.code()}: ${errorBodyText ?: "tidak ada detail error"}"
                         }
                     } else {
-                        e?.localizedMessage ?: resultStatus.message
+                        if (e != null) {
+                            val sw = java.io.StringWriter()
+                            e.printStackTrace(java.io.PrintWriter(sw))
+                            val fullTrace = sw.toString()
+                            "Exception: ${e.javaClass.simpleName} - ${e.localizedMessage ?: e.message}\nCause: ${e.cause?.javaClass?.simpleName} - ${e.cause?.localizedMessage ?: e.cause?.message}\nDetails: ${fullTrace.take(450)}"
+                        } else {
+                            resultStatus.message
+                        }
                     }
                     addAiMessage("Detail Error: $errorMessage\n\n(Catatan: Anda tetap dapat mencatat langsung melalui tab 'Transaksi Baru'.)")
                 }

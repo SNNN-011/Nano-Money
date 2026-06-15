@@ -109,11 +109,17 @@ object GeminiClient {
         ""
     }
 
-    private val okHttpClient = OkHttpClient.Builder()
-        .connectTimeout(30, TimeUnit.SECONDS)
-        .readTimeout(30, TimeUnit.SECONDS)
-        .writeTimeout(30, TimeUnit.SECONDS)
-        .addInterceptor { chain ->
+    private val BASE_HOST = try {
+        java.net.URL(BASE_URL).host
+    } catch (e: Throwable) {
+        ""
+    }
+
+    private val okHttpClient = OkHttpClient.Builder().apply {
+        connectTimeout(30, TimeUnit.SECONDS)
+        readTimeout(30, TimeUnit.SECONDS)
+        writeTimeout(30, TimeUnit.SECONDS)
+        addInterceptor { chain ->
             val originalRequest = chain.request()
             val requestBuilder = originalRequest.newBuilder()
             
@@ -123,7 +129,7 @@ object GeminiClient {
             
             chain.proceed(requestBuilder.build())
         }
-        .build()
+    }.build()
 
     val service: GeminiApiService by lazy {
         val cleanBase = if (BASE_URL.endsWith("/")) BASE_URL else "$BASE_URL/"
