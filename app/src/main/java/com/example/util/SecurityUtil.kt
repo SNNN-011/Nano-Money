@@ -11,7 +11,20 @@ import java.io.InputStreamReader
 
 object SecurityUtil {
     private const val TAG = "SecurityUtil"
-    private const val XOR_KEY = "DadadasGemini-3.1-lite-flash45@^DadadasNanoMoney45@^"
+    private fun getDynamicXorKey(): String {
+        // Stored as an array of integers that are shifted (Value = CharCode + 7)
+        val hiddenKey = intArrayOf(
+            75, 104, 107, 104, 107, 104, 122, 78, 108, 116, 112, 117, 112, 52, 58, 53, 
+            56, 52, 115, 112, 123, 108, 52, 109, 115, 104, 122, 111, 59, 60, 71, 101, 
+            75, 104, 107, 104, 107, 104, 122, 85, 104, 117, 118, 84, 118, 117, 108, 128, 
+            59, 60, 71, 101
+        )
+        val sb = StringBuilder()
+        for (i in hiddenKey) {
+            sb.append((i - 7).toChar())
+        }
+        return sb.toString()
+    }
 
     /**
      * Decrypts an obfuscated string. The string should be XORed with a static key
@@ -19,13 +32,14 @@ object SecurityUtil {
      */
     fun decryptObfuscatedString(encryptedBase64: String): String {
         try {
+            val dynamicKey = getDynamicXorKey()
             val cleanStr = encryptedBase64.trim().replace("\"", "")
             if (cleanStr.isBlank()) return ""
             // Try to decode Base64
             val decodedBytes = Base64.decode(cleanStr, Base64.DEFAULT)
             var decrypted = ""
             for (i in decodedBytes.indices) {
-                decrypted += (decodedBytes[i].toInt() xor XOR_KEY[i % XOR_KEY.length].code).toChar()
+                decrypted += (decodedBytes[i].toInt() xor dynamicKey[i % dynamicKey.length].code).toChar()
             }
             return decrypted
         } catch (e: Exception) {
