@@ -21,10 +21,11 @@ class BackupWorker(
 ) : CoroutineWorker(context, workerParams) {
 
     override suspend fun doWork(): Result {
-        Log.d("BackupWorker", "Memulai pencadangan otomatis via WorkManager...")
+        Log.d("BackupWorker", "Memulai pencadangan otomatis via WorkManager... Attempt: $runAttemptCount")
         val context = applicationContext
         val securityPrefs = context.getSharedPreferences("security_prefs", Context.MODE_PRIVATE)
         val now = System.currentTimeMillis()
+        var shouldRetry = false
         try {
             when (val result = BackupHelper.performBackup(context, isAuto = true)) {
                 is BackupHelper.BackupResult.Success -> {
@@ -53,6 +54,9 @@ class BackupWorker(
                                         .putString("last_auto_backup_drive_status", "Gagal: ${uploadRes.message}")
                                         .putLong("last_auto_backup_drive_time", now)
                                         .apply()
+                                    if (runAttemptCount < 3) {
+                                        shouldRetry = true
+                                    }
                                 }
                             }
                         } catch (uploadException: Exception) {
@@ -61,6 +65,9 @@ class BackupWorker(
                                 .putString("last_auto_backup_drive_status", "Gagal: ${uploadException.localizedMessage}")
                                 .putLong("last_auto_backup_drive_time", now)
                                 .apply()
+                            if (runAttemptCount < 3) {
+                                shouldRetry = true
+                            }
                         }
                     } else {
                         securityPrefs.edit()
@@ -76,6 +83,9 @@ class BackupWorker(
                         .putLong("last_auto_backup_local_time", now)
                         .apply()
                     showFailureNotification(context, result.message)
+                    if (runAttemptCount < 3) {
+                        shouldRetry = true
+                    }
                 }
             }
         } catch (e: Exception) {
@@ -85,8 +95,16 @@ class BackupWorker(
                 .putLong("last_auto_backup_local_time", now)
                 .apply()
             showFailureNotification(context, e.localizedMessage ?: e.toString())
+            if (runAttemptCount < 3) {
+                shouldRetry = true
+            }
         }
-        return Result.success()
+        return if (shouldRetry) {
+            Log.d("BackupWorker", "Menjadwalkan ulang pencadangan otomatis via WorkManager retry")
+            Result.retry()
+        } else {
+            Result.success()
+        }
     }
 
     private fun showFailureNotification(context: Context, errorMessage: String) {

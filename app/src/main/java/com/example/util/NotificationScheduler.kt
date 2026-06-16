@@ -55,9 +55,6 @@ object NotificationScheduler {
     }
     
     fun scheduleDailyAlarm(context: Context) {
-        val prefs = context.getSharedPreferences("app_security_prefs", Context.MODE_PRIVATE)
-        val hour = prefs.getInt("reminder_hour", 20)
-        val minute = prefs.getInt("reminder_minute", 0)
-        scheduleDailyAlarm(context, hour, minute)
+        scheduleDailyAlarm(context, 20, 0)
     }
 }

@@ -49,674 +49,11 @@ import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
-@Composable
-fun UnifiedExportCard(
-    isWideScreen: Boolean,
-    availableMonths: List<YearMonth>,
-    selectedMonths: Set<YearMonth>,
-    onSelectedMonthsChanged: (Set<YearMonth>) -> Unit,
-    isMonthsExpanded: Boolean,
-    onIsMonthsExpandedChanged: (Boolean) -> Unit,
-    onExportPdfFile: (List<YearMonth>) -> Unit,
-    onExportCsvFile: (List<YearMonth>) -> Unit,
-    onImportCsvFile: () -> Unit
-) {
-    var showPdfHelpInfo by remember { mutableStateOf(false) }
 
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(28.dp),
-        colors = CardDefaults.cardColors(containerColor = TranslucentForm.copy(alpha = 0.65f)),
-        border = BorderStroke(
-            width = 1.dp,
-            brush = Brush.verticalGradient(
-                colors = listOf(GhostWhite.copy(alpha = 0.15f), GhostWhite.copy(alpha = 0.02f))
-            )
-        )
-    ) {
-        Column(
-            modifier = Modifier.padding(24.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            // Header inside card
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.clickable { onIsMonthsExpandedChanged(!isMonthsExpanded) }.weight(1f)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .width(3.dp)
-                            .height(20.dp)
-                            .background(
-                                brush = Brush.verticalGradient(
-                                    colors = listOf(SteelBlue, SteelBlue.copy(alpha = 0.4f))
-                                ),
-                                shape = RoundedCornerShape(2.dp)
-                            )
-                    )
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Text(
-                        text = "Pilih Periode Laporan Keuangan",
-                        style = MaterialTheme.typography.titleMedium.copy(
-                            fontSize = 17.sp,
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = 0.2.sp
-                        ),
-                        color = GhostWhite
-                    )
-                }
 
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    IconButton(
-                        onClick = { showPdfHelpInfo = true },
-                        modifier = Modifier.size(24.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Info,
-                            contentDescription = "Info Ekspor PDF",
-                            tint = GhostWhite.copy(alpha = 0.6f),
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                    Icon(
-                        imageVector = if (isMonthsExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                        contentDescription = if (isMonthsExpanded) "Sembunyikan" else "Tampilkan Semua",
-                        tint = SteelBlue,
-                        modifier = Modifier.size(20.dp).clickable { onIsMonthsExpandedChanged(!isMonthsExpanded) }
-                    )
-                }
-            }
 
-            if (showPdfHelpInfo) {
-                AlertDialog(
-                    onDismissRequest = { showPdfHelpInfo = false },
-                    title = { Text("Informasi Ekspor PDF", color = GhostWhite, fontWeight = FontWeight.Bold) },
-                    text = {
-                        Text(
-                            text = "Ekspor laporan keuangan Anda dalam format PDF yang rapi dan profesional.\n\n• Pilih satu atau beberapa bulan sekaligus untuk dijadikan laporan.\n• Setiap bulan ditampilkan di halaman terpisah agar mudah dibaca.\n• Laporan mencakup ringkasan statistik, grafik arus kas, pie chart kategori pengeluaran, dan tabel transaksi lengkap.\n• File PDF langsung tersimpan di penyimpanan perangkat Anda dan bisa dibagikan kapan saja.",
-                            color = GhostWhite.copy(alpha = 0.8f),
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                    },
-                    confirmButton = {
-                        TextButton(onClick = { showPdfHelpInfo = false }) {
-                            Text("Mengerti", color = SteelBlue, fontWeight = FontWeight.Bold)
-                        }
-                    },
-                    containerColor = MidnightAbyss,
-                    titleContentColor = GhostWhite,
-                    textContentColor = GhostWhite
-                )
-            }
 
-            if (isMonthsExpanded) {
-                Text(
-                    text = "Tentukan bulan transaksi yang ingin di-ekspor atau di-cetak sebagai laporan keuangan. Anda bisa memilih satu, beberapa, atau semua bulan sekaligus.",
-                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp, lineHeight = 18.sp),
-                    color = GhostWhite.copy(alpha = 0.55f)
-                )
 
-                // Month Selector Toggles
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    PremiumButton(
-                        text = "Pilih Semua",
-                        onClick = { onSelectedMonthsChanged(availableMonths.toSet()) },
-                        isActive = true,
-                        fillMaxWidth = false,
-                        testTag = "select_all_months",
-                        horizontalPadding = 12.dp,
-                        verticalPadding = 6.dp
-                    )
-
-                    PremiumButton(
-                        text = "Kosongkan",
-                        onClick = { onSelectedMonthsChanged(emptySet()) },
-                        isActive = false,
-                        fillMaxWidth = false,
-                        testTag = "clear_all_months",
-                        horizontalPadding = 12.dp,
-                        verticalPadding = 6.dp
-                    )
-                }
-
-                // Render Selectable Months
-                val chunkedMonths = availableMonths.chunked(if (isWideScreen) 3 else 2)
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    chunkedMonths.forEach { rowMonths ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            rowMonths.forEach { month ->
-                                MonthSelectChip(
-                                    month = month,
-                                    isSelected = selectedMonths.contains(month),
-                                    onClick = {
-                                        val updated = if (selectedMonths.contains(month)) {
-                                            selectedMonths - month
-                                        } else {
-                                            selectedMonths + month
-                                        }
-                                        onSelectedMonthsChanged(updated)
-                                    },
-                                    modifier = Modifier.weight(1f)
-                                )
-                            }
-                            val emptySpaces = (if (isWideScreen) 3 else 2) - rowMonths.size
-                            if (emptySpaces > 0) {
-                                repeat(emptySpaces) {
-                                    Spacer(modifier = Modifier.weight(1f))
-                                }
-                            }
-                        }
-                    }
-                }
-            } else {
-                // Collapsed state month summary indicator
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { onIsMonthsExpandedChanged(true) }
-                        .background(GhostWhite.copy(alpha = 0.03f), shape = RoundedCornerShape(12.dp))
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    val formatter = remember { DateTimeFormatter.ofPattern("MMM yyyy", Locale("id", "ID")) }
-                    val displaySelectedStr = if (selectedMonths.isEmpty()) {
-                        "Tidak ada bulan terpilih"
-                    } else {
-                        selectedMonths.sorted().joinToString(", ") { it.format(formatter) }
-                    }
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "Periode terpilih (${selectedMonths.size} bulan):",
-                            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
-                            color = SteelBlue
-                        )
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = displaySelectedStr,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = GhostWhite.copy(alpha = 0.7f)
-                        )
-                    }
-
-                    Text(
-                        text = "Ubah",
-                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                        color = SteelBlue
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(4.dp))
-            HorizontalDivider(color = GhostWhite.copy(alpha = 0.08f))
-
-            // Buttons Layout (PDF Wide, CSV side-by-side)
-            PremiumButton(
-                text = "UNDUH LAPORAN PDF",
-                onClick = { onExportPdfFile(selectedMonths.toList()) },
-                isActive = selectedMonths.isNotEmpty(),
-                icon = Icons.Default.PictureAsPdf,
-                testTag = "export_pdf_button",
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            Spacer(modifier = Modifier.height(2.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                PremiumButton(
-                    text = "Ekspor Excel",
-                    onClick = { onExportCsvFile(selectedMonths.toList()) },
-                    isActive = selectedMonths.isNotEmpty(),
-                    icon = Icons.Default.Assessment,
-                    testTag = "export_csv_button",
-                    modifier = Modifier.weight(1f),
-                    horizontalPadding = 12.dp,
-                    verticalPadding = 10.dp
-                )
-
-                PremiumButton(
-                    text = "Impor Excel",
-                    onClick = onImportCsvFile,
-                    isActive = true,
-                    icon = Icons.Default.Download,
-                    testTag = "import_csv_button",
-                    modifier = Modifier.weight(1f),
-                    horizontalPadding = 12.dp,
-                    verticalPadding = 10.dp
-                )
-            }
-        }
-    }
-}
-
-@Composable
-fun SecuritySettingsSection(
-    isPinEnabled: Boolean,
-    onPinToggle: (Boolean) -> Unit,
-    isBiometricEnabled: Boolean,
-    onBiometricToggle: (Boolean) -> Unit
-) {
-    val context = LocalContext.current
-
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = TranslucentForm.copy(alpha = 0.65f)),
-        border = BorderStroke(
-            width = 1.dp,
-            brush = Brush.verticalGradient(
-                colors = listOf(GhostWhite.copy(alpha = 0.15f), GhostWhite.copy(alpha = 0.02f))
-            )
-        )
-    ) {
-        Column(
-            modifier = Modifier.padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            // Header of Security
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    modifier = Modifier
-                        .width(3.dp)
-                        .height(20.dp)
-                        .background(
-                            brush = Brush.verticalGradient(
-                                colors = listOf(SteelBlue, SteelBlue.copy(alpha = 0.4f))
-                            ),
-                            shape = RoundedCornerShape(2.dp)
-                        )
-                )
-                Spacer(modifier = Modifier.width(10.dp))
-                Text(
-                    text = "Aman & Kunci Aplikasi",
-                    style = MaterialTheme.typography.titleMedium.copy(
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 0.2.sp
-                    ),
-                    color = GhostWhite
-                )
-            }
-
-            Text(
-                text = "Aktifkan kunci pengaman PIN atau Biometrik Sidik Jari untuk mencegah orang lain melihat catatan keuangan Anda.",
-                style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp, lineHeight = 16.sp),
-                color = GhostWhite.copy(alpha = 0.55f)
-            )
-
-            // PIN Toggle Item
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "Kunci PIN 4-Angka",
-                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
-                        color = GhostWhite
-                    )
-                    Text(
-                        text = if (isPinEnabled) "PIN aktif" else "Amankan aplikasi dengan PIN rahasia",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = GhostWhite.copy(alpha = 0.5f)
-                    )
-                }
-                PremiumSwitch(
-                    checked = isPinEnabled,
-                    onCheckedChange = { checked ->
-                        onPinToggle(checked)
-                    }
-                )
-            }
-
-            HorizontalDivider(color = GhostWhite.copy(alpha = 0.08f))
-
-            // Biometrics Toggle Item
-            val isBiometricAllowed = isPinEnabled
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "Kunci Sidik Jari",
-                        style = MaterialTheme.typography.bodyMedium.copy(
-                            fontWeight = FontWeight.Bold,
-                            color = if (isBiometricAllowed) GhostWhite else GhostWhite.copy(alpha = 0.4f)
-                        )
-                    )
-                    Text(
-                        text = if (isBiometricAllowed) {
-                            "Gunakan sensor sidik jari perangkat untuk masuk dengan cepat"
-                        } else {
-                            "PIN harus aktif terlebih dahulu untuk mengaktifkan Kunci Sidik Jari"
-                        },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = if (isBiometricAllowed) GhostWhite.copy(alpha = 0.5f) else GhostWhite.copy(alpha = 0.25f)
-                    )
-                }
-                PremiumSwitch(
-                    checked = isBiometricEnabled && isBiometricAllowed,
-                    onCheckedChange = { checked ->
-                        if (!isBiometricAllowed) {
-                            Toast.makeText(context, "Untuk menggunakan fitur sidik jari, Anda harus mengaktifkan PIN terlebih dahulu!", Toast.LENGTH_LONG).show()
-                        } else {
-                            onBiometricToggle(checked)
-                        }
-                    }
-                )
-            }
-        }
-    }
-}
-
-@Composable
-fun NotificationReminderSection(
-    isReminderEnabled: Boolean,
-    onReminderToggle: (Boolean) -> Unit,
-    reminderHour: Int,
-    onReminderHourChanged: (Int) -> Unit,
-    reminderMinute: Int,
-    onReminderMinuteChanged: (Int) -> Unit
-) {
-    val context = LocalContext.current
-    var tempHour by remember(reminderHour) { mutableStateOf(reminderHour) }
-    var tempMinute by remember(reminderMinute) { mutableStateOf(reminderMinute) }
-
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = TranslucentForm.copy(alpha = 0.65f)),
-        border = BorderStroke(
-            width = 1.dp,
-            brush = Brush.verticalGradient(
-                colors = listOf(GhostWhite.copy(alpha = 0.15f), GhostWhite.copy(alpha = 0.02f))
-            )
-        )
-    ) {
-        Column(
-            modifier = Modifier.padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Box(
-                    modifier = Modifier
-                        .width(3.dp)
-                        .height(20.dp)
-                        .background(
-                        brush = Brush.verticalGradient(
-                            colors = listOf(SteelBlue, SteelBlue.copy(alpha = 0.4f))
-                        ),
-                        shape = RoundedCornerShape(2.dp)
-                    )
-                )
-                Spacer(modifier = Modifier.width(10.dp))
-                Text(
-                    text = "Pengingat Harian Keuangan",
-                    style = MaterialTheme.typography.titleMedium.copy(
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 0.2.sp
-                    ),
-                    color = GhostWhite
-                )
-            }
-
-            Text(
-                text = "Aktifkan pengingat notifikasi harian untuk membantu Anda konsisten mencatat keuangan pribadi setiap sore/malam.",
-                style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp, lineHeight = 16.sp),
-                color = GhostWhite.copy(alpha = 0.55f)
-            )
-
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "Aktifkan Pengingat",
-                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
-                        color = GhostWhite
-                    )
-                    Text(
-                        text = "Kirim notifikasi pukul ${String.format("%02d:%02d", reminderHour, reminderMinute)} WIB",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = GhostWhite.copy(alpha = 0.5f)
-                    )
-                }
-
-                if (isReminderEnabled) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(2.dp),
-                        modifier = Modifier.padding(end = 12.dp)
-                    ) {
-                        // Hour Column
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center
-                        ) {
-                            IconButton(
-                                onClick = {
-                                    tempHour = (tempHour + 1) % 24
-                                },
-                                modifier = Modifier.size(22.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.KeyboardArrowUp,
-                                    contentDescription = "Tambah Jam",
-                                    tint = SteelBlue,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
-
-                            // Editable Hour Box
-                            var hourTextState by remember(tempHour) { mutableStateOf(String.format("%02d", tempHour)) }
-                            BasicTextField(
-                                value = hourTextState,
-                                onValueChange = { input ->
-                                    val filtered = input.filter { it.isDigit() }.take(2)
-                                    hourTextState = filtered
-                                    if (filtered.isNotEmpty()) {
-                                        val num = filtered.toIntOrNull()
-                                        if (num != null && num in 0..23) {
-                                            tempHour = num
-                                        }
-                                    }
-                                },
-                                textStyle = MaterialTheme.typography.bodyMedium.copy(
-                                    color = GhostWhite,
-                                    fontWeight = FontWeight.Bold,
-                                    textAlign = TextAlign.Center
-                                ),
-                                keyboardOptions = KeyboardOptions(
-                                    keyboardType = KeyboardType.Number,
-                                    imeAction = ImeAction.Done
-                                ),
-                                singleLine = true,
-                                cursorBrush = SolidColor(SteelBlue),
-                                modifier = Modifier
-                                    .width(32.dp)
-                                    .height(24.dp)
-                                    .background(MidnightAbyss, shape = RoundedCornerShape(6.dp))
-                                    .border(1.dp, GhostWhite.copy(alpha = 0.2f), shape = RoundedCornerShape(6.dp))
-                                    .wrapContentHeight(Alignment.CenterVertically)
-                            )
-
-                            IconButton(
-                                onClick = {
-                                    tempHour = if (tempHour - 1 < 0) 23 else tempHour - 1
-                                },
-                                modifier = Modifier.size(22.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.KeyboardArrowDown,
-                                    contentDescription = "Kurang Jam",
-                                    tint = SteelBlue,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
-                        }
-
-                        // Separator Colon
-                        Text(
-                            text = ":",
-                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
-                            color = GhostWhite,
-                            modifier = Modifier.padding(bottom = 2.dp)
-                        )
-
-                        // Minute Column
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center
-                        ) {
-                            IconButton(
-                                onClick = {
-                                    tempMinute = (tempMinute + 1) % 60
-                                },
-                                modifier = Modifier.size(22.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.KeyboardArrowUp,
-                                    contentDescription = "Tambah Menit",
-                                    tint = SteelBlue,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
-
-                            // Editable Minute Box
-                            var minuteTextState by remember(tempMinute) { mutableStateOf(String.format("%02d", tempMinute)) }
-                            BasicTextField(
-                                value = minuteTextState,
-                                onValueChange = { input ->
-                                    val filtered = input.filter { it.isDigit() }.take(2)
-                                    minuteTextState = filtered
-                                    if (filtered.isNotEmpty()) {
-                                        val num = filtered.toIntOrNull()
-                                        if (num != null && num in 0..59) {
-                                            tempMinute = num
-                                        }
-                                    }
-                                },
-                                textStyle = MaterialTheme.typography.bodyMedium.copy(
-                                    color = GhostWhite,
-                                    fontWeight = FontWeight.Bold,
-                                    textAlign = TextAlign.Center
-                                ),
-                                keyboardOptions = KeyboardOptions(
-                                    keyboardType = KeyboardType.Number,
-                                    imeAction = ImeAction.Done
-                                ),
-                                singleLine = true,
-                                cursorBrush = SolidColor(SteelBlue),
-                                modifier = Modifier
-                                    .width(32.dp)
-                                    .height(24.dp)
-                                    .background(MidnightAbyss, shape = RoundedCornerShape(6.dp))
-                                    .border(1.dp, GhostWhite.copy(alpha = 0.2f), shape = RoundedCornerShape(6.dp))
-                                    .wrapContentHeight(Alignment.CenterVertically)
-                            )
-
-                            IconButton(
-                                onClick = {
-                                    tempMinute = if (tempMinute - 1 < 0) 59 else tempMinute - 1
-                                },
-                                modifier = Modifier.size(22.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.KeyboardArrowDown,
-                                    contentDescription = "Kurang Menit",
-                                    tint = SteelBlue,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                            }
-                        }
-                    }
-                }
-
-                PremiumSwitch(
-                    checked = isReminderEnabled,
-                    onCheckedChange = { checked ->
-                        onReminderToggle(checked)
-                    }
-                )
-            }
-
-            if (isReminderEnabled) {
-                val hasChanges = tempHour != reminderHour || tempMinute != reminderMinute
-                Button(
-                    onClick = {
-                        onReminderHourChanged(tempHour)
-                        onReminderMinuteChanged(tempMinute)
-                        com.example.util.NotificationScheduler.scheduleDailyReminder(context, true, tempHour, tempMinute)
-                        Toast.makeText(context, "Pengingat berhasil diatur ke pukul ${String.format("%02d:%02d", tempHour, tempMinute)} WIB!", Toast.LENGTH_SHORT).show()
-                    },
-                    modifier = Modifier.fillMaxWidth().height(38.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = if (hasChanges) SteelBlue else TranslucentGlass,
-                        contentColor = if (hasChanges) MidnightAbyss else GhostWhite
-                    ),
-                    shape = RoundedCornerShape(12.dp),
-                    border = if (!hasChanges) BorderStroke(1.dp, GhostWhite.copy(alpha = 0.15f)) else null,
-                    contentPadding = PaddingValues(0.dp)
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center
-                    ) {
-                        Icon(
-                            imageVector = if (hasChanges) Icons.Default.Check else Icons.Default.NotificationsActive,
-                            contentDescription = null,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = if (hasChanges) "TERAPKAN PERUBAHAN WAKTU" else "JADWAL AKTIF (Pukul ${String.format("%02d:%02d", reminderHour, reminderMinute)} WIB)",
-                            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp)
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
 
 @Composable
 fun DatabaseBackupSection(
@@ -841,7 +178,7 @@ fun DatabaseBackupSection(
                     title = { Text("Mulai Pencadangan Data", color = GhostWhite, fontWeight = FontWeight.Bold) },
                     text = {
                         Text(
-                            text = "Fitur ini memungkinkan Anda menyimpan seluruh data transaksi ke Google Drive secara otomatis maupun manual, sehingga data tetap aman meski aplikasi dihapus atau ganti perangkat.\n\n• Backup Otomatis: Data dicadangkan secara berkala sesuai jadwal yang Anda pilih (Harian/Mingguan).\n• Backup Manual: Ketuk tombol 'Cadangkan Sekarang' kapan saja untuk menyimpan data terbaru.\n• Pulihkan Data: Pilih file cadangan dari daftar untuk mengembalikan data ke kondisi tersebut.\n\nJika Anda tidak bisa login ke Google Drive atau mengalami masalah sinkronisasi, silakan hubungi developer untuk bantuan lebih lanjut.",
+                            text = "Fitur ini memungkinkan Anda menyimpan seluruh data transaksi ke Google Drive secara otomatis maupun manual, sehingga data tetap aman meski aplikasi dihapus atau ganti perangkat.\n\n• Backup Otomatis: Data dicadangkan secara berkala sesuai jadwal yang Anda pilih (Harian/Mingguan).\n\n⚠️ PENTING: Jika HP Anda membatasi latar belakang secara agresif (tipe Xiaomi, Oppo, Vivo, Samsung, dll.), sistem dapat mematikan back up otomatis saat aplikasi ditutup. Pastikan izin 'Mulai Otomatis' (Autostart) aktif dan atur mode hemat baterai ke 'Tanpa Batasan' (No Restrictions) untuk aplikasi ini.\n\n• Backup Manual: Ketuk tombol 'Cadangkan Sekarang' kapan saja untuk menyimpan data terbaru.\n• Pulihkan Data: Pilih file cadangan dari daftar untuk mengembalikan data ke kondisi tersebut.\n\nJika Anda tidak bisa login ke Google Drive atau mengalami masalah sinkronisasi, silakan hubungi developer untuk bantuan lebih lanjut.",
                             color = GhostWhite.copy(alpha = 0.8f),
                             style = MaterialTheme.typography.bodyMedium
                         )
@@ -881,7 +218,7 @@ fun DatabaseBackupSection(
                     checked = isAutoBackupEnabled,
                     onCheckedChange = { checked ->
                         onAutoBackupEnabledChanged(checked)
-                        BackupScheduler.schedulePeriodicBackup(context, checked, autoBackupInterval, autoBackupHour, autoBackupMinute, autoBackupDayOfWeek)
+                        BackupScheduler.schedulePeriodicBackup(context, checked, autoBackupInterval, autoBackupHour, autoBackupMinute, autoBackupDayOfWeek, forceUpdate = true)
                         Toast.makeText(context, if (checked) "Pencadangan otomatis aktif!" else "Pencadangan otomatis mati!", Toast.LENGTH_SHORT).show()
                     }
                 )
@@ -1084,7 +421,7 @@ fun DatabaseBackupSection(
                                             .clickable {
                                                 val newInterval = if (autoBackupInterval == "daily") "weekly" else "daily"
                                                 onAutoBackupIntervalChanged(newInterval)
-                                                BackupScheduler.schedulePeriodicBackup(context, true, newInterval, autoBackupHour, autoBackupMinute, autoBackupDayOfWeek)
+                                                BackupScheduler.schedulePeriodicBackup(context, true, newInterval, autoBackupHour, autoBackupMinute, autoBackupDayOfWeek, forceUpdate = true)
                                                 Toast.makeText(
                                                     context, 
                                                     "Siklus pencadangan diatur: ${if (newInterval == "daily") "Harian" else "Mingguan"}", 
@@ -1392,7 +729,7 @@ fun DatabaseBackupSection(
                                     if (autoBackupInterval == "weekly") {
                                         onAutoBackupDayOfWeekChanged(tempBackupDayOfWeek)
                                     }
-                                    BackupScheduler.schedulePeriodicBackup(context, true, autoBackupInterval, tempBackupHour, tempBackupMinute, if (autoBackupInterval == "weekly") tempBackupDayOfWeek else autoBackupDayOfWeek)
+                                    BackupScheduler.schedulePeriodicBackup(context, true, autoBackupInterval, tempBackupHour, tempBackupMinute, if (autoBackupInterval == "weekly") tempBackupDayOfWeek else autoBackupDayOfWeek, forceUpdate = true)
                                     val timeStr = String.format("%02d:%02d", tempBackupHour, tempBackupMinute)
                                     val toastMsg = if (autoBackupInterval == "weekly") {
                                         "Jadwal pencadangan otomatis diatur ke hari ${getDayNameIndonesian(tempBackupDayOfWeek)} pukul $timeStr WIB!"
@@ -1433,6 +770,80 @@ fun DatabaseBackupSection(
                                         style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp)
                                     )
                                 }
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(com.example.ui.theme.SteelBlue.copy(alpha = 0.08f), shape = RoundedCornerShape(12.dp))
+                        .border(1.dp, com.example.ui.theme.SteelBlue.copy(alpha = 0.2f), shape = RoundedCornerShape(12.dp))
+                        .padding(14.dp)
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.Warning,
+                                contentDescription = null,
+                                tint = com.example.ui.theme.SteelBlue,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = "Optimasi Latar Belakang & Baterai",
+                                style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold, color = com.example.ui.theme.SteelBlue)
+                            )
+                        }
+
+                        Text(
+                            text = "Beberapa sistem HP (terutama Xiaomi, Oppo, Vivo, Samsung, dll.) secara agresif membatasi aktivitas latar belakang untuk menghemat baterai, yang dapat menghentikan proses backup otomatis saat aplikasi ditutup.",
+                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp, lineHeight = 16.sp),
+                            color = GhostWhite.copy(alpha = 0.75f)
+                        )
+
+                        Text(
+                            text = "💡 Petunjuk: Pastikan izin 'Mulai Otomatis' (Autostart) aktif untuk aplikasi ini dan atur pembatasan baterai ke 'Tanpa Batasan' (No Restrictions) di pengaturan sistem.",
+                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp, lineHeight = 15.sp),
+                            color = GhostWhite.copy(alpha = 0.5f)
+                        )
+
+                        Spacer(modifier = Modifier.height(2.dp))
+
+                        Button(
+                            onClick = {
+                                try {
+                                    val intent = android.content.Intent(android.provider.Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
+                                    context.startActivity(intent)
+                                } catch (e: Exception) {
+                                    Toast.makeText(context, "Tidak dapat membuka pengaturan baterai secara otomatis. Silakan buka Pengaturan HP > Aplikasi > Penghemat Baterai secara manual.", Toast.LENGTH_LONG).show()
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth().height(34.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = com.example.ui.theme.SteelBlue.copy(alpha = 0.15f),
+                                contentColor = GhostWhite
+                            ),
+                            shape = RoundedCornerShape(8.dp),
+                            contentPadding = PaddingValues(0.dp)
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Settings,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "BUKA PENGATURAN BATERAI HP",
+                                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                                )
                             }
                         }
                     }

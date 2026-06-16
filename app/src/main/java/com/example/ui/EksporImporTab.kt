@@ -128,9 +128,7 @@ fun EksporImporTabContent(
     var isPinEnabled by remember { mutableStateOf(securityPrefs.getBoolean("pin_enabled", false)) }
     var savedPin by remember { mutableStateOf(securityPrefs.getString("saved_pin", "") ?: "") }
     var isBiometricEnabled by remember { mutableStateOf(securityPrefs.getBoolean("biometric_enabled", false)) }
-    var isReminderEnabled by remember { mutableStateOf(securityPrefs.getBoolean("reminder_enabled", false)) }
-    var reminderHour by remember { mutableStateOf(securityPrefs.getInt("reminder_hour", 20)) }
-    var reminderMinute by remember { mutableStateOf(securityPrefs.getInt("reminder_minute", 0)) }
+
 
     // Pin setups
     var isSetPinDialogOpen by remember { mutableStateOf(false) }
@@ -285,33 +283,7 @@ fun EksporImporTabContent(
                 }
             )
 
-            Spacer(modifier = Modifier.height(10.dp))
 
-            // Daily Reminder Settings Section Card
-            NotificationReminderSection(
-                isReminderEnabled = isReminderEnabled,
-                onReminderToggle = { checked ->
-                    isReminderEnabled = checked
-                    securityPrefs.edit().putBoolean("reminder_enabled", checked).commit()
-                    com.example.util.NotificationScheduler.scheduleDailyReminder(context, checked, reminderHour, reminderMinute)
-                },
-                reminderHour = reminderHour,
-                onReminderHourChanged = { hour ->
-                    reminderHour = hour
-                    securityPrefs.edit().putInt("reminder_hour", hour).commit()
-                    if (isReminderEnabled) {
-                        com.example.util.NotificationScheduler.scheduleDailyReminder(context, true, hour, reminderMinute)
-                    }
-                },
-                reminderMinute = reminderMinute,
-                onReminderMinuteChanged = { minute ->
-                    reminderMinute = minute
-                    securityPrefs.edit().putInt("reminder_minute", minute).commit()
-                    if (isReminderEnabled) {
-                        com.example.util.NotificationScheduler.scheduleDailyReminder(context, true, reminderHour, minute)
-                    }
-                }
-            )
 
             Spacer(modifier = Modifier.height(10.dp))
 

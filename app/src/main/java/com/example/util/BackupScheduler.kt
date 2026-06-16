@@ -12,7 +12,15 @@ import java.util.concurrent.TimeUnit
 object BackupScheduler {
     private const val UNIQUE_WORK_NAME = "AutoBackupWork"
 
-    fun schedulePeriodicBackup(context: Context, enabled: Boolean, interval: String, hour: Int = 2, minute: Int = 0, dayOfWeek: Int = Calendar.SUNDAY) {
+    fun schedulePeriodicBackup(
+        context: Context, 
+        enabled: Boolean, 
+        interval: String, 
+        hour: Int = 2, 
+        minute: Int = 0, 
+        dayOfWeek: Int = Calendar.SUNDAY,
+        forceUpdate: Boolean = false
+    ) {
         val workManager = WorkManager.getInstance(context)
 
         if (!enabled) {
@@ -45,22 +53,34 @@ object BackupScheduler {
 
         val repeatInterval = if (interval == "weekly") 7L else 1L
 
+        val constraints = androidx.work.Constraints.Builder()
+            .setRequiredNetworkType(androidx.work.NetworkType.CONNECTED)
+            .build()
+
         val periodicWorkRequest = PeriodicWorkRequestBuilder<BackupWorker>(
             repeatInterval, TimeUnit.DAYS
         )
+            .setConstraints(constraints)
             .setInitialDelay(initialDelay, TimeUnit.MILLISECONDS)
+            .setBackoffCriteria(
+                androidx.work.BackoffPolicy.EXPONENTIAL,
+                androidx.work.WorkRequest.MIN_BACKOFF_MILLIS,
+                TimeUnit.MILLISECONDS
+            )
             .addTag(UNIQUE_WORK_NAME)
             .build()
+
+        val policy = if (forceUpdate) ExistingPeriodicWorkPolicy.REPLACE else ExistingPeriodicWorkPolicy.KEEP
 
         try {
             workManager.enqueueUniquePeriodicWork(
                 UNIQUE_WORK_NAME,
-                ExistingPeriodicWorkPolicy.REPLACE,
+                policy,
                 periodicWorkRequest
             )
             Log.d(
                 "BackupScheduler", 
-                "Pencadangan otomatis diatur menggunakan WorkManager: $interval mulai pukul ${String.format("%02d:%02d", hour, minute)} (Initial delay: ${TimeUnit.MILLISECONDS.toMinutes(initialDelay)} menit)"
+                "Pencadangan otomatis diatur menggunakan WorkManager (${policy.name}): $interval mulai pukul ${String.format("%02d:%02d", hour, minute)} (Initial delay: ${TimeUnit.MILLISECONDS.toMinutes(initialDelay)} menit)"
             )
         } catch (e: Exception) {
             Log.e("BackupScheduler", "Gagal mengatur WorkManager untuk pencadangan otomatis: ${e.message}", e)
