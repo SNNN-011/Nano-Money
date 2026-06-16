@@ -89,7 +89,7 @@ object BackupHelper {
                 Log.w("BackupHelper", "Failed on PRAGMA wal_checkpoint, continuing backup: ${e.message}")
             }
 
-            val prefix = if (isAuto) "auto_backup_" else "manual_backup_"
+            val prefix = if (isAuto) "auto_DataNanoMoney_" else "manual_DataNanoMoney_"
             val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
             val backupFile = File(backupDir, "$prefix$timestamp.db")
 
@@ -135,7 +135,12 @@ object BackupHelper {
     fun getBackups(context: Context): List<File> {
         val backupDir = getBackupDirectory(context)
         return backupDir.listFiles { file -> 
-            file.name.endsWith(".db") && (file.name.startsWith("auto_backup_") || file.name.startsWith("manual_backup_"))
+            file.name.endsWith(".db") && (
+                file.name.startsWith("auto_backup_") || 
+                file.name.startsWith("manual_backup_") ||
+                file.name.startsWith("auto_DataNanoMoney_") ||
+                file.name.startsWith("manual_DataNanoMoney_")
+            )
         }?.sortedByDescending { it.lastModified() }?.toList() ?: emptyList()
     }
 
@@ -143,7 +148,7 @@ object BackupHelper {
         try {
             val backupDir = getBackupDirectory(context)
             val autoBackups = backupDir.listFiles { file -> 
-                file.name.startsWith("auto_backup_") && file.name.endsWith(".db")
+                (file.name.startsWith("auto_backup_") || file.name.startsWith("auto_DataNanoMoney_")) && file.name.endsWith(".db")
             }?.sortedBy { it.lastModified() } ?: return
 
             if (autoBackups.size > MAX_AUTO_BACKUPS) {

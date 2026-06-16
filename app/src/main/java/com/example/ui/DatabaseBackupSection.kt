@@ -178,7 +178,7 @@ fun DatabaseBackupSection(
                     title = { Text("Mulai Pencadangan Data", color = GhostWhite, fontWeight = FontWeight.Bold) },
                     text = {
                         Text(
-                            text = "Fitur ini memungkinkan Anda menyimpan seluruh data transaksi ke Google Drive secara otomatis maupun manual, sehingga data tetap aman meski aplikasi dihapus atau ganti perangkat.\n\n• Backup Otomatis: Data dicadangkan secara berkala sesuai jadwal yang Anda pilih (Harian/Mingguan).\n\n⚠️ PENTING: Jika HP Anda membatasi latar belakang secara agresif (tipe Xiaomi, Oppo, Vivo, Samsung, dll.), sistem dapat mematikan back up otomatis saat aplikasi ditutup. Pastikan izin 'Mulai Otomatis' (Autostart) aktif dan atur mode hemat baterai ke 'Tanpa Batasan' (No Restrictions) untuk aplikasi ini.\n\n• Backup Manual: Ketuk tombol 'Cadangkan Sekarang' kapan saja untuk menyimpan data terbaru.\n• Pulihkan Data: Pilih file cadangan dari daftar untuk mengembalikan data ke kondisi tersebut.\n\nJika Anda tidak bisa login ke Google Drive atau mengalami masalah sinkronisasi, silakan hubungi developer untuk bantuan lebih lanjut.",
+                            text = "Fitur ini memungkinkan Anda menyimpan seluruh data transaksi ke Google Drive secara otomatis maupun manual, sehingga data tetap aman meski aplikasi dihapus atau ganti perangkat.\n\n• Backup Otomatis: Data dicadangkan secara berkala sesuai jadwal yang Anda pilih (Harian/Mingguan).\n• Backup Manual: Ketuk tombol 'Cadangkan Sekarang' kapan saja untuk menyimpan data terbaru.\n• Pulihkan Data: Pilih file cadangan dari daftar untuk mengembalikan data ke kondisi tersebut.\n\nJika Anda tidak bisa login ke Google Drive atau mengalami masalah sinkronisasi, silakan hubungi developer untuk bantuan lebih lanjut.",
                             color = GhostWhite.copy(alpha = 0.8f),
                             style = MaterialTheme.typography.bodyMedium
                         )
@@ -770,80 +770,6 @@ fun DatabaseBackupSection(
                                         style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp)
                                     )
                                 }
-                            }
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(14.dp))
-
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(com.example.ui.theme.SteelBlue.copy(alpha = 0.08f), shape = RoundedCornerShape(12.dp))
-                        .border(1.dp, com.example.ui.theme.SteelBlue.copy(alpha = 0.2f), shape = RoundedCornerShape(12.dp))
-                        .padding(14.dp)
-                ) {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = Icons.Default.Warning,
-                                contentDescription = null,
-                                tint = com.example.ui.theme.SteelBlue,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = "Optimasi Latar Belakang & Baterai",
-                                style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold, color = com.example.ui.theme.SteelBlue)
-                            )
-                        }
-
-                        Text(
-                            text = "Beberapa sistem HP (terutama Xiaomi, Oppo, Vivo, Samsung, dll.) secara agresif membatasi aktivitas latar belakang untuk menghemat baterai, yang dapat menghentikan proses backup otomatis saat aplikasi ditutup.",
-                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp, lineHeight = 16.sp),
-                            color = GhostWhite.copy(alpha = 0.75f)
-                        )
-
-                        Text(
-                            text = "💡 Petunjuk: Pastikan izin 'Mulai Otomatis' (Autostart) aktif untuk aplikasi ini dan atur pembatasan baterai ke 'Tanpa Batasan' (No Restrictions) di pengaturan sistem.",
-                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp, lineHeight = 15.sp),
-                            color = GhostWhite.copy(alpha = 0.5f)
-                        )
-
-                        Spacer(modifier = Modifier.height(2.dp))
-
-                        Button(
-                            onClick = {
-                                try {
-                                    val intent = android.content.Intent(android.provider.Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
-                                    context.startActivity(intent)
-                                } catch (e: Exception) {
-                                    Toast.makeText(context, "Tidak dapat membuka pengaturan baterai secara otomatis. Silakan buka Pengaturan HP > Aplikasi > Penghemat Baterai secara manual.", Toast.LENGTH_LONG).show()
-                                }
-                            },
-                            modifier = Modifier.fillMaxWidth().height(34.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = com.example.ui.theme.SteelBlue.copy(alpha = 0.15f),
-                                contentColor = GhostWhite
-                            ),
-                            shape = RoundedCornerShape(8.dp),
-                            contentPadding = PaddingValues(0.dp)
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Settings,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(14.dp)
-                                )
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(
-                                    text = "BUKA PENGATURAN BATERAI HP",
-                                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                                )
                             }
                         }
                     }

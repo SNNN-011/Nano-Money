@@ -35,6 +35,7 @@ class BackupWorker(
                         .putLong("last_auto_backup_local_time", now)
                         .apply()
                     
+                    var driveStatus = "Tidak Aktif"
                     // Silently upload to Google Drive if account is connected
                     if (GoogleDriveHelper.getSignedInAccount(context) != null) {
                         try {
@@ -47,6 +48,7 @@ class BackupWorker(
                                         .putString("last_auto_backup_drive_status", "Sukses")
                                         .putLong("last_auto_backup_drive_time", now)
                                         .apply()
+                                    driveStatus = "Berhasil"
                                 }
                                 is GoogleDriveHelper.DriveResult.Error -> {
                                     Log.e("BackupWorker", "Gagal mengunggah otomatis cadangan ke Google Drive: ${uploadRes.message}")
@@ -54,6 +56,7 @@ class BackupWorker(
                                         .putString("last_auto_backup_drive_status", "Gagal: ${uploadRes.message}")
                                         .putLong("last_auto_backup_drive_time", now)
                                         .apply()
+                                    driveStatus = "Gagal (${uploadRes.message})"
                                     if (runAttemptCount < 3) {
                                         shouldRetry = true
                                     }
@@ -65,6 +68,7 @@ class BackupWorker(
                                 .putString("last_auto_backup_drive_status", "Gagal: ${uploadException.localizedMessage}")
                                 .putLong("last_auto_backup_drive_time", now)
                                 .apply()
+                            driveStatus = "Gagal (${uploadException.localizedMessage})"
                             if (runAttemptCount < 3) {
                                 shouldRetry = true
                             }
@@ -74,7 +78,9 @@ class BackupWorker(
                             .putString("last_auto_backup_drive_status", "Tidak Aktif (Google Drive belum terhubung)")
                             .putLong("last_auto_backup_drive_time", 0L)
                             .apply()
+                        driveStatus = "Tidak Aktif (Belum Terhubung)"
                     }
+                    showSuccessNotification(context, result.fileName, driveStatus)
                 }
                 is BackupHelper.BackupResult.Error -> {
                     Log.e("BackupWorker", "Pencadangan otomatis gagal: ${result.message}")
@@ -143,5 +149,43 @@ class BackupWorker(
             .build()
             
         notificationManager.notify(1002, notification)
+    }
+
+    private fun showSuccessNotification(context: Context, fileName: String, driveStatus: String) {
+        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        val channelId = "backup_success_notifications"
+        
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                channelId,
+                "Pencadangan Otomatis Berhasil",
+                NotificationManager.IMPORTANCE_DEFAULT
+            ).apply {
+                description = "Memberitahu jika pencadangan otomatis telah berhasil dilakukan."
+            }
+            notificationManager.createNotificationChannel(channel)
+        }
+        
+        val clickIntent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        }
+        val pendingIntentFlags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        } else {
+            PendingIntent.FLAG_UPDATE_CURRENT
+        }
+        val pendingIntent = PendingIntent.getActivity(context, 1001, clickIntent, pendingIntentFlags)
+        
+        val notification = NotificationCompat.Builder(context, channelId)
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setContentTitle("Pencadangan Otomatis Berhasil ✅")
+            .setContentText("Database berhasil dicadangkan: $fileName. Google Drive: $driveStatus")
+            .setStyle(NotificationCompat.BigTextStyle().bigText("Pencadangan otomatis berhasil diselesaikan.\n\n• File lokal: $fileName\n• Google Drive: $driveStatus"))
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setContentIntent(pendingIntent)
+            .setAutoCancel(true)
+            .build()
+            
+        notificationManager.notify(1001, notification)
     }
 }
