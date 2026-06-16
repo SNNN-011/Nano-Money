@@ -72,6 +72,40 @@ fun LockScreenOverlay(
         }
     }
 
+    LaunchedEffect(enteredPin) {
+        if (enteredPin.length == 4) {
+            delay(150) // Fix Bug 1: Allow UI to render 4th dot before freezing/navigating
+            val freshPin = securityPrefs.getString("saved_pin", "") ?: ""
+            if (enteredPin == freshPin) {
+                failedAttempts = 0
+                cooldownUntil = 0L
+                securityPrefs.edit()
+                    .putInt("failed_pin_attempts", 0)
+                    .putLong("cooldown_until", 0L)
+                    .apply()
+                onUnlock()
+            } else {
+                val nextFails = failedAttempts + 1
+                failedAttempts = nextFails
+                if (nextFails >= 5) {
+                    val triggerTime = System.currentTimeMillis() + 30000
+                    cooldownUntil = triggerTime
+                    securityPrefs.edit()
+                        .putInt("failed_pin_attempts", nextFails)
+                        .putLong("cooldown_until", triggerTime)
+                        .apply()
+                    errorMessage = "Terlalu banyak percobaan."
+                } else {
+                    securityPrefs.edit()
+                        .putInt("failed_pin_attempts", nextFails)
+                        .apply()
+                    errorMessage = "PIN Salah! Sisa percobaan: ${5 - nextFails}"
+                }
+                enteredPin = ""
+            }
+        }
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -234,36 +268,6 @@ fun LockScreenOverlay(
                                             .clickable(enabled = remainingCooldownSeconds == 0L) {
                                                 if (enteredPin.length < 4) {
                                                     enteredPin += key
-                                                    if (enteredPin.length == 4) {
-                                                        val freshPin = securityPrefs.getString("saved_pin", "") ?: ""
-                                                        if (enteredPin == freshPin) {
-                                                            failedAttempts = 0
-                                                            cooldownUntil = 0L
-                                                            securityPrefs.edit()
-                                                                .putInt("failed_pin_attempts", 0)
-                                                                .putLong("cooldown_until", 0L)
-                                                                .apply()
-                                                            onUnlock()
-                                                        } else {
-                                                            val nextFails = failedAttempts + 1
-                                                            failedAttempts = nextFails
-                                                            if (nextFails >= 5) {
-                                                                val triggerTime = System.currentTimeMillis() + 30000
-                                                                cooldownUntil = triggerTime
-                                                                securityPrefs.edit()
-                                                                    .putInt("failed_pin_attempts", nextFails)
-                                                                    .putLong("cooldown_until", triggerTime)
-                                                                    .apply()
-                                                                errorMessage = "Terlalu banyak percobaan."
-                                                            } else {
-                                                                securityPrefs.edit()
-                                                                    .putInt("failed_pin_attempts", nextFails)
-                                                                    .apply()
-                                                                errorMessage = "PIN Salah! Sisa percobaan: ${5 - nextFails}"
-                                                            }
-                                                            enteredPin = ""
-                                                        }
-                                                    }
                                                 }
                                             },
                                         contentAlignment = Alignment.Center

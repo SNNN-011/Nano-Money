@@ -12,7 +12,6 @@ import java.io.InputStreamReader
 object SecurityUtil {
     private const val TAG = "SecurityUtil"
     private fun getDynamicXorKey(): String {
-        // Stored as an array of integers that are shifted (Value = CharCode + 7)
         val hiddenKey = intArrayOf(
             75, 104, 107, 104, 107, 104, 122, 78, 108, 116, 112, 117, 112, 52, 58, 53, 
             56, 52, 115, 112, 123, 108, 52, 109, 115, 104, 122, 111, 59, 60, 71, 101, 
@@ -27,10 +26,51 @@ object SecurityUtil {
     }
 
     /**
+     * Detects dynamic instrumentation (e.g., Frida, Xposed) and active debuggers.
+     * If detected, immediately terminates the application.
+     */
+    private fun checkDebuggingAndHooks() {
+        try {
+            // 1. Check TracerPid to detect active debugging
+            val statusFile = File("/proc/self/status")
+            if (statusFile.exists()) {
+                statusFile.forEachLine { line ->
+                    if (line.startsWith("TracerPid:")) {
+                        val pid = line.substringAfter("TracerPid:").trim().toIntOrNull()
+                        if (pid != null && pid > 0) {
+                            Log.e(TAG, "Debugger detected! TracerPid: $pid")
+                            kotlin.system.exitProcess(0)
+                        }
+                    }
+                }
+            }
+
+            // 2. Scan loaded memory maps for suspicious libraries (Anti-Frida/Xposed)
+            val mapsFile = File("/proc/self/maps")
+            if (mapsFile.exists()) {
+                mapsFile.forEachLine { line ->
+                    val lowerLine = line.lowercase()
+                    if (lowerLine.contains("frida") || 
+                        lowerLine.contains("xposed") ||
+                        lowerLine.contains("edxposed") ||
+                        lowerLine.contains("lsposed") ||
+                        lowerLine.contains("substrate")) {
+                        Log.e(TAG, "Hooking framework detected via memory map: $line")
+                        kotlin.system.exitProcess(0) // Forcefully exit
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to perform security checks", e)
+        }
+    }
+
+    /**
      * Decrypts an obfuscated string. The string should be XORed with a static key
      * and then Base64 encoded before being stored in BuildConfig/.env.
      */
     fun decryptObfuscatedString(encryptedBase64: String): String {
+        checkDebuggingAndHooks()
         try {
             val dynamicKey = getDynamicXorKey()
             val cleanStr = encryptedBase64.trim().replace("\"", "")

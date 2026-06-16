@@ -43,6 +43,8 @@ import androidx.compose.ui.layout.ContentScale
 import android.net.Uri
 import android.os.Build
 import android.provider.MediaStore
+import android.widget.Toast
+import androidx.core.content.ContextCompat
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.ui.platform.LocalContext
@@ -75,6 +77,16 @@ fun ChatScreen(
             } catch (e: Exception) {
                 e.printStackTrace()
             }
+        }
+    }
+
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted: Boolean ->
+        if (isGranted) {
+            cameraLauncher.launch(null)
+        } else {
+            Toast.makeText(context, "Izin kamera ditolak. Tidak dapat membuka kamera.", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -154,7 +166,12 @@ fun ChatScreen(
                         text = "Ambil Foto Langsung",
                         onClick = {
                             showSourceSelector = false
-                            cameraLauncher.launch(null)
+                            val permissionStatus = ContextCompat.checkSelfPermission(context, android.Manifest.permission.CAMERA)
+                            if (permissionStatus == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                                cameraLauncher.launch(null)
+                            } else {
+                                cameraPermissionLauncher.launch(android.Manifest.permission.CAMERA)
+                            }
                         },
                         modifier = Modifier.fillMaxWidth(),
                         isActive = true,
