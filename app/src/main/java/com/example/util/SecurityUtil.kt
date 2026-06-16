@@ -2,6 +2,7 @@ package com.example.util
 
 import android.content.Context
 import android.os.Build
+import android.util.Base64
 import android.util.Log
 import com.example.BuildConfig
 import java.io.BufferedReader
@@ -10,6 +11,28 @@ import java.io.InputStreamReader
 
 object SecurityUtil {
     private const val TAG = "SecurityUtil"
+    private const val XOR_KEY = "DadadasGemini-3.1-lite-flash45@^DadadasNanoMoney45@^"
+
+    /**
+     * Decrypts an obfuscated string. The string should be XORed with a static key
+     * and then Base64 encoded before being stored in BuildConfig/.env.
+     */
+    fun decryptObfuscatedString(encryptedBase64: String): String {
+        try {
+            val cleanStr = encryptedBase64.trim().replace("\"", "")
+            if (cleanStr.isBlank()) return ""
+            // Try to decode Base64
+            val decodedBytes = Base64.decode(cleanStr, Base64.DEFAULT)
+            var decrypted = ""
+            for (i in decodedBytes.indices) {
+                decrypted += (decodedBytes[i].toInt() xor XOR_KEY[i % XOR_KEY.length].code).toChar()
+            }
+            return decrypted
+        } catch (e: Exception) {
+            // If it fails (e.g. not a valid Base64 or standard string), just return the fallback/original
+            return encryptedBase64.trim().replace("\"", "")
+        }
+    }
 
     enum class SecurityStatus {
         SAFE,

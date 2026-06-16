@@ -98,13 +98,29 @@ interface GeminiApiService {
 
 object GeminiClient {
     private val BASE_URL = try {
-        com.example.BuildConfig.GEMINI_BASE_URL.trim().replace("\"", "").ifEmpty { "https://your-cloudflare-worker-url.workers.dev/" }
+        val rawUrl = com.example.BuildConfig.GEMINI_BASE_URL
+        val decryptedUrl = com.example.util.SecurityUtil.decryptObfuscatedString(rawUrl)
+        val finalUrl = if (decryptedUrl.startsWith("http")) decryptedUrl else rawUrl.trim().replace("\"", "")
+        
+        if (finalUrl.isEmpty() || finalUrl.contains("your-cloudflare-worker-url")) {
+            "https://generativelanguage.googleapis.com/"
+        } else {
+            finalUrl
+        }
     } catch (e: Throwable) {
-        "https://your-cloudflare-worker-url.workers.dev/"
+        "https://generativelanguage.googleapis.com/"
     }
 
     private val WORKER_SECRET_KEY = try {
-        com.example.BuildConfig.WORKER_SECRET_KEY.trim().replace("\"", "")
+        val rawSecret = com.example.BuildConfig.WORKER_SECRET_KEY
+        val decryptedSecret = com.example.util.SecurityUtil.decryptObfuscatedString(rawSecret)
+        
+        // If decrypted secret contains unprintable characters, assume fallback to raw
+        if (decryptedSecret.isNotEmpty() && !decryptedSecret.any { it.code < 32 }) {
+            decryptedSecret
+        } else {
+            rawSecret.trim().replace("\"", "")
+        }
     } catch (e: Throwable) {
         ""
     }
@@ -123,6 +139,10 @@ object GeminiClient {
             sb.append((x xor obfuscationKey).toChar())
         }
         return sb.toString()
+    }
+
+    private fun cleanString(input: String): String {
+        return input.replace(Regex("[^a-zA-Z0-9+/=:-]"), "").trim()
     }
 
     private val okHttpClient = OkHttpClient.Builder().apply {
@@ -181,9 +201,20 @@ object GeminiClient {
     }
 
     fun getFullUrl(path: String): String {
+        var cleanPath = if (path.startsWith("/")) path.substring(1) else path
+        
+        // If calling the direct standard Google Gemini API, map unsupported mockup models to standard ones
+        if (BASE_URL.contains("googleapis.com")) {
+            if (cleanPath.contains("models/gemma-4-31b-it") || cleanPath.contains("models/gemini-3.1-flash-lite") || cleanPath.contains("models/gemini-2.0-flash-lite")) {
+                cleanPath = cleanPath
+                    .replace("models/gemma-4-31b-it", "models/gemini-1.5-flash")
+                    .replace("models/gemini-3.1-flash-lite", "models/gemini-1.5-flash")
+                    .replace("models/gemini-2.0-flash-lite", "models/gemini-1.5-flash")
+            }
+        }
+        
         val base = BASE_URL.trim()
         val cleanBase = if (base.endsWith("/")) base else "$base/"
-        val cleanPath = if (path.startsWith("/")) path.substring(1) else path
         return cleanBase + cleanPath
     }
 }

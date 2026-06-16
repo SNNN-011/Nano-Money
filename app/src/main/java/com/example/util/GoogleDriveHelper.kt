@@ -11,6 +11,7 @@ import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.api.Scope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import okhttp3.CertificatePinner
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -333,9 +334,9 @@ object GoogleDriveHelper {
         
         // Build a query focusing specifically on our backups folder if found
         val query = if (!folderId.isNullOrEmpty()) {
-            "name contains 'backup_' and name contains '.db' and '$folderId' in parents and trashed = false"
+            "(name contains 'backup_' or name contains 'DataNanoMoney_') and name contains '.db' and '$folderId' in parents and trashed = false"
         } else {
-            "name contains 'backup_' and name contains '.db' and trashed = false"
+            "(name contains 'backup_' or name contains 'DataNanoMoney_') and name contains '.db' and trashed = false"
         }
         val url = "https://www.googleapis.com/drive/v3/files?q=${java.net.URLEncoder.encode(query, "UTF-8")}&fields=files(id,name,createdTime,size)&orderBy=createdTime desc"
 

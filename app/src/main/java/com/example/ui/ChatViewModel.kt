@@ -332,7 +332,7 @@ class ChatViewModel(
                 is com.example.domain.RequestResult.Error -> {
                     val e = resultStatus.e
                     val errorMessage = if (e is IOException) {
-                        "Gagal terhubung. Periksa koneksimu ya 🙏"
+                        "Gagal terhubung. Periksa koneksimu ya 🙏 (Detail: ${e.javaClass.simpleName} - ${e.message})"
                     } else if (e is retrofit2.HttpException) {
                         val errorBodyText = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                             try { e.response()?.errorBody()?.string() } catch (ioe: java.io.IOException) { "gagal" }
