@@ -46,6 +46,7 @@ import android.provider.MediaStore
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.window.Dialog
 import com.example.ui.util.CategoryIconMapper
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -107,88 +108,140 @@ fun ChatScreen(
     }
 
     if (showModelInfo) {
-        AlertDialog(
-            onDismissRequest = { showModelInfo = false },
-            title = { Text("Informasi AI", color = GhostWhite, fontWeight = FontWeight.Bold) },
-            text = {
-                Text(
-                    text = "Jika Gemma mengalami error atau respons tidak akurat, coba ganti ke model Gemini untuk hasil yang lebih baik.",
-                    color = GhostWhite.copy(alpha = 0.8f),
-                    style = MaterialTheme.typography.bodyMedium
-                )
-            },
-            confirmButton = {
-                TextButton(onClick = { showModelInfo = false }) {
-                    Text("Mengerti", color = SteelBlue, fontWeight = FontWeight.Bold)
+        Dialog(onDismissRequest = { showModelInfo = false }) {
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(containerColor = MidnightAbyss),
+                border = BorderStroke(
+                    width = 1.dp,
+                    brush = Brush.verticalGradient(
+                        colors = listOf(
+                            GhostWhite.copy(alpha = 0.2f),
+                            GhostWhite.copy(alpha = 0.02f)
+                        )
+                    )
+                ),
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+            ) {
+                Box(modifier = Modifier.background(TranslucentGlass)) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(24.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        Text(
+                            text = "Informasi AI",
+                            color = GhostWhite,
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold
+                        )
+
+                        Text(
+                            text = "Jika Gemma mengalami error atau respons tidak akurat, coba ganti ke model Gemini untuk hasil yang lebih baik.",
+                            color = GhostWhite.copy(alpha = 0.8f),
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        PremiumButton(
+                            text = "Mengerti",
+                            onClick = { showModelInfo = false },
+                            isActive = true,
+                            modifier = Modifier.fillMaxWidth(),
+                            testTag = "model_info_understand_button"
+                        )
+                    }
                 }
-            },
-            containerColor = MidnightAbyss,
-            titleContentColor = GhostWhite,
-            textContentColor = GhostWhite
-        )
+            }
+        }
     }
 
     if (showSourceSelector) {
-        AlertDialog(
-            onDismissRequest = { showSourceSelector = false },
-            title = {
-                Text(
-                    text = "Ambil Struk Belanja",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = GhostWhite,
-                    fontWeight = FontWeight.Bold
-                )
-            },
-            text = {
-                Column(
-                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Text(
-                        text = "Silakan pilih sumber foto struk belanja Anda untuk dipindai oleh AI.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = GhostWhite.copy(alpha = 0.7f),
-                        modifier = Modifier.padding(bottom = 8.dp)
+        Dialog(onDismissRequest = { showSourceSelector = false }) {
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(containerColor = MidnightAbyss),
+                border = BorderStroke(
+                    width = 1.dp,
+                    brush = Brush.verticalGradient(
+                        colors = listOf(
+                            GhostWhite.copy(alpha = 0.2f),
+                            GhostWhite.copy(alpha = 0.02f)
+                        )
                     )
-                    
-                    PremiumButton(
-                        text = "Ambil Foto Langsung",
-                        onClick = {
-                            showSourceSelector = false
-                            cameraLauncher.launch(null)
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        isActive = true,
-                        icon = Icons.Default.AddAPhoto,
-                        testTag = "camera_button"
-                    )
+                ),
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+            ) {
+                Box(modifier = Modifier.background(TranslucentGlass)) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(24.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        Text(
+                            text = "Ambil Struk Belanja",
+                            style = MaterialTheme.typography.titleLarge,
+                            color = GhostWhite,
+                            fontWeight = FontWeight.Bold
+                        )
 
-                    PremiumButton(
-                        text = "Pilih dari Galeri",
-                        onClick = {
-                            showSourceSelector = false
-                            imagePickerLauncher.launch("image/*")
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        isActive = false,
-                        icon = Icons.Default.Image,
-                        testTag = "gallery_button"
-                    )
+                        Text(
+                            text = "Silakan pilih sumber foto struk belanja Anda untuk dipindai oleh AI.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = GhostWhite.copy(alpha = 0.7f)
+                        )
+
+                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            PremiumButton(
+                                text = "Ambil Foto Langsung",
+                                onClick = {
+                                    showSourceSelector = false
+                                    cameraLauncher.launch(null)
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                isActive = true,
+                                icon = Icons.Default.AddAPhoto,
+                                testTag = "camera_button"
+                            )
+
+                            PremiumButton(
+                                text = "Pilih dari Galeri",
+                                onClick = {
+                                    showSourceSelector = false
+                                    imagePickerLauncher.launch("image/*")
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                isActive = false,
+                                icon = Icons.Default.Image,
+                                testTag = "gallery_button"
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(4.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.End
+                        ) {
+                            PremiumButton(
+                                text = "Batal",
+                                onClick = { showSourceSelector = false },
+                                isActive = false,
+                                testTag = "cancel_source_selector_button",
+                                fillMaxWidth = false,
+                                horizontalPadding = 24.dp,
+                                verticalPadding = 8.dp
+                            )
+                        }
+                    }
                 }
-            },
-            confirmButton = {},
-            dismissButton = {
-                PremiumButton(
-                    text = "Batal",
-                    onClick = { showSourceSelector = false },
-                    isActive = false,
-                    testTag = "cancel_source_selector_button",
-                    fillMaxWidth = false
-                )
-            },
-            containerColor = MidnightAbyss,
-            shape = RoundedCornerShape(24.dp)
-        )
+            }
+        }
     }
 
     val pendingConfirmationForDialog by viewModel.pendingConfirmation.collectAsState()

@@ -18,6 +18,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -112,25 +113,53 @@ fun UnifiedExportCard(
             }
 
             if (showPdfHelpInfo) {
-                AlertDialog(
-                    onDismissRequest = { showPdfHelpInfo = false },
-                    title = { Text("Informasi Ekspor PDF", color = GhostWhite, fontWeight = FontWeight.Bold) },
-                    text = {
-                        Text(
-                            text = "Ekspor laporan keuangan Anda dalam format PDF yang rapi dan profesional.\n\n• Pilih satu atau beberapa bulan sekaligus untuk dijadikan laporan.\n• Setiap bulan ditampilkan di halaman terpisah agar mudah dibaca.\n• Laporan mencakup ringkasan statistik, grafik arus kas, pie chart kategori pengeluaran, dan tabel transaksi lengkap.\n• File PDF langsung tersimpan di penyimpanan perangkat Anda dan bisa dibagikan kapan saja.",
-                            color = GhostWhite.copy(alpha = 0.8f),
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                    },
-                    confirmButton = {
-                        TextButton(onClick = { showPdfHelpInfo = false }) {
-                            Text("Mengerti", color = SteelBlue, fontWeight = FontWeight.Bold)
+                Dialog(onDismissRequest = { showPdfHelpInfo = false }) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth().padding(16.dp),
+                        shape = RoundedCornerShape(24.dp),
+                        colors = CardDefaults.cardColors(containerColor = MidnightAbyss),
+                        border = BorderStroke(
+                            width = 1.dp,
+                            brush = Brush.verticalGradient(
+                                colors = listOf(
+                                    GhostWhite.copy(alpha = 0.2f),
+                                    GhostWhite.copy(alpha = 0.02f)
+                                )
+                            )
+                        ),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+                    ) {
+                        Box(modifier = Modifier.background(TranslucentGlass)) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(24.dp),
+                                verticalArrangement = Arrangement.spacedBy(16.dp)
+                            ) {
+                                Text(
+                                    text = "Informasi Ekspor PDF",
+                                    color = GhostWhite,
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = "Ekspor laporan keuangan Anda dalam format PDF yang rapi dan profesional.\n\n• Pilih satu atau beberapa bulan sekaligus untuk dijadikan laporan.\n• Setiap bulan ditampilkan di halaman terpisah agar mudah dibaca.\n• Laporan mencakup ringkasan statistik, grafik arus kas, pie chart kategori pengeluaran, dan tabel transaksi lengkap.\n• File PDF langsung tersimpan di penyimpanan perangkat Anda dan bisa dibagikan kapan saja.",
+                                    color = GhostWhite.copy(alpha = 0.8f),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    lineHeight = 20.sp
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                PremiumButton(
+                                    text = "Mengerti",
+                                    onClick = { showPdfHelpInfo = false },
+                                    isActive = true,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    testTag = "pdf_info_dismiss"
+                                )
+                            }
                         }
-                    },
-                    containerColor = MidnightAbyss,
-                    titleContentColor = GhostWhite,
-                    textContentColor = GhostWhite
-                )
+                    }
+                }
             }
 
             if (isMonthsExpanded) {

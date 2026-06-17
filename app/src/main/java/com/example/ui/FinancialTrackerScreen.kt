@@ -401,9 +401,8 @@ fun FinancialTrackerScreen(
                         onClick = {
                             focusManager.clearFocus()
                             navController.navigate(TrackerTab.CHAT.name) {
-                                popUpTo(TrackerTab.BERANDA.name) { saveState = true }
+                                popUpTo(TrackerTab.BERANDA.name) { inclusive = false }
                                 launchSingleTop = true
-                                restoreState = true
                             }
                         },
                         icon = { Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = "Chat", modifier = Modifier.size(20.dp)) },
@@ -425,9 +424,8 @@ fun FinancialTrackerScreen(
                                 viewModel.resetForm()
                             }
                             navController.navigate(TrackerTab.TRANSAKSI_BARU.name) {
-                                popUpTo(TrackerTab.BERANDA.name) { saveState = true }
+                                popUpTo(TrackerTab.BERANDA.name) { inclusive = false }
                                 launchSingleTop = true
-                                restoreState = true
                             }
                         },
                         icon = { Icon(Icons.Default.AddCircleOutline, contentDescription = "Transaksi Baru", modifier = Modifier.size(20.dp)) },
@@ -446,9 +444,8 @@ fun FinancialTrackerScreen(
                         onClick = {
                             focusManager.clearFocus()
                             navController.navigate(TrackerTab.KALENDER.name) {
-                                popUpTo(TrackerTab.BERANDA.name) { saveState = true }
+                                popUpTo(TrackerTab.BERANDA.name) { inclusive = false }
                                 launchSingleTop = true
-                                restoreState = true
                             }
                         },
                         icon = { Icon(Icons.Default.DateRange, contentDescription = "Kalender", modifier = Modifier.size(20.dp)) },
@@ -467,9 +464,8 @@ fun FinancialTrackerScreen(
                         onClick = { 
                             focusManager.clearFocus()
                             navController.navigate(TrackerTab.EKSPOR_IMPOR.name) {
-                                popUpTo(TrackerTab.BERANDA.name) { saveState = true }
+                                popUpTo(TrackerTab.BERANDA.name) { inclusive = false }
                                 launchSingleTop = true
-                                restoreState = true
                             }
                         },
                         icon = { Icon(Icons.Default.ImportExport, contentDescription = "Ekspor Impor", modifier = Modifier.size(20.dp)) },
@@ -560,7 +556,14 @@ fun FinancialTrackerScreen(
                                     popUpTo(TrackerTab.BERANDA.name) { inclusive = true }
                                 }
                             },
-                            onReset = { viewModel.resetForm() },
+                            onReset = { 
+                                viewModel.resetForm() 
+                                if (!navController.popBackStack()) {
+                                    navController.navigate(TrackerTab.BERANDA.name) {
+                                        popUpTo(TrackerTab.BERANDA.name) { inclusive = true }
+                                    }
+                                }
+                            },
                             onSaveRecord = { viewModel.validateAndSave() }
                         )
                     }

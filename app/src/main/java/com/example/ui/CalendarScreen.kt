@@ -1,5 +1,6 @@
 package com.example.ui
 
+import androidx.compose.animation.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -275,101 +276,148 @@ fun CalendarTabContent(
             // Include analysis content directly within Kalender screen
             AnalysisTabContent(viewModel = analysisViewModel)
         }
-    }
 
-    // Modal BottomSheet for Detail Transactions
-    if (showBottomSheet) {
-
-        ModalBottomSheet(
-            onDismissRequest = { showBottomSheet = false },
-            containerColor = CalBgCardSheet,
-            contentColor = CalTeksUtama,
-            dragHandle = { BottomSheetDefaults.DragHandle(color = CalTeksSekunder.copy(alpha = 0.4f)) },
-            modifier = Modifier.testTag("calendar_detail_bottom_sheet")
+        // 1. Semi-transparent dimming background backdrop
+        AnimatedVisibility(
+            visible = showBottomSheet,
+            enter = fadeIn(),
+            exit = fadeOut()
         ) {
-            Column(
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.5f))
+                    .clickable { showBottomSheet = false }
+            )
+        }
+
+        // 2. Custom slide-up animated Bottom Card
+        AnimatedVisibility(
+            visible = showBottomSheet,
+            enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
+            exit = slideOutVertically(targetOffsetY = { it }) + fadeOut(),
+            modifier = Modifier.align(Alignment.BottomCenter)
+        ) {
+            Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .windowInsetsPadding(WindowInsets.navigationBars)
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                    .align(Alignment.BottomCenter),
+                shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+                colors = CardDefaults.cardColors(containerColor = MidnightAbyss),
+                border = BorderStroke(
+                    width = 1.dp,
+                    brush = Brush.verticalGradient(
+                        colors = listOf(
+                            GhostWhite.copy(alpha = 0.2f),
+                            GhostWhite.copy(alpha = 0.02f)
+                        )
+                    )
+                ),
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
             ) {
-                // Header Date Title Indonesian
-                Text(
-                    text = getFormattedIndonesianHeaderDate(selectedDate),
-                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                    color = CalTeksUtama,
-                    modifier = Modifier.padding(bottom = 16.dp)
-                )
-
-                if (selectedDateTransactions.isEmpty()) {
-                    // Empty state layout
+                Box(modifier = Modifier.background(TranslucentGlass)) {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 32.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                            .windowInsetsPadding(WindowInsets.navigationBars)
+                            .padding(horizontal = 24.dp, vertical = 20.dp)
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.CalendarToday,
-                            contentDescription = "Empty",
-                            tint = CalTeksSekunder,
-                            modifier = Modifier.size(48.dp)
+                        // Drag handle visual indicator
+                        Box(
+                            modifier = Modifier
+                                .align(Alignment.CenterHorizontally)
+                                .width(36.dp)
+                                .height(4.dp)
+                                .background(CalTeksSekunder.copy(alpha = 0.3f), RoundedCornerShape(2.dp))
                         )
+
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        // Header Date Title Indonesian
                         Text(
-                            text = "Tidak ada transaksi di tanggal ini",
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = CalTeksSekunder,
-                            textAlign = TextAlign.Center
+                            text = getFormattedIndonesianHeaderDate(selectedDate),
+                            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                            color = CalTeksUtama,
+                            modifier = Modifier.padding(bottom = 16.dp)
                         )
-                        PremiumButton(
-                            text = "Tambah Transaksi",
-                            onClick = {
-                                onNavigateToNewTransaction(selectedDate)
-                                showBottomSheet = false
-                            },
-                            isActive = true,
-                            icon = Icons.Default.Add,
-                            testTag = "bottom_sheet_add_trans_empty_btn",
-                            fillMaxWidth = false
-                        )
-                    }
-                } else {
-                    // List of transactions
-                    LazyColumn(
-                        modifier = Modifier
-                            .weight(1f, fill = false)
-                            .padding(bottom = 16.dp)
-                    ) {
-                        items(selectedDateTransactions, key = { it.id }) { record ->
-                            TransactionListItem(
-                                record = record,
-                                onEdit = {
-                                    onNavigateToEditTransaction(record)
+
+                        if (selectedDateTransactions.isEmpty()) {
+                            // Empty state layout
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 24.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(16.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.CalendarToday,
+                                    contentDescription = "Empty",
+                                    tint = CalTeksSekunder,
+                                    modifier = Modifier.size(48.dp)
+                                )
+                                Text(
+                                    text = "Tidak ada transaksi di tanggal ini",
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = CalTeksSekunder,
+                                    textAlign = TextAlign.Center
+                                )
+                                PremiumButton(
+                                    text = "Tambah Transaksi",
+                                    onClick = {
+                                        onNavigateToNewTransaction(selectedDate)
+                                        showBottomSheet = false
+                                    },
+                                    isActive = true,
+                                    icon = Icons.Default.Add,
+                                    testTag = "bottom_sheet_add_trans_empty_btn",
+                                    fillMaxWidth = false
+                                )
+                            }
+                        } else {
+                            // List of transactions
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(max = 240.dp)
+                            ) {
+                                LazyColumn(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(bottom = 16.dp)
+                                ) {
+                                    items(selectedDateTransactions, key = { it.id }) { record ->
+                                        TransactionListItem(
+                                            record = record,
+                                            onEdit = {
+                                                onNavigateToEditTransaction(record)
+                                                showBottomSheet = false
+                                            },
+                                            onDelete = {
+                                                onDeleteRecord(record)
+                                            }
+                                        )
+                                        HorizontalDivider(color = CalTeksSekunder.copy(alpha = 0.1f))
+                                    }
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            // Floating action button inside BottomSheet bottom area
+                            PremiumButton(
+                                text = "Tambah Transaksi",
+                                onClick = {
+                                    onNavigateToNewTransaction(selectedDate)
                                     showBottomSheet = false
                                 },
-                                onDelete = {
-                                    onDeleteRecord(record)
-                                }
+                                isActive = true,
+                                icon = Icons.Default.Add,
+                                testTag = "bottom_sheet_add_trans_btn",
+                                modifier = Modifier.fillMaxWidth()
                             )
-                            HorizontalDivider(color = CalTeksSekunder.copy(alpha = 0.1f))
                         }
                     }
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    // Floating action button inside BottomSheet bottom area
-                    PremiumButton(
-                        text = "Tambah Transaksi",
-                        onClick = {
-                            onNavigateToNewTransaction(selectedDate)
-                            showBottomSheet = false
-                        },
-                        isActive = true,
-                        icon = Icons.Default.Add,
-                        testTag = "bottom_sheet_add_trans_btn",
-                        modifier = Modifier.fillMaxWidth()
-                    )
                 }
             }
         }

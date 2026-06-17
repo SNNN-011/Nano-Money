@@ -120,9 +120,7 @@ object BackupHelper {
                 }
             }
 
-            if (isAuto) {
-                cleanOldAutoBackups(context)
-            }
+            cleanOldBackups(context)
 
             Log.d("BackupHelper", "Settings and database successfully backed up to ${backupFile.absolutePath}")
             BackupResult.Success(backupFile.name)
@@ -144,22 +142,17 @@ object BackupHelper {
         }?.sortedByDescending { it.lastModified() }?.toList() ?: emptyList()
     }
 
-    private fun cleanOldAutoBackups(context: Context) {
+    private fun cleanOldBackups(context: Context) {
         try {
-            val backupDir = getBackupDirectory(context)
-            val autoBackups = backupDir.listFiles { file -> 
-                (file.name.startsWith("auto_backup_") || file.name.startsWith("auto_DataNanoMoney_")) && file.name.endsWith(".db")
-            }?.sortedBy { it.lastModified() } ?: return
-
-            if (autoBackups.size > MAX_AUTO_BACKUPS) {
-                val toDeleteCount = autoBackups.size - MAX_AUTO_BACKUPS
-                for (i in 0 until toDeleteCount) {
-                    autoBackups[i].delete()
-                    Log.d("BackupHelper", "Deleted old auto backup: ${autoBackups[i].name}")
+            val allBackups = getBackups(context)
+            if (allBackups.size > 5) {
+                for (i in 5 until allBackups.size) {
+                    allBackups[i].delete()
+                    Log.d("BackupHelper", "Menghapus cadangan lokal lama untuk membatasi maksimal 5: ${allBackups[i].name}")
                 }
             }
         } catch (e: Exception) {
-            Log.e("BackupHelper", "Error cleaning old backups: ${e.message}")
+            Log.e("BackupHelper", "Gagal membersihkan cadangan lama: ${e.message}")
         }
     }
 

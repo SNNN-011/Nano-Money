@@ -117,11 +117,11 @@ object GoogleDriveHelper {
     }
 
     /**
-     * Helper to retrieve or create the dedicated "NanoMoney_Backups" folder in the user's Google Drive.
+     * Helper to retrieve or create the dedicated "Backup Nano Money" folder in the user's Google Drive.
      */
     private fun getOrCreateFolderId(token: String): String? {
         try {
-            val query = "mimeType = 'application/vnd.google-apps.folder' and name = 'NanoMoney_Backups' and trashed = false"
+            val query = "mimeType = 'application/vnd.google-apps.folder' and name = 'Backup Nano Money' and trashed = false"
             val searchUrl = "https://www.googleapis.com/drive/v3/files?q=${java.net.URLEncoder.encode(query, "UTF-8")}&fields=files(id)"
             val request = Request.Builder()
                 .url(searchUrl)
@@ -141,12 +141,12 @@ object GoogleDriveHelper {
                     return filesArr.getJSONObject(0).getString("id")
                 }
             } else {
-                Log.w(TAG, "Gagal mencari folder NanoMoney_Backups: HTTP ${response.code}")
+                Log.w(TAG, "Gagal mencari folder Backup Nano Money: HTTP ${response.code}")
             }
 
             // Folder does not exist, let's create it
             val folderMetadata = JSONObject().apply {
-                put("name", "NanoMoney_Backups")
+                put("name", "Backup Nano Money")
                 put("mimeType", "application/vnd.google-apps.folder")
             }.toString()
 
@@ -289,6 +289,21 @@ object GoogleDriveHelper {
         return DriveResult.Success(fileIdToUpload)
     }
 
+    private fun tryCleanOldDriveBackups(token: String) {
+        try {
+            val driveFiles = listBackupsFromDriveInternal(token)
+            if (driveFiles.size > 5) {
+                for (i in 5 until driveFiles.size) {
+                    val fileToDelete = driveFiles[i]
+                    deleteBackupFromDriveInternal(token, fileToDelete.id)
+                    Log.i(TAG, "Menghapus cadangan Drive lama untuk membatasi maksimal 5: ${fileToDelete.name} (${fileToDelete.id})")
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Gagal membersihkan cadangan Drive lama: ${e.message}", e)
+        }
+    }
+
     /**
      * Upload backup database (.db) file to Google Drive.
      */
@@ -305,7 +320,11 @@ object GoogleDriveHelper {
 
         try {
             val folderId = getOrCreateFolderId(token)
-            uploadBackupToDriveInternal(token, backupFile, folderId)
+            val result = uploadBackupToDriveInternal(token, backupFile, folderId)
+            if (result is DriveResult.Success) {
+                tryCleanOldDriveBackups(token)
+            }
+            result
         } catch (unauthorized: UnauthorizedException) {
             Log.w(TAG, "Koneksi Google Drive unauthorized (token expired). Mencoba menyegarkan token...")
             tokenResult = fetchAccessToken(context, forceRefresh = true)
@@ -315,7 +334,11 @@ object GoogleDriveHelper {
             token = (tokenResult as DriveResult.Success).data
             try {
                 val folderId = getOrCreateFolderId(token)
-                uploadBackupToDriveInternal(token, backupFile, folderId)
+                val result = uploadBackupToDriveInternal(token, backupFile, folderId)
+                if (result is DriveResult.Success) {
+                    tryCleanOldDriveBackups(token)
+                }
+                result
             } catch (e: Exception) {
                 Log.e(TAG, "Gagal mengunggah cadangan setelah penyeleksian ulang token: ${e.message}", e)
                 DriveResult.Error("Gagal mengunggah berkas ke Google Drive: ${e.localizedMessage ?: "Kesalahan tidak diketahui."}")

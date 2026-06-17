@@ -28,6 +28,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import com.example.ui.theme.*
 
 @Composable
@@ -650,25 +651,55 @@ fun DashboardStatsSection(
     }
 
     if (showRutinInfo) {
-        AlertDialog(
-            onDismissRequest = { showRutinInfo = false },
-            title = { Text("Transaksi Rutin", color = GhostWhite, fontWeight = FontWeight.Bold) },
-            text = {
-                Text(
-                    text = "Transaksi Rutin memungkinkan Anda membuat transaksi yang otomatis tercatat setiap bulan tanpa perlu input manual.\n\nContoh penggunaan:\n• Gaji masuk setiap tanggal 1\n• Cicilan atau tagihan rutin setiap bulan\n• Uang jajan mingguan\n\nTransaksi akan otomatis ditambahkan ke catatan sesuai tanggal dan frekuensi yang Anda tentukan.",
-                    color = GhostWhite.copy(alpha = 0.8f),
-                    style = MaterialTheme.typography.bodyMedium
-                )
-            },
-            confirmButton = {
-                TextButton(onClick = { showRutinInfo = false }) {
-                    Text("Mengerti", color = SteelBlue, fontWeight = FontWeight.Bold)
+        Dialog(onDismissRequest = { showRutinInfo = false }) {
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(containerColor = MidnightAbyss),
+                border = BorderStroke(
+                    width = 1.dp,
+                    brush = Brush.verticalGradient(
+                        colors = listOf(
+                            GhostWhite.copy(alpha = 0.2f),
+                            GhostWhite.copy(alpha = 0.02f)
+                        )
+                    )
+                ),
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+            ) {
+                Box(modifier = Modifier.background(TranslucentGlass)) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(24.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        Text(
+                            text = "Transaksi Rutin",
+                            color = GhostWhite,
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold
+                        )
+
+                        Text(
+                            text = "Transaksi Rutin memungkinkan Anda membuat transaksi yang otomatis tercatat setiap bulan tanpa perlu input manual.\n\nContoh penggunaan:\n• Gaji masuk setiap tanggal 1\n• Cicilan atau tagihan rutin setiap bulan\n• Uang jajan mingguan\n\nTransaksi akan otomatis ditambahkan ke catatan sesuai tanggal dan frekuensi yang Anda tentukan.",
+                            color = GhostWhite.copy(alpha = 0.8f),
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        PremiumButton(
+                            text = "Mengerti",
+                            onClick = { showRutinInfo = false },
+                            isActive = true,
+                            modifier = Modifier.fillMaxWidth(),
+                            testTag = "rutin_info_understand_button"
+                        )
+                    }
                 }
-            },
-            containerColor = MidnightAbyss,
-            titleContentColor = GhostWhite,
-            textContentColor = GhostWhite
-        )
+            }
+        }
     }
 }
 

@@ -73,14 +73,26 @@ class MainActivity : FragmentActivity() {
           
           val needsLock = isPinEnabled || isBiometricEnabled
           var isAppUnlocked by remember { mutableStateOf(!needsLock) }
-          var showPermissionDialog by remember { mutableStateOf(!securityPrefs.getBoolean("permission_dialog_shown", false)) }
           var isLaunching by remember { mutableStateOf(true) }
           
           val permissionLauncher = rememberLauncherForActivityResult(
               contract = ActivityResultContracts.RequestMultiplePermissions()
           ) { _ ->
               securityPrefs.edit().putBoolean("permission_dialog_shown", true).apply()
-              showPermissionDialog = false
+          }
+
+          LaunchedEffect(isAppUnlocked, isLaunching) {
+              if (isAppUnlocked && !isLaunching) {
+                  if (!securityPrefs.getBoolean("permission_dialog_shown", false)) {
+                      val permissions = mutableListOf<String>()
+                      if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                          permissions.add(android.Manifest.permission.POST_NOTIFICATIONS)
+                      }
+                      permissions.add(android.Manifest.permission.CAMERA)
+                      permissionLauncher.launch(permissions.toTypedArray())
+                      securityPrefs.edit().putBoolean("permission_dialog_shown", true).apply()
+                  }
+              }
           }
           
           if (isLaunching) {
@@ -102,201 +114,7 @@ class MainActivity : FragmentActivity() {
               }
             )
           } else {
-            if (showPermissionDialog) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(MidnightAbyss)
-                        .padding(24.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .verticalScroll(rememberScrollState()),
-                        shape = RoundedCornerShape(24.dp),
-                        colors = CardDefaults.cardColors(containerColor = TranslucentForm.copy(alpha = 0.9f)),
-                        border = BorderStroke(
-                            width = 1.dp,
-                            brush = Brush.verticalGradient(
-                                colors = listOf(GhostWhite.copy(alpha = 0.2f), GhostWhite.copy(alpha = 0.02f))
-                            )
-                        )
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(24.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(20.dp)
-                        ) {
-                            // Header Icon
-                            Box(
-                                modifier = Modifier
-                                    .size(64.dp)
-                                    .background(SteelBlue.copy(alpha = 0.15f), RoundedCornerShape(20.dp)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Security,
-                                    contentDescription = null,
-                                    tint = SteelBlue,
-                                    modifier = Modifier.size(32.dp)
-                                )
-                            }
-
-                            // Header Text
-                            Text(
-                                text = "Izin Akses Aplikasi",
-                                style = MaterialTheme.typography.titleLarge.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 22.sp,
-                                    color = GhostWhite
-                                ),
-                                textAlign = TextAlign.Center
-                            )
-
-                            Text(
-                                text = "Demi kelancaran pelacakan keuangan, pencadangan otomatis harian, dan notifikasi pengingat tepat waktu, aplikasi memerlukan beberapa izin akses operasional:",
-                                style = MaterialTheme.typography.bodyMedium.copy(
-                                    color = GhostWhite.copy(alpha = 0.7f),
-                                    lineHeight = 20.sp
-                                ),
-                                textAlign = TextAlign.Center
-                            )
-
-                            Spacer(modifier = Modifier.height(4.dp))
-
-                            // Benefit Row 1: Notifications
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .background(TranslucentGlass, RoundedCornerShape(16.dp))
-                                    .padding(16.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(40.dp)
-                                        .background(SteelBlue.copy(alpha = 0.1f), RoundedCornerShape(12.dp)),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Notifications,
-                                        contentDescription = null,
-                                        tint = SteelBlue,
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                }
-                                Spacer(modifier = Modifier.width(16.dp))
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = "Notifikasi & Pengingat",
-                                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold, color = GhostWhite)
-                                    )
-                                    Text(
-                                        text = "Mengingatkan Anda mencatat pemasukan & pengeluaran di jam yang Anda tentukan agar keuangan tetap terkontrol.",
-                                        style = MaterialTheme.typography.bodySmall.copy(color = GhostWhite.copy(alpha = 0.5f), lineHeight = 16.sp)
-                                    )
-                                }
-                            }
-
-                            // Benefit Row 2: Camera
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .background(TranslucentGlass, RoundedCornerShape(16.dp))
-                                    .padding(16.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(40.dp)
-                                        .background(SteelBlue.copy(alpha = 0.1f), RoundedCornerShape(12.dp)),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.CameraAlt,
-                                        contentDescription = null,
-                                        tint = SteelBlue,
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                }
-                                Spacer(modifier = Modifier.width(16.dp))
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = "Akses Kamera (Scan)",
-                                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold, color = GhostWhite)
-                                    )
-                                    Text(
-                                        text = "Memudahkan pengunggahan atau pemindaian foto kuitansi/nota secara instan melalui asisten obrolan AI.",
-                                        style = MaterialTheme.typography.bodySmall.copy(color = GhostWhite.copy(alpha = 0.5f), lineHeight = 16.sp)
-                                    )
-                                }
-                            }
-
-                            Spacer(modifier = Modifier.height(12.dp))
-
-                            // Action buttons
-                            Column(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalArrangement = Arrangement.spacedBy(10.dp)
-                            ) {
-                                // Grant Button with Beautiful Gradient
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(48.dp)
-                                        .clip(RoundedCornerShape(16.dp))
-                                        .background(
-                                            brush = Brush.verticalGradient(
-                                                colors = listOf(SteelBlue, SteelBlue.copy(alpha = 0.7f))
-                                            ),
-                                            shape = RoundedCornerShape(16.dp)
-                                        )
-                                        .clickable {
-                                            val permissions = mutableListOf<String>()
-                                            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
-                                                permissions.add(android.Manifest.permission.POST_NOTIFICATIONS)
-                                            }
-                                            permissions.add(android.Manifest.permission.CAMERA)
-                                            permissionLauncher.launch(permissions.toTypedArray())
-                                        },
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text = "Izinkan Akses",
-                                        color = MidnightAbyss,
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 14.sp
-                                    )
-                                }
-
-                                // Skip button
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .height(48.dp)
-                                        .clip(RoundedCornerShape(16.dp))
-                                        .border(1.dp, GhostWhite.copy(alpha = 0.2f), RoundedCornerShape(16.dp))
-                                        .clickable {
-                                            securityPrefs.edit().putBoolean("permission_dialog_shown", true).apply()
-                                            showPermissionDialog = false
-                                        },
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text = "Nanti Saja",
-                                        color = GhostWhite.copy(alpha = 0.8f),
-                                        fontWeight = FontWeight.Bold,
-                                        fontSize = 14.sp
-                                    )
-                                }
-                            }
-                        }
-                    }
-                }
-            } else {
-                FinancialTrackerScreen(application = application, showStartupSplash = false)
-            }
+            FinancialTrackerScreen(application = application, showStartupSplash = false)
           }
          }
         }

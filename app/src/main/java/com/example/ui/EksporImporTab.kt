@@ -45,6 +45,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.clickable
+import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import android.widget.Toast
@@ -340,198 +341,249 @@ fun EksporImporTabContent(
 
             // 1. Confirm Restore Local Backup Dialog
             if (selectedBackupToRestore != null) {
-                AlertDialog(
-                    onDismissRequest = { selectedBackupToRestore = null },
-                    containerColor = MidnightAbyss,
-                    title = {
-                        Text(
-                            text = "Konfirmasi Pemulihan",
-                            color = GhostWhite,
-                            fontWeight = FontWeight.Bold
-                        )
-                    },
-                    text = {
-                        Text(
-                            text = "Apakah Anda yakin ingin memulihkan database dari salinan cadangan ini? Seluruh data catatan keuangan aktif saat ini akan ditimpa dengan data cadangan.\n\nSetelah klik pulihkan, aplikasi akan memuat ulang data.",
-                            color = GhostWhite.copy(alpha = 0.8f),
-                            fontSize = 13.sp,
-                            lineHeight = 18.sp
-                        )
-                    },
-                    confirmButton = {
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            PremiumButton(
-                                text = "Batal",
-                                onClick = { selectedBackupToRestore = null },
-                                isActive = false,
-                                modifier = Modifier.weight(1f),
-                                horizontalPadding = 8.dp,
-                                verticalPadding = 6.dp
+                Dialog(onDismissRequest = { selectedBackupToRestore = null }) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth().padding(16.dp),
+                        shape = RoundedCornerShape(24.dp),
+                        colors = CardDefaults.cardColors(containerColor = MidnightAbyss),
+                        border = BorderStroke(
+                            width = 1.dp,
+                            brush = Brush.verticalGradient(
+                                colors = listOf(
+                                    GhostWhite.copy(alpha = 0.2f),
+                                    GhostWhite.copy(alpha = 0.02f)
+                                )
                             )
-                            PremiumButton(
-                                text = "PULIHKAN & MULAI ULANG",
-                                onClick = {
-                                    val backupToRestore = selectedBackupToRestore
-                                    selectedBackupToRestore = null
-                                    if (backupToRestore != null) {
-                                        val success = BackupHelper.restoreBackup(context, backupToRestore)
-                                        if (success) {
-                                            Toast.makeText(context, "Database berhasil dipulihkan!", Toast.LENGTH_LONG).show()
-                                        } else {
-                                            Toast.makeText(context, "Gagal memulihkan database", Toast.LENGTH_LONG).show()
-                                        }
-                                    }
-                                },
-                                isActive = true,
-                                modifier = Modifier.weight(1.5f),
-                                horizontalPadding = 8.dp,
-                                verticalPadding = 6.dp
-                            )
+                        ),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+                    ) {
+                        Box(modifier = Modifier.background(TranslucentGlass)) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(24.dp),
+                                verticalArrangement = Arrangement.spacedBy(16.dp)
+                            ) {
+                                Text(
+                                    text = "Konfirmasi Pemulihan",
+                                    color = GhostWhite,
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = "Apakah Anda yakin ingin memulihkan database dari salinan cadangan ini? Seluruh data catatan keuangan aktif saat ini akan ditimpa dengan data cadangan.\n\nSetelah klik pulihkan, aplikasi akan memuat ulang data.",
+                                    color = GhostWhite.copy(alpha = 0.8f),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    lineHeight = 20.sp
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    PremiumButton(
+                                        text = "Batal",
+                                        onClick = { selectedBackupToRestore = null },
+                                        isActive = false,
+                                        modifier = Modifier.weight(1f),
+                                        testTag = "cancel_restore_local_backup"
+                                    )
+                                    PremiumButton(
+                                        text = "Pulihkan & Mulai Ulang",
+                                        onClick = {
+                                            val backupToRestore = selectedBackupToRestore
+                                            selectedBackupToRestore = null
+                                            if (backupToRestore != null) {
+                                                val success = BackupHelper.restoreBackup(context, backupToRestore)
+                                                if (success) {
+                                                    Toast.makeText(context, "Database berhasil dipulihkan!", Toast.LENGTH_LONG).show()
+                                                } else {
+                                                    Toast.makeText(context, "Gagal memulihkan database", Toast.LENGTH_LONG).show()
+                                                }
+                                            }
+                                        },
+                                        isActive = true,
+                                        modifier = Modifier.weight(1.5f),
+                                        testTag = "confirm_restore_local_backup"
+                                    )
+                                }
+                            }
                         }
                     }
-                )
+                }
             }
 
             // 2. Google Drive Upload Local Backup Dialog
             if (selectedLocalBackupToUpload != null) {
-                AlertDialog(
-                    onDismissRequest = { selectedLocalBackupToUpload = null },
-                    containerColor = MidnightAbyss,
-                    title = {
-                        Text(
-                            text = "Unggah ke Google Drive",
-                            color = GhostWhite,
-                            fontWeight = FontWeight.Bold
-                        )
-                    },
-                    text = {
-                        Text(
-                            text = "Apakah Anda yakin ingin mengunggah berkas cadangan '${selectedLocalBackupToUpload?.name}' ke Google Drive Anda? Berkas ini akan tersimpan aman dari kehilangan lokal.",
-                            color = GhostWhite.copy(alpha = 0.8f),
-                            fontSize = 13.sp,
-                            lineHeight = 18.sp
-                        )
-                    },
-                    confirmButton = {
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            PremiumButton(
-                                text = "Batal",
-                                onClick = { selectedLocalBackupToUpload = null },
-                                isActive = false,
-                                modifier = Modifier.weight(1f),
-                                horizontalPadding = 8.dp,
-                                verticalPadding = 6.dp
+                Dialog(onDismissRequest = { selectedLocalBackupToUpload = null }) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth().padding(16.dp),
+                        shape = RoundedCornerShape(24.dp),
+                        colors = CardDefaults.cardColors(containerColor = MidnightAbyss),
+                        border = BorderStroke(
+                            width = 1.dp,
+                            brush = Brush.verticalGradient(
+                                colors = listOf(
+                                    GhostWhite.copy(alpha = 0.2f),
+                                    GhostWhite.copy(alpha = 0.02f)
+                                )
                             )
-                            PremiumButton(
-                                text = "UNGGAH",
-                                onClick = {
-                                    val localFile = selectedLocalBackupToUpload
-                                    selectedLocalBackupToUpload = null
-                                    if (localFile != null) {
-                                        coroutineScope.launch {
-                                            isDriveProcessing = true
-                                            when (val res = GoogleDriveHelper.uploadBackupToDrive(context, localFile)) {
-                                                is GoogleDriveHelper.DriveResult.Success -> {
-                                                    Toast.makeText(context, "Sukses mengunggah cadangan ke Google Drive!", Toast.LENGTH_SHORT).show()
-                                                    val listRes = GoogleDriveHelper.listBackupsFromDrive(context)
-                                                    if (listRes is GoogleDriveHelper.DriveResult.Success) {
-                                                        driveBackupList = listRes.data
+                        ),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+                    ) {
+                        Box(modifier = Modifier.background(TranslucentGlass)) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(24.dp),
+                                verticalArrangement = Arrangement.spacedBy(16.dp)
+                            ) {
+                                Text(
+                                    text = "Unggah ke Google Drive",
+                                    color = GhostWhite,
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = "Apakah Anda yakin ingin mengunggah berkas cadangan '${selectedLocalBackupToUpload?.name}' ke Google Drive Anda? Berkas ini akan tersimpan aman dari kehilangan lokal.",
+                                    color = GhostWhite.copy(alpha = 0.8f),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    lineHeight = 20.sp
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    PremiumButton(
+                                        text = "Batal",
+                                        onClick = { selectedLocalBackupToUpload = null },
+                                        isActive = false,
+                                        modifier = Modifier.weight(1f),
+                                        testTag = "cancel_upload_to_drive"
+                                    )
+                                    PremiumButton(
+                                        text = "Unggah",
+                                        onClick = {
+                                            val localFile = selectedLocalBackupToUpload
+                                            selectedLocalBackupToUpload = null
+                                            if (localFile != null) {
+                                                coroutineScope.launch {
+                                                    isDriveProcessing = true
+                                                    when (val res = GoogleDriveHelper.uploadBackupToDrive(context, localFile)) {
+                                                        is GoogleDriveHelper.DriveResult.Success -> {
+                                                            Toast.makeText(context, "Sukses mengunggah cadangan ke Google Drive!", Toast.LENGTH_SHORT).show()
+                                                            val listRes = GoogleDriveHelper.listBackupsFromDrive(context)
+                                                            if (listRes is GoogleDriveHelper.DriveResult.Success) {
+                                                                driveBackupList = listRes.data
+                                                            }
+                                                        }
+                                                        is GoogleDriveHelper.DriveResult.Error -> {
+                                                            driveErrorDetailMessage = res.message
+                                                        }
                                                     }
-                                                }
-                                                is GoogleDriveHelper.DriveResult.Error -> {
-                                                    driveErrorDetailMessage = res.message
+                                                    isDriveProcessing = false
                                                 }
                                             }
-                                            isDriveProcessing = false
-                                        }
-                                    }
-                                },
-                                isActive = true,
-                                modifier = Modifier.weight(1.2f),
-                                horizontalPadding = 8.dp,
-                                verticalPadding = 6.dp
-                            )
+                                        },
+                                        isActive = true,
+                                        modifier = Modifier.weight(1.2f),
+                                        testTag = "confirm_upload_to_drive"
+                                    )
+                                }
+                            }
                         }
                     }
-                )
+                }
             }
 
             // 3. Google Drive Cloud Backup Restore Dialog
             if (selectedDriveBackupToRestore != null) {
-                AlertDialog(
-                    onDismissRequest = { selectedDriveBackupToRestore = null },
-                    containerColor = MidnightAbyss,
-                    title = {
-                        Text(
-                            text = "Pulihkan dari Google Drive",
-                            color = GhostWhite,
-                            fontWeight = FontWeight.Bold
-                        )
-                    },
-                    text = {
-                        Text(
-                            text = "Perhatian: Mengunduh dan memulihkan berkas dari Google Drive akan menimpa seluruh database lokal aktif Anda dengan data cadangan cloud ini.\n\nAplikasi akan mengunduh berkas, menuliskannya, dan secara otomatis memuat ulang saat pemulihan berhasil. Apakah Anda ingin melanjutkan?",
-                            color = GhostWhite.copy(alpha = 0.8f),
-                            fontSize = 13.sp,
-                            lineHeight = 18.sp
-                        )
-                    },
-                    confirmButton = {
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            PremiumButton(
-                                text = "Batal",
-                                onClick = { selectedDriveBackupToRestore = null },
-                                isActive = false,
-                                modifier = Modifier.weight(1f),
-                                horizontalPadding = 8.dp,
-                                verticalPadding = 6.dp
+                Dialog(onDismissRequest = { selectedDriveBackupToRestore = null }) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth().padding(16.dp),
+                        shape = RoundedCornerShape(24.dp),
+                        colors = CardDefaults.cardColors(containerColor = MidnightAbyss),
+                        border = BorderStroke(
+                            width = 1.dp,
+                            brush = Brush.verticalGradient(
+                                colors = listOf(
+                                    GhostWhite.copy(alpha = 0.2f),
+                                    GhostWhite.copy(alpha = 0.02f)
+                                )
                             )
-                            PremiumButton(
-                                text = "UNDUH & PULIHKAN",
-                                onClick = {
-                                    val driveFile = selectedDriveBackupToRestore
-                                    selectedDriveBackupToRestore = null
-                                    if (driveFile != null) {
-                                        coroutineScope.launch {
-                                            isDriveProcessing = true
-                                            val localTargetDir = BackupHelper.getBackupDirectory(context)
-                                            val localTempFile = File(localTargetDir, "temp_cloud_restore_${driveFile.name}")
-                                            
-                                            when (val downloadRes = GoogleDriveHelper.downloadBackupFromDrive(context, driveFile.id, localTempFile)) {
-                                                is GoogleDriveHelper.DriveResult.Success -> {
-                                                    val successRestore = BackupHelper.restoreBackup(context, localTempFile)
-                                                    localTempFile.delete()
-                                                    if (successRestore) {
-                                                        Toast.makeText(context, "Database berhasil dipulihkan dari Cloud!", Toast.LENGTH_LONG).show()
-                                                    } else {
-                                                        Toast.makeText(context, "Gagal menimpa database dengan berkas hasil unduhan.", Toast.LENGTH_LONG).show()
+                        ),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+                    ) {
+                        Box(modifier = Modifier.background(TranslucentGlass)) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(24.dp),
+                                verticalArrangement = Arrangement.spacedBy(16.dp)
+                            ) {
+                                Text(
+                                    text = "Pulihkan dari Google Drive",
+                                    color = GhostWhite,
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = "Perhatian: Mengunduh dan memulihkan berkas dari Google Drive akan menimpa seluruh database lokal aktif Anda dengan data cadangan cloud ini.\n\nAplikasi akan mengunduh berkas, menuliskannya, dan secara otomatis memuat ulang saat pemulihan berhasil. Apakah Anda ingin melanjutkan?",
+                                    color = GhostWhite.copy(alpha = 0.8f),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    lineHeight = 20.sp
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    PremiumButton(
+                                        text = "Batal",
+                                        onClick = { selectedDriveBackupToRestore = null },
+                                        isActive = false,
+                                        modifier = Modifier.weight(1f),
+                                        testTag = "cancel_restore_from_drive"
+                                    )
+                                    PremiumButton(
+                                        text = "Unduh & Pulihkan",
+                                        onClick = {
+                                            val driveFile = selectedDriveBackupToRestore
+                                            selectedDriveBackupToRestore = null
+                                            if (driveFile != null) {
+                                                coroutineScope.launch {
+                                                    isDriveProcessing = true
+                                                    val localTargetDir = BackupHelper.getBackupDirectory(context)
+                                                    val localTempFile = File(localTargetDir, "temp_cloud_restore_${driveFile.name}")
+                                                    
+                                                    when (val downloadRes = GoogleDriveHelper.downloadBackupFromDrive(context, driveFile.id, localTempFile)) {
+                                                        is GoogleDriveHelper.DriveResult.Success -> {
+                                                            val successRestore = BackupHelper.restoreBackup(context, localTempFile)
+                                                            localTempFile.delete()
+                                                            if (successRestore) {
+                                                                Toast.makeText(context, "Database berhasil dipulihkan dari Cloud!", Toast.LENGTH_LONG).show()
+                                                            } else {
+                                                                Toast.makeText(context, "Gagal menimpa database dengan berkas hasil unduhan.", Toast.LENGTH_LONG).show()
+                                                            }
+                                                        }
+                                                        is GoogleDriveHelper.DriveResult.Error -> {
+                                                            driveErrorDetailMessage = downloadRes.message
+                                                        }
                                                     }
-                                                }
-                                                is GoogleDriveHelper.DriveResult.Error -> {
-                                                    driveErrorDetailMessage = downloadRes.message
+                                                    isDriveProcessing = false
                                                 }
                                             }
-                                            isDriveProcessing = false
-                                        }
-                                    }
-                                },
-                                isActive = true,
-                                modifier = Modifier.weight(1.5f),
-                                horizontalPadding = 8.dp,
-                                verticalPadding = 6.dp
-                            )
+                                        },
+                                        isActive = true,
+                                        modifier = Modifier.weight(1.5f),
+                                        testTag = "confirm_restore_from_drive"
+                                    )
+                                }
+                            }
                         }
                     }
-                )
+                }
             }
 
             // 4. Google Drive Error Detail Alert Dialog
@@ -541,256 +593,301 @@ fun EksporImporTabContent(
                     errorMsg.split(" ", "\n", "\t").firstOrNull { it.startsWith("http://") || it.startsWith("https://") } 
                 }
 
-                AlertDialog(
-                    onDismissRequest = { driveErrorDetailMessage = null },
-                    containerColor = MidnightAbyss,
-                    title = {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = Icons.Default.Info,
-                                contentDescription = null,
-                                tint = Color(0xFFE57373),
-                                modifier = Modifier.size(24.dp)
+                Dialog(onDismissRequest = { driveErrorDetailMessage = null }) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth().padding(16.dp),
+                        shape = RoundedCornerShape(24.dp),
+                        colors = CardDefaults.cardColors(containerColor = MidnightAbyss),
+                        border = BorderStroke(
+                            width = 1.dp,
+                            brush = Brush.verticalGradient(
+                                colors = listOf(
+                                    GhostWhite.copy(alpha = 0.2f),
+                                    GhostWhite.copy(alpha = 0.02f)
+                                )
                             )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = "Masalah Google Drive",
-                                color = GhostWhite,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    },
-                    text = {
-                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                            Text(
-                                text = "Berikut detail masalah yang terjadi saat memproses Google Drive Anda:",
-                                color = GhostWhite.copy(alpha = 0.8f),
-                                fontSize = 13.sp
-                            )
-
-                            Box(
+                        ),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+                    ) {
+                        Box(modifier = Modifier.background(TranslucentGlass)) {
+                            Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .background(Color.Black.copy(alpha = 0.4f), shape = RoundedCornerShape(8.dp))
-                                    .border(1.dp, GhostWhite.copy(alpha = 0.08f), shape = RoundedCornerShape(8.dp))
-                                    .padding(10.dp)
+                                    .padding(24.dp),
+                                verticalArrangement = Arrangement.spacedBy(16.dp)
                             ) {
-                                Text(
-                                    text = errorMsg,
-                                    style = MaterialTheme.typography.bodySmall.copy(
-                                        fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
-                                        fontSize = 11.sp,
-                                        lineHeight = 15.sp
-                                    ),
-                                    color = Color(0xFFFFCC80)
-                                )
-                            }
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        imageVector = Icons.Default.Info,
+                                        contentDescription = null,
+                                        tint = Color(0xFFE57373),
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = "Masalah Google Drive",
+                                        color = GhostWhite,
+                                        style = MaterialTheme.typography.titleLarge,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
 
-                            if (errorMsg.contains("is disabled") || errorMsg.contains("has not been used")) {
-                                Text(
-                                    text = "💡 Petunjuk: Layanan Google Drive API belum diaktifkan di Google Cloud Project dari aplikasi ini. Salin atau ketuk tombol di bawah untuk membukanya dan mengaktifkan tombol 'Enable Google Drive API' di konsol pengembang Google.",
-                                    color = SteelBlue,
-                                    fontSize = 11.sp,
-                                    lineHeight = 15.sp,
-                                    fontWeight = FontWeight.Medium
-                                )
-                            }
-                        }
-                    },
-                    confirmButton = {
-                        Column(
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            if (extractedUrl != null) {
-                                PremiumButton(
-                                    text = "BUKA TAUTAN GOOGLE CONSOLE",
-                                    onClick = {
-                                        try {
-                                            val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(extractedUrl))
-                                            context.startActivity(intent)
-                                        } catch (e: Exception) {
-                                            Toast.makeText(context, "Gagal membuka web browser.", Toast.LENGTH_SHORT).show()
-                                        }
-                                    },
-                                    isActive = true,
+                                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                    Text(
+                                        text = "Berikut detail masalah yang terjadi saat memproses Google Drive Anda:",
+                                        color = GhostWhite.copy(alpha = 0.8f),
+                                        style = MaterialTheme.typography.bodyMedium
+                                    )
+
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .background(Color.Black.copy(alpha = 0.4f), shape = RoundedCornerShape(8.dp))
+                                            .border(1.dp, GhostWhite.copy(alpha = 0.08f), shape = RoundedCornerShape(8.dp))
+                                            .padding(10.dp)
+                                    ) {
+                                        Text(
+                                            text = errorMsg,
+                                            style = MaterialTheme.typography.bodySmall.copy(
+                                                fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace,
+                                                fontSize = 11.sp,
+                                                lineHeight = 15.sp
+                                            ),
+                                            color = Color(0xFFFFCC80)
+                                        )
+                                    }
+
+                                    if (errorMsg.contains("is disabled") || errorMsg.contains("has not been used")) {
+                                        Text(
+                                            text = "💡 Petunjuk: Layanan Google Drive API belum diaktifkan di Google Cloud Project dari aplikasi ini. Salin atau ketuk tombol di bawah untuk membukanya dan mengaktifkan tombol 'Enable Google Drive API' di konsol pengembang Google.",
+                                            color = SteelBlue,
+                                            fontSize = 11.sp,
+                                            lineHeight = 15.sp,
+                                            fontWeight = FontWeight.Medium
+                                        )
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                Column(
                                     modifier = Modifier.fillMaxWidth(),
-                                    horizontalPadding = 8.dp,
-                                    verticalPadding = 8.dp
-                                )
-                            }
-
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                PremiumButton(
-                                    text = "Salin Detail Error",
-                                    onClick = {
-                                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-                                        val clip = android.content.ClipData.newPlainText("GoogleDriveError", errorMsg)
-                                        clipboard.setPrimaryClip(clip)
-                                        Toast.makeText(context, "Detail error disalin ke papan klip!", Toast.LENGTH_SHORT).show()
-                                    },
-                                    isActive = false,
-                                    modifier = Modifier.weight(1f),
-                                    horizontalPadding = 8.dp,
-                                    verticalPadding = 6.dp
-                                )
-
-                                PremiumButton(
-                                    text = "Tutup",
-                                    onClick = { driveErrorDetailMessage = null },
-                                    isActive = true,
-                                    modifier = Modifier.weight(1f),
-                                    horizontalPadding = 8.dp,
-                                    verticalPadding = 6.dp
-                                )
-                            }
-                        }
-                    }
-                )
-            }
-
-            // 5. SET PIN DIALOG
-            if (isSetPinDialogOpen) {
-                AlertDialog(
-                    onDismissRequest = { isSetPinDialogOpen = false },
-                    title = { Text("Atur PIN Kunci & Pemulihan", color = GhostWhite, fontWeight = FontWeight.Bold) },
-                    containerColor = MidnightAbyss,
-                    text = {
-                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Text("Masukkan 4 angka kode PIN baru Anda:", color = GhostWhite.copy(alpha = 0.7f), fontSize = 13.sp)
-                            OutlinedTextField(
-                                value = pinInputText,
-                                onValueChange = { newValue ->
-                                    if (newValue.length <= 4 && newValue.all { it.isDigit() }) {
-                                        pinInputText = newValue
-                                    }
-                                },
-                                textStyle = androidx.compose.ui.text.TextStyle(color = GhostWhite, fontSize = 18.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center),
-                                modifier = Modifier.fillMaxWidth(),
-                                singleLine = true,
-                                placeholder = { Text("••••", color = GhostWhite.copy(alpha = 0.25f), modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center) },
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = SteelBlue,
-                                    unfocusedBorderColor = GhostWhite.copy(alpha = 0.2f),
-                                    focusedTextColor = GhostWhite
-                                )
-                            )
-
-                            HorizontalDivider(color = GhostWhite.copy(alpha = 0.08f), modifier = Modifier.padding(vertical = 4.dp))
-
-                            Text("Pilih pertanyaan keamanan untuk bantuan pemulihan jika Anda lupa PIN:", color = GhostWhite.copy(alpha = 0.7f), fontSize = 13.sp)
-                            
-                            Box(modifier = Modifier.fillMaxWidth()) {
-                                OutlinedTextField(
-                                    value = securityQuestions[selectedQuestionIndex],
-                                    onValueChange = {},
-                                    readOnly = true,
-                                    modifier = Modifier.fillMaxWidth().clickable { isQuestionDropdownExpanded = true },
-                                    colors = OutlinedTextFieldDefaults.colors(
-                                        focusedBorderColor = SteelBlue,
-                                        unfocusedBorderColor = GhostWhite.copy(alpha = 0.2f),
-                                        focusedTextColor = GhostWhite,
-                                        unfocusedTextColor = GhostWhite
-                                    ),
-                                    trailingIcon = {
-                                        IconButton(onClick = { isQuestionDropdownExpanded = !isQuestionDropdownExpanded }) {
-                                            Icon(
-                                                imageVector = if (isQuestionDropdownExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                                                contentDescription = null,
-                                                tint = SteelBlue
-                                            )
-                                        }
-                                    }
-                                )
-                                DropdownMenu(
-                                    expanded = isQuestionDropdownExpanded,
-                                    onDismissRequest = { isQuestionDropdownExpanded = false },
-                                    modifier = Modifier.fillMaxWidth().background(MidnightAbyss)
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
-                                    securityQuestions.forEachIndexed { index, question ->
-                                        DropdownMenuItem(
-                                            text = { Text(question, color = GhostWhite, fontSize = 12.sp) },
+                                    if (extractedUrl != null) {
+                                        PremiumButton(
+                                            text = "Buka Tautan Google Console",
                                             onClick = {
-                                                selectedQuestionIndex = index
-                                                isQuestionDropdownExpanded = false
-                                            }
+                                                try {
+                                                    val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(extractedUrl))
+                                                    context.startActivity(intent)
+                                                } catch (e: Exception) {
+                                                    Toast.makeText(context, "Gagal membuka web browser.", Toast.LENGTH_SHORT).show()
+                                                }
+                                            },
+                                            isActive = true,
+                                            modifier = Modifier.fillMaxWidth(),
+                                            testTag = "open_google_console"
+                                        )
+                                    }
+
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                    ) {
+                                        PremiumButton(
+                                            text = "Salin Error",
+                                            onClick = {
+                                                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                                                val clip = android.content.ClipData.newPlainText("GoogleDriveError", errorMsg)
+                                                clipboard.setPrimaryClip(clip)
+                                                Toast.makeText(context, "Detail error disalin ke papan klip!", Toast.LENGTH_SHORT).show()
+                                            },
+                                            isActive = false,
+                                            modifier = Modifier.weight(1f),
+                                            testTag = "copy_error_details"
+                                        )
+
+                                        PremiumButton(
+                                            text = "Tutup",
+                                            onClick = { driveErrorDetailMessage = null },
+                                            isActive = true,
+                                            modifier = Modifier.weight(1f),
+                                            testTag = "close_error_dialog"
                                         )
                                     }
                                 }
                             }
-
-                            Spacer(modifier = Modifier.height(2.dp))
-
-                            OutlinedTextField(
-                                value = securityAnswerInput,
-                                onValueChange = { securityAnswerInput = it },
-                                placeholder = { Text("Jawaban Anda...", color = GhostWhite.copy(alpha = 0.3f)) },
-                                label = { Text("Jawaban Pemulihan PIN", color = GhostWhite.copy(alpha = 0.6f)) },
-                                singleLine = true,
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = SteelBlue,
-                                    unfocusedBorderColor = GhostWhite.copy(alpha = 0.2f),
-                                    focusedTextColor = GhostWhite,
-                                    unfocusedTextColor = GhostWhite
-                                ),
-                                modifier = Modifier.fillMaxWidth()
-                            )
-
-                            if (pinDialogErrorText.isNotEmpty()) {
-                                Text(
-                                    pinDialogErrorText,
-                                    color = Color.Red,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.padding(top = 4.dp)
-                                )
-                            }
-                        }
-                    },
-                    confirmButton = {
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            PremiumButton(
-                                text = "Batal",
-                                onClick = { isSetPinDialogOpen = false },
-                                isActive = false,
-                                modifier = Modifier.weight(1f),
-                                horizontalPadding = 8.dp,
-                                verticalPadding = 6.dp
-                            )
-                            PremiumButton(
-                                text = "Simpan",
-                                onClick = {
-                                    if (pinInputText.length != 4) {
-                                        pinDialogErrorText = "PIN harus terdiri dari 4 digit angka!"
-                                    } else if (securityAnswerInput.trim().isEmpty()) {
-                                        pinDialogErrorText = "Jawaban pemulihan tidak boleh kosong!"
-                                    } else {
-                                        isPinEnabled = true
-                                        savedPin = pinInputText
-                                        securityPrefs.edit()
-                                            .putBoolean("pin_enabled", true)
-                                            .putString("saved_pin", pinInputText)
-                                            .putString("security_question", securityQuestions[selectedQuestionIndex])
-                                            .putString("security_answer", securityAnswerInput.trim().lowercase())
-                                            .apply()
-                                        isSetPinDialogOpen = false
-                                        Toast.makeText(context, "Kunci PIN berhasil diatur!", Toast.LENGTH_SHORT).show()
-                                    }
-                                },
-                                isActive = true,
-                                modifier = Modifier.weight(1f),
-                                horizontalPadding = 8.dp,
-                                verticalPadding = 6.dp
-                            )
                         }
                     }
-                )
+                }
+            }
+
+            // 5. SET PIN DIALOG
+            if (isSetPinDialogOpen) {
+                Dialog(onDismissRequest = { isSetPinDialogOpen = false }) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth().padding(16.dp),
+                        shape = RoundedCornerShape(24.dp),
+                        colors = CardDefaults.cardColors(containerColor = MidnightAbyss),
+                        border = BorderStroke(
+                            width = 1.dp,
+                            brush = Brush.verticalGradient(
+                                colors = listOf(
+                                    GhostWhite.copy(alpha = 0.2f),
+                                    GhostWhite.copy(alpha = 0.02f)
+                                )
+                            )
+                        ),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+                    ) {
+                        Box(modifier = Modifier.background(TranslucentGlass)) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(24.dp),
+                                verticalArrangement = Arrangement.spacedBy(16.dp)
+                            ) {
+                                Text(
+                                    text = "Atur PIN Kunci & Pemulihan",
+                                    color = GhostWhite,
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.Bold
+                                )
+
+                                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    Text("Masukkan 4 angka kode PIN baru Anda:", color = GhostWhite.copy(alpha = 0.7f), fontSize = 13.sp)
+                                    OutlinedTextField(
+                                        value = pinInputText,
+                                        onValueChange = { newValue ->
+                                            if (newValue.length <= 4 && newValue.all { it.isDigit() }) {
+                                                pinInputText = newValue
+                                            }
+                                        },
+                                        textStyle = androidx.compose.ui.text.TextStyle(color = GhostWhite, fontSize = 18.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center),
+                                        modifier = Modifier.fillMaxWidth(),
+                                        singleLine = true,
+                                        placeholder = { Text("••••", color = GhostWhite.copy(alpha = 0.25f), modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center) },
+                                        colors = OutlinedTextFieldDefaults.colors(
+                                            focusedBorderColor = SteelBlue,
+                                            unfocusedBorderColor = GhostWhite.copy(alpha = 0.2f),
+                                            focusedTextColor = GhostWhite
+                                        )
+                                    )
+
+                                    HorizontalDivider(color = GhostWhite.copy(alpha = 0.08f), modifier = Modifier.padding(vertical = 4.dp))
+
+                                    Text("Pilih pertanyaan keamanan untuk bantuan pemulihan jika Anda lupa PIN:", color = GhostWhite.copy(alpha = 0.7f), fontSize = 13.sp)
+                                    
+                                    Box(modifier = Modifier.fillMaxWidth()) {
+                                        OutlinedTextField(
+                                            value = securityQuestions[selectedQuestionIndex],
+                                            onValueChange = {},
+                                            readOnly = true,
+                                            modifier = Modifier.fillMaxWidth().clickable { isQuestionDropdownExpanded = true },
+                                            colors = OutlinedTextFieldDefaults.colors(
+                                                focusedBorderColor = SteelBlue,
+                                                unfocusedBorderColor = GhostWhite.copy(alpha = 0.2f),
+                                                focusedTextColor = GhostWhite,
+                                                unfocusedTextColor = GhostWhite
+                                            ),
+                                            trailingIcon = {
+                                                IconButton(onClick = { isQuestionDropdownExpanded = !isQuestionDropdownExpanded }) {
+                                                    Icon(
+                                                        imageVector = if (isQuestionDropdownExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                                                        contentDescription = null,
+                                                        tint = SteelBlue
+                                                    )
+                                                }
+                                            }
+                                        )
+                                        DropdownMenu(
+                                            expanded = isQuestionDropdownExpanded,
+                                            onDismissRequest = { isQuestionDropdownExpanded = false },
+                                            modifier = Modifier.fillMaxWidth().background(MidnightAbyss)
+                                        ) {
+                                            securityQuestions.forEachIndexed { index, question ->
+                                                DropdownMenuItem(
+                                                    text = { Text(question, color = GhostWhite, fontSize = 12.sp) },
+                                                    onClick = {
+                                                        selectedQuestionIndex = index
+                                                        isQuestionDropdownExpanded = false
+                                                    }
+                                                )
+                                            }
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.height(2.dp))
+
+                                    OutlinedTextField(
+                                        value = securityAnswerInput,
+                                        onValueChange = { securityAnswerInput = it },
+                                        placeholder = { Text("Jawaban Anda...", color = GhostWhite.copy(alpha = 0.3f)) },
+                                        label = { Text("Jawaban Pemulihan PIN", color = GhostWhite.copy(alpha = 0.6f)) },
+                                        singleLine = true,
+                                        colors = OutlinedTextFieldDefaults.colors(
+                                            focusedBorderColor = SteelBlue,
+                                            unfocusedBorderColor = GhostWhite.copy(alpha = 0.2f),
+                                            focusedTextColor = GhostWhite,
+                                            unfocusedTextColor = GhostWhite
+                                        ),
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+
+                                    if (pinDialogErrorText.isNotEmpty()) {
+                                        Text(
+                                            pinDialogErrorText,
+                                            color = Color.Red,
+                                            fontSize = 11.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            modifier = Modifier.padding(top = 4.dp)
+                                        )
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(8.dp))
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    PremiumButton(
+                                        text = "Batal",
+                                        onClick = { isSetPinDialogOpen = false },
+                                        isActive = false,
+                                        modifier = Modifier.weight(1f),
+                                        testTag = "cancel_set_pin"
+                                    )
+                                    PremiumButton(
+                                        text = "Simpan",
+                                        onClick = {
+                                            if (pinInputText.length != 4) {
+                                                pinDialogErrorText = "PIN harus terdiri dari 4 digit angka!"
+                                            } else if (securityAnswerInput.trim().isEmpty()) {
+                                                pinDialogErrorText = "Jawaban pemulihan tidak boleh kosong!"
+                                            } else {
+                                                isPinEnabled = true
+                                                savedPin = pinInputText
+                                                securityPrefs.edit()
+                                                    .putBoolean("pin_enabled", true)
+                                                    .putString("saved_pin", pinInputText)
+                                                    .putString("security_question", securityQuestions[selectedQuestionIndex])
+                                                    .putString("security_answer", securityAnswerInput.trim().lowercase())
+                                                    .apply()
+                                                isSetPinDialogOpen = false
+                                                Toast.makeText(context, "Kunci PIN berhasil diatur!", Toast.LENGTH_SHORT).show()
+                                            }
+                                        },
+                                        isActive = true,
+                                        modifier = Modifier.weight(1f),
+                                        testTag = "confirm_set_pin"
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
             }
 
             Spacer(modifier = Modifier.height(48.dp))

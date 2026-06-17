@@ -15,6 +15,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -173,25 +174,53 @@ fun DatabaseBackupSection(
             )
 
             if (showBackupHelpInfo) {
-                AlertDialog(
-                    onDismissRequest = { showBackupHelpInfo = false },
-                    title = { Text("Mulai Pencadangan Data", color = GhostWhite, fontWeight = FontWeight.Bold) },
-                    text = {
-                        Text(
-                            text = "Fitur ini memungkinkan Anda menyimpan seluruh data transaksi ke Google Drive secara otomatis maupun manual, sehingga data tetap aman meski aplikasi dihapus atau ganti perangkat.\n\n• Backup Otomatis: Data dicadangkan secara berkala sesuai jadwal yang Anda pilih (Harian/Mingguan).\n• Backup Manual: Ketuk tombol 'Cadangkan Sekarang' kapan saja untuk menyimpan data terbaru.\n• Pulihkan Data: Pilih file cadangan dari daftar untuk mengembalikan data ke kondisi tersebut.\n\nJika Anda tidak bisa login ke Google Drive atau mengalami masalah sinkronisasi, silakan hubungi developer untuk bantuan lebih lanjut.",
-                            color = GhostWhite.copy(alpha = 0.8f),
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                    },
-                    confirmButton = {
-                        TextButton(onClick = { showBackupHelpInfo = false }) {
-                            Text("Mengerti", color = SteelBlue, fontWeight = FontWeight.Bold)
+                Dialog(onDismissRequest = { showBackupHelpInfo = false }) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth().padding(16.dp),
+                        shape = RoundedCornerShape(24.dp),
+                        colors = CardDefaults.cardColors(containerColor = MidnightAbyss),
+                        border = BorderStroke(
+                            width = 1.dp,
+                            brush = Brush.verticalGradient(
+                                colors = listOf(
+                                    GhostWhite.copy(alpha = 0.2f),
+                                    GhostWhite.copy(alpha = 0.02f)
+                                )
+                            )
+                        ),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+                    ) {
+                        Box(modifier = Modifier.background(TranslucentGlass)) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(24.dp),
+                                verticalArrangement = Arrangement.spacedBy(16.dp)
+                            ) {
+                                Text(
+                                    text = "Mulai Pencadangan Data",
+                                    color = GhostWhite,
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = "Fitur ini memungkinkan Anda menyimpan seluruh data transaksi ke Google Drive secara otomatis maupun manual, sehingga data tetap aman meski aplikasi dihapus atau ganti perangkat.\n\n• Backup Otomatis: Data dicadangkan secara berkala sesuai jadwal yang Anda pilih (Harian/Mingguan).\n• Backup Manual: Ketuk tombol 'Cadangkan Sekarang' kapan saja untuk menyimpan data terbaru.\n• Pulihkan Data: Pilih file cadangan dari daftar untuk mengembalikan data ke kondisi tersebut.\n\nJika Anda tidak bisa login ke Google Drive atau mengalami masalah sinkronisasi, silakan hubungi developer untuk bantuan lebih lanjut.",
+                                    color = GhostWhite.copy(alpha = 0.8f),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    lineHeight = 20.sp
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                PremiumButton(
+                                    text = "Mengerti",
+                                    onClick = { showBackupHelpInfo = false },
+                                    isActive = true,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    testTag = "backup_help_dismiss"
+                                )
+                            }
                         }
-                    },
-                    containerColor = MidnightAbyss,
-                    titleContentColor = GhostWhite,
-                    textContentColor = GhostWhite
-                )
+                    }
+                }
             }
 
             // Auto Backup Toggle Item
@@ -971,39 +1000,72 @@ fun DatabaseBackupSection(
             }
 
             if (showDisconnectConfirmation) {
-                AlertDialog(
-                    onDismissRequest = { showDisconnectConfirmation = false },
-                    title = { Text("Putuskan Koneksi Google Drive?", color = GhostWhite, fontWeight = FontWeight.Bold) },
-                    text = {
-                        Text(
-                            text = "Anda akan keluar dari akun Google yang terhubung. Backup otomatis akan berhenti dan Anda perlu login ulang untuk menggunakan fitur sinkronisasi Drive.",
-                            color = GhostWhite.copy(alpha = 0.8f),
-                            style = MaterialTheme.typography.bodyMedium
-                        )
-                    },
-                    confirmButton = {
-                        TextButton(
-                            onClick = {
-                                showDisconnectConfirmation = false
-                                GoogleDriveHelper.signOut(context) {
-                                    onConnectedGoogleAccountChanged(null)
-                                    onDriveBackupListChanged(emptyList())
-                                    Toast.makeText(context, "Akses Google Drive terputus.", Toast.LENGTH_SHORT).show()
+                Dialog(onDismissRequest = { showDisconnectConfirmation = false }) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth().padding(16.dp),
+                        shape = RoundedCornerShape(24.dp),
+                        colors = CardDefaults.cardColors(containerColor = MidnightAbyss),
+                        border = BorderStroke(
+                            width = 1.dp,
+                            brush = Brush.verticalGradient(
+                                colors = listOf(
+                                    GhostWhite.copy(alpha = 0.2f),
+                                    GhostWhite.copy(alpha = 0.02f)
+                                )
+                            )
+                        ),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+                    ) {
+                        Box(modifier = Modifier.background(TranslucentGlass)) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(24.dp),
+                                verticalArrangement = Arrangement.spacedBy(16.dp)
+                            ) {
+                                Text(
+                                    text = "Putuskan Google Drive?",
+                                    color = GhostWhite,
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = "Anda akan keluar dari akun Google yang terhubung. Backup otomatis akan berhenti dan Anda perlu login ulang untuk menggunakan fitur sinkronisasi Drive.",
+                                    color = GhostWhite.copy(alpha = 0.8f),
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    lineHeight = 20.sp
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    PremiumButton(
+                                        text = "Batal",
+                                        onClick = { showDisconnectConfirmation = false },
+                                        isActive = false,
+                                        modifier = Modifier.weight(1f),
+                                        testTag = "cancel_disconnect_button"
+                                    )
+                                    PremiumButton(
+                                        text = "Putuskan",
+                                        onClick = {
+                                            showDisconnectConfirmation = false
+                                            GoogleDriveHelper.signOut(context) {
+                                                onConnectedGoogleAccountChanged(null)
+                                                onDriveBackupListChanged(emptyList())
+                                                Toast.makeText(context, "Akses Google Drive terputus.", Toast.LENGTH_SHORT).show()
+                                            }
+                                        },
+                                        isActive = true,
+                                        modifier = Modifier.weight(1.2f),
+                                        testTag = "confirm_disconnect_button"
+                                    )
                                 }
                             }
-                        ) {
-                            Text("Putuskan", color = Color.Red.copy(alpha = 0.8f), fontWeight = FontWeight.Bold)
                         }
-                    },
-                    dismissButton = {
-                        TextButton(onClick = { showDisconnectConfirmation = false }) {
-                            Text("Batal", color = GhostWhite.copy(alpha = 0.6f))
-                        }
-                    },
-                    containerColor = MidnightAbyss,
-                    titleContentColor = GhostWhite,
-                    textContentColor = GhostWhite
-                )
+                    }
+                }
             }
 
             if (connectedGoogleAccount == null) {
@@ -1153,14 +1215,18 @@ fun DatabaseBackupSection(
 
                                         IconButton(
                                             onClick = {
-                                                driveBackupFileToDelete = driveFile
+                                                if (driveBackupList.size <= 1) {
+                                                    Toast.makeText(context, "Satu-satunya cadangan di Google Drive tidak dapat dihapus demi keamanan data Anda.", Toast.LENGTH_LONG).show()
+                                                } else {
+                                                    driveBackupFileToDelete = driveFile
+                                                }
                                             },
                                             modifier = Modifier.size(28.dp)
                                         ) {
                                             Icon(
                                                 imageVector = Icons.Default.Delete,
                                                 contentDescription = "Hapus Cadangan Drive",
-                                                tint = Color.Red.copy(alpha = 0.7f),
+                                                tint = if (driveBackupList.size <= 1) GhostWhite.copy(alpha = 0.25f) else Color.Red.copy(alpha = 0.7f),
                                                 modifier = Modifier.size(16.dp)
                                             )
                                         }
@@ -1175,125 +1241,159 @@ fun DatabaseBackupSection(
     }
 
     if (backupFileToDelete != null) {
-        AlertDialog(
-            onDismissRequest = { backupFileToDelete = null },
-            containerColor = MidnightAbyss,
-            title = {
-                Text(
-                    text = "Hapus Cadangan Lokal",
-                    color = GhostWhite,
-                    fontWeight = FontWeight.Bold
-                )
-            },
-            text = {
-                Text(
-                    text = "Apakah Anda yakin ingin menghapus salinan cadangan lokal '${backupFileToDelete?.name}'? Berkas yang dihapus tidak dapat dipulihkan lagi.",
-                    color = GhostWhite.copy(alpha = 0.8f),
-                    fontSize = 13.sp,
-                    lineHeight = 18.sp
-                )
-            },
-            confirmButton = {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    PremiumButton(
-                        text = "Batal",
-                        onClick = { backupFileToDelete = null },
-                        isActive = false,
-                        modifier = Modifier.weight(1f),
-                        horizontalPadding = 8.dp,
-                        verticalPadding = 6.dp
+        Dialog(onDismissRequest = { backupFileToDelete = null }) {
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(containerColor = MidnightAbyss),
+                border = BorderStroke(
+                    width = 1.dp,
+                    brush = Brush.verticalGradient(
+                        colors = listOf(
+                            GhostWhite.copy(alpha = 0.2f),
+                            GhostWhite.copy(alpha = 0.02f)
+                        )
                     )
-                    PremiumButton(
-                        text = "HAPUS",
-                        onClick = {
-                            val file = backupFileToDelete
-                            backupFileToDelete = null
-                            if (file != null) {
-                                val deleted = file.delete()
-                                if (deleted) {
-                                    onBackupListChanged(BackupHelper.getBackups(context))
-                                    Toast.makeText(context, "Salinan cadangan dihapus.", Toast.LENGTH_SHORT).show()
-                                } else {
-                                    Toast.makeText(context, "Gagal menghapus salinan.", Toast.LENGTH_SHORT).show()
-                                }
-                            }
-                        },
-                        isActive = true,
-                        modifier = Modifier.weight(1f),
-                        horizontalPadding = 8.dp,
-                        verticalPadding = 6.dp
-                    )
+                ),
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+            ) {
+                Box(modifier = Modifier.background(TranslucentGlass)) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(24.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        Text(
+                            text = "Hapus Cadangan Lokal",
+                            color = GhostWhite,
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "Apakah Anda yakin ingin menghapus salinan cadangan lokal '${backupFileToDelete?.name}'? Berkas yang dihapus tidak dapat dipulihkan lagi.",
+                            color = GhostWhite.copy(alpha = 0.8f),
+                            style = MaterialTheme.typography.bodyMedium,
+                            lineHeight = 20.sp
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            PremiumButton(
+                                text = "Batal",
+                                onClick = { backupFileToDelete = null },
+                                isActive = false,
+                                modifier = Modifier.weight(1f),
+                                testTag = "cancel_delete_local_backup"
+                            )
+                            PremiumButton(
+                                text = "Hapus",
+                                onClick = {
+                                    val file = backupFileToDelete
+                                    backupFileToDelete = null
+                                    if (file != null) {
+                                        val deleted = file.delete()
+                                        if (deleted) {
+                                            onBackupListChanged(BackupHelper.getBackups(context))
+                                            Toast.makeText(context, "Salinan cadangan dihapus.", Toast.LENGTH_SHORT).show()
+                                        } else {
+                                            Toast.makeText(context, "Gagal menghapus salinan.", Toast.LENGTH_SHORT).show()
+                                        }
+                                    }
+                                },
+                                isActive = true,
+                                modifier = Modifier.weight(1f),
+                                testTag = "confirm_delete_local_backup"
+                            )
+                        }
+                    }
                 }
             }
-        )
+        }
     }
 
     if (driveBackupFileToDelete != null) {
-        AlertDialog(
-            onDismissRequest = { driveBackupFileToDelete = null },
-            containerColor = MidnightAbyss,
-            title = {
-                Text(
-                    text = "Hapus Cadangan Google Drive",
-                    color = GhostWhite,
-                    fontWeight = FontWeight.Bold
-                )
-            },
-            text = {
-                Text(
-                    text = "Apakah Anda yakin ingin menghapus salinan cadangan '${driveBackupFileToDelete?.name}' dari akun Google Drive Anda? Tindakan ini bersifat permanen.",
-                    color = GhostWhite.copy(alpha = 0.8f),
-                    fontSize = 13.sp,
-                    lineHeight = 18.sp
-                )
-            },
-            confirmButton = {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    PremiumButton(
-                        text = "Batal",
-                        onClick = { driveBackupFileToDelete = null },
-                        isActive = false,
-                        modifier = Modifier.weight(1f),
-                        horizontalPadding = 8.dp,
-                        verticalPadding = 6.dp
+        Dialog(onDismissRequest = { driveBackupFileToDelete = null }) {
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(containerColor = MidnightAbyss),
+                border = BorderStroke(
+                    width = 1.dp,
+                    brush = Brush.verticalGradient(
+                        colors = listOf(
+                            GhostWhite.copy(alpha = 0.2f),
+                            GhostWhite.copy(alpha = 0.02f)
+                        )
                     )
-                    PremiumButton(
-                        text = "HAPUS DARI CLOUD",
-                        onClick = {
-                            val driveFile = driveBackupFileToDelete
-                            driveBackupFileToDelete = null
-                            if (driveFile != null) {
-                                coroutineScope.launch {
-                                    onIsDriveProcessingChanged(true)
-                                    when (val delRes = GoogleDriveHelper.deleteBackupFromDrive(context, driveFile.id)) {
-                                        is GoogleDriveHelper.DriveResult.Success -> {
-                                            Toast.makeText(context, "Berhasil menghapus berkas di Google Drive.", Toast.LENGTH_SHORT).show()
-                                            val syncList = GoogleDriveHelper.listBackupsFromDrive(context)
-                                            if (syncList is GoogleDriveHelper.DriveResult.Success) {
-                                                onDriveBackupListChanged(syncList.data)
+                ),
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+            ) {
+                Box(modifier = Modifier.background(TranslucentGlass)) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(24.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        Text(
+                            text = "Hapus Cadangan Google Drive",
+                            color = GhostWhite,
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "Apakah Anda yakin ingin menghapus salinan cadangan '${driveBackupFileToDelete?.name}' dari akun Google Drive Anda? Tindakan ini bersifat permanen.",
+                            color = GhostWhite.copy(alpha = 0.8f),
+                            style = MaterialTheme.typography.bodyMedium,
+                            lineHeight = 20.sp
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            PremiumButton(
+                                text = "Batal",
+                                onClick = { driveBackupFileToDelete = null },
+                                isActive = false,
+                                modifier = Modifier.weight(1f),
+                                testTag = "cancel_delete_drive_backup"
+                            )
+                            PremiumButton(
+                                text = "Hapus dari Cloud",
+                                onClick = {
+                                    val driveFile = driveBackupFileToDelete
+                                    driveBackupFileToDelete = null
+                                    if (driveFile != null) {
+                                        coroutineScope.launch {
+                                            onIsDriveProcessingChanged(true)
+                                            when (val delRes = GoogleDriveHelper.deleteBackupFromDrive(context, driveFile.id)) {
+                                                is GoogleDriveHelper.DriveResult.Success -> {
+                                                    Toast.makeText(context, "Berhasil menghapus berkas di Google Drive.", Toast.LENGTH_SHORT).show()
+                                                    val syncList = GoogleDriveHelper.listBackupsFromDrive(context)
+                                                    if (syncList is GoogleDriveHelper.DriveResult.Success) {
+                                                        onDriveBackupListChanged(syncList.data)
+                                                    }
+                                                }
+                                                is GoogleDriveHelper.DriveResult.Error -> {
+                                                    onDriveErrorDetailMessageChange(delRes.message)
+                                                }
                                             }
-                                        }
-                                        is GoogleDriveHelper.DriveResult.Error -> {
-                                            onDriveErrorDetailMessageChange(delRes.message)
+                                            onIsDriveProcessingChanged(false)
                                         }
                                     }
-                                    onIsDriveProcessingChanged(false)
-                                }
-                            }
-                        },
-                        isActive = true,
-                        modifier = Modifier.weight(1.3f),
-                        horizontalPadding = 8.dp,
-                        verticalPadding = 6.dp
-                    )
+                                },
+                                isActive = true,
+                                modifier = Modifier.weight(1.3f),
+                                testTag = "confirm_delete_drive_backup"
+                            )
+                        }
+                    }
                 }
             }
-        )
+        }
     }
 }

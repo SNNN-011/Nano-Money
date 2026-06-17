@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.theme.*
 import kotlinx.coroutines.delay
+import androidx.compose.ui.window.Dialog
 
 @Composable
 fun LockScreenOverlay(
@@ -300,150 +301,172 @@ fun LockScreenOverlay(
         var newPinInput by remember { mutableStateOf("") }
         var dialogError by remember { mutableStateOf("") }
 
-        AlertDialog(
-            onDismissRequest = { isResetPinDialogOpen = false },
-            title = {
-                Text(
-                    text = if (!isAnswerVerified) "Pemulihan PIN" else "Buat PIN Baru",
-                    color = GhostWhite,
-                    fontWeight = FontWeight.Bold
-                )
-            },
-            containerColor = MidnightAbyss,
-            text = {
-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                    if (storedQuestion.isEmpty()) {
+        Dialog(onDismissRequest = { isResetPinDialogOpen = false }) {
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(containerColor = MidnightAbyss),
+                border = BorderStroke(
+                    width = 1.dp,
+                    brush = Brush.verticalGradient(
+                        colors = listOf(
+                            GhostWhite.copy(alpha = 0.2f),
+                            GhostWhite.copy(alpha = 0.02f)
+                        )
+                    )
+                ),
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+            ) {
+                Box(modifier = Modifier.background(TranslucentGlass)) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(24.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
                         Text(
-                            text = "Pertanyaan keamanan belum diatur pada perangkat ini. Silakan hubungi dukungan atau pasang ulang aplikasi.",
-                            color = GhostWhite.copy(alpha = 0.7f),
-                            fontSize = 13.sp,
-                            lineHeight = 18.sp
-                        )
-                    } else if (!isAnswerVerified) {
-                        Text(
-                            text = "Jawab pertanyaan keamanan di bawah untuk mengatur ulang PIN Anda:",
-                            color = GhostWhite.copy(alpha = 0.7f),
-                            fontSize = 13.sp,
-                            lineHeight = 18.sp
-                        )
-                        
-                        Card(
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                            shape = RoundedCornerShape(10.dp),
-                            colors = CardDefaults.cardColors(containerColor = GhostWhite.copy(alpha = 0.05f))
-                        ) {
-                            Text(
-                                text = storedQuestion,
-                                color = SteelBlue,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 13.sp,
-                                modifier = Modifier.padding(12.dp)
-                            )
-                        }
-
-                        OutlinedTextField(
-                            value = answerInput,
-                            onValueChange = { answerInput = it },
-                            placeholder = { Text("Masukkan jawaban Anda...", color = GhostWhite.copy(alpha = 0.3f)) },
-                            singleLine = true,
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = SteelBlue,
-                                unfocusedBorderColor = GhostWhite.copy(alpha = 0.2f),
-                                focusedTextColor = GhostWhite
-                            ),
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    } else {
-                        Text(
-                            text = "Pertanyaan berhasil diverifikasi! Silakan masukkan 4 angka kode PIN baru Anda:",
-                            color = GhostWhite.copy(alpha = 0.7f),
-                            fontSize = 13.sp,
-                            lineHeight = 18.sp
-                        )
-
-                        OutlinedTextField(
-                            value = newPinInput,
-                            onValueChange = { newValue ->
-                                if (newValue.length <= 4 && newValue.all { it.isDigit() }) {
-                                    newPinInput = newValue
-                                }
-                            },
-                            singleLine = true,
-                            placeholder = { Text("••••", color = GhostWhite.copy(alpha = 0.25f), modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center) },
-                            textStyle = androidx.compose.ui.text.TextStyle(color = GhostWhite, fontSize = 18.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = SteelBlue,
-                                unfocusedBorderColor = GhostWhite.copy(alpha = 0.2f),
-                                focusedTextColor = GhostWhite
-                            ),
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
-
-                    if (dialogError.isNotEmpty()) {
-                        Text(
-                            text = dialogError,
-                            color = Color.Red,
-                            fontSize = 11.sp,
+                            text = if (!isAnswerVerified) "Pemulihan PIN" else "Buat PIN Baru",
+                            color = GhostWhite,
+                            style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold
                         )
-                    }
-                }
-            },
-            confirmButton = {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    PremiumButton(
-                        text = "Batal",
-                        onClick = { isResetPinDialogOpen = false },
-                        isActive = false,
-                        modifier = Modifier.weight(1f),
-                        horizontalPadding = 8.dp,
-                        verticalPadding = 6.dp
-                    )
-                    
-                    if (storedQuestion.isNotEmpty()) {
-                        PremiumButton(
-                            text = if (!isAnswerVerified) "Verifikasi" else "Simpan & Masuk",
-                            onClick = {
-                                if (!isAnswerVerified) {
-                                    if (answerInput.trim().lowercase() == storedAnswer.trim().lowercase()) {
-                                        isAnswerVerified = true
-                                        dialogError = ""
-                                    } else {
-                                        dialogError = "Jawaban Salah! Pastikan penulisan Anda tepat."
-                                    }
-                                } else {
-                                    if (newPinInput.length != 4) {
-                                        dialogError = "PIN baru harus terdiri dari 4 digit angka!"
-                                    } else {
-                                        // Update PIN
-                                        securityPrefs.edit()
-                                            .putString("saved_pin", newPinInput)
-                                            .putInt("failed_pin_attempts", 0)
-                                            .putLong("cooldown_until", 0L)
-                                            .apply()
-                                        
-                                        // Unlock
-                                        failedAttempts = 0
-                                        cooldownUntil = 0L
-                                        enteredPin = ""
-                                        isResetPinDialogOpen = false
-                                        onUnlock()
-                                        Toast.makeText(context, "PIN di-reset dan aplikasi berhasil dibuka!", Toast.LENGTH_SHORT).show()
-                                    }
+
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            if (storedQuestion.isEmpty()) {
+                                Text(
+                                    text = "Pertanyaan keamanan belum diatur pada perangkat ini. Silakan hubungi dukungan atau pasang ulang aplikasi.",
+                                    color = GhostWhite.copy(alpha = 0.7f),
+                                    fontSize = 13.sp,
+                                    lineHeight = 18.sp
+                                )
+                            } else if (!isAnswerVerified) {
+                                Text(
+                                    text = "Jawab pertanyaan keamanan di bawah untuk mengatur ulang PIN Anda:",
+                                    color = GhostWhite.copy(alpha = 0.7f),
+                                    fontSize = 13.sp,
+                                    lineHeight = 18.sp
+                                )
+
+                                Card(
+                                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                                    shape = RoundedCornerShape(10.dp),
+                                    colors = CardDefaults.cardColors(containerColor = GhostWhite.copy(alpha = 0.05f))
+                                ) {
+                                    Text(
+                                        text = storedQuestion,
+                                        color = SteelBlue,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 13.sp,
+                                        modifier = Modifier.padding(12.dp)
+                                    )
                                 }
-                            },
-                            isActive = true,
-                            modifier = Modifier.weight(1f),
-                            horizontalPadding = 8.dp,
-                            verticalPadding = 6.dp
-                        )
+
+                                OutlinedTextField(
+                                    value = answerInput,
+                                    onValueChange = { answerInput = it },
+                                    placeholder = { Text("Masukkan jawaban Anda...", color = GhostWhite.copy(alpha = 0.3f)) },
+                                    singleLine = true,
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedBorderColor = SteelBlue,
+                                        unfocusedBorderColor = GhostWhite.copy(alpha = 0.2f),
+                                        focusedTextColor = GhostWhite
+                                    ),
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            } else {
+                                Text(
+                                    text = "Pertanyaan berhasil diverifikasi! Silakan masukkan 4 angka kode PIN baru Anda:",
+                                    color = GhostWhite.copy(alpha = 0.7f),
+                                    fontSize = 13.sp,
+                                    lineHeight = 18.sp
+                                )
+
+                                OutlinedTextField(
+                                    value = newPinInput,
+                                    onValueChange = { newValue ->
+                                        if (newValue.length <= 4 && newValue.all { it.isDigit() }) {
+                                            newPinInput = newValue
+                                        }
+                                    },
+                                    singleLine = true,
+                                    placeholder = { Text("••••", color = GhostWhite.copy(alpha = 0.25f), modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center) },
+                                    textStyle = androidx.compose.ui.text.TextStyle(color = GhostWhite, fontSize = 18.sp, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center),
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedBorderColor = SteelBlue,
+                                        unfocusedBorderColor = GhostWhite.copy(alpha = 0.2f),
+                                        focusedTextColor = GhostWhite
+                                    ),
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            }
+
+                            if (dialogError.isNotEmpty()) {
+                                Text(
+                                    text = dialogError,
+                                    color = Color.Red,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            PremiumButton(
+                                text = "Batal",
+                                onClick = { isResetPinDialogOpen = false },
+                                isActive = false,
+                                modifier = Modifier.weight(1f),
+                                horizontalPadding = 8.dp,
+                                verticalPadding = 6.dp
+                            )
+
+                            if (storedQuestion.isNotEmpty()) {
+                                PremiumButton(
+                                    text = if (!isAnswerVerified) "Verifikasi" else "Simpan & Masuk",
+                                    onClick = {
+                                        if (!isAnswerVerified) {
+                                            if (answerInput.trim().lowercase() == storedAnswer.trim().lowercase()) {
+                                                isAnswerVerified = true
+                                                dialogError = ""
+                                            } else {
+                                                dialogError = "Jawaban Salah! Pastikan penulisan Anda tepat."
+                                            }
+                                        } else {
+                                            if (newPinInput.length != 4) {
+                                                dialogError = "PIN baru harus terdiri dari 4 digit angka!"
+                                            } else {
+                                                // Update PIN
+                                                securityPrefs.edit()
+                                                    .putString("saved_pin", newPinInput)
+                                                    .putInt("failed_pin_attempts", 0)
+                                                    .putLong("cooldown_until", 0L)
+                                                    .apply()
+
+                                                // Unlock
+                                                failedAttempts = 0
+                                                cooldownUntil = 0L
+                                                enteredPin = ""
+                                                isResetPinDialogOpen = false
+                                                onUnlock()
+                                                Toast.makeText(context, "PIN di-reset dan aplikasi berhasil dibuka!", Toast.LENGTH_SHORT).show()
+                                            }
+                                        }
+                                    },
+                                    isActive = true,
+                                    modifier = Modifier.weight(1f),
+                                    horizontalPadding = 8.dp,
+                                    verticalPadding = 6.dp
+                                )
+                            }
+                        }
                     }
                 }
             }
-        )
+        }
     }
 }

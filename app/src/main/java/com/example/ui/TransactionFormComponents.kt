@@ -466,9 +466,9 @@ fun TransactionFormCard(
                     modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    // Reset Button (Inactive segmented style inside glass card)
+                    // Batal Button (Inactive segmented style inside glass card)
                     PremiumButton(
-                        text = "Reset",
+                        text = "Batal",
                         onClick = onReset,
                         modifier = Modifier.weight(1f),
                         isActive = false,

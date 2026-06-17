@@ -2,6 +2,7 @@ package com.example.ui
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -14,6 +15,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import com.example.ui.theme.*
 import java.util.*
 
@@ -144,89 +146,116 @@ fun CustomDatePickerDialog(
         listOf("Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember")
     }
 
-    AlertDialog(
-        onDismissRequest = onDismissRequest,
-        confirmButton = {
-            PremiumButton(
-                text = "Pilih",
-                onClick = {
-                    val outCal = Calendar.getInstance().apply {
-                        set(Calendar.YEAR, selectedYear)
-                        set(Calendar.MONTH, selectedMonth)
-                        val maxDay = getActualMaximum(Calendar.DAY_OF_MONTH)
-                        set(Calendar.DAY_OF_MONTH, selectedDay.coerceAtMost(maxDay))
-                        set(Calendar.HOUR_OF_DAY, 12)
-                        set(Calendar.MINUTE, 0)
-                        set(Calendar.SECOND, 0)
-                        set(Calendar.MILLISECOND, 0)
-                    }
-                    onDateSelected(outCal.timeInMillis)
-                },
-                isActive = true,
-                fillMaxWidth = false
-            )
-        },
-        dismissButton = {
-            PremiumButton(
-                text = "Batal",
-                onClick = onDismissRequest,
-                isActive = false,
-                fillMaxWidth = false
-            )
-        },
-        title = {
-            Text("Pilih Tanggal Transaksi", style = MaterialTheme.typography.titleLarge)
-        },
-        text = {
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Text(
-                    text = String.format(Locale.forLanguageTag("id-ID"), "%02d %s %d", selectedDay, months[selectedMonth], selectedYear),
-                    style = MaterialTheme.typography.headlineMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(bottom = 16.dp)
+    Dialog(onDismissRequest = onDismissRequest) {
+        Card(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = MidnightAbyss),
+            border = BorderStroke(
+                width = 1.dp,
+                brush = androidx.compose.ui.graphics.Brush.verticalGradient(
+                    colors = listOf(
+                        GhostWhite.copy(alpha = 0.2f),
+                        GhostWhite.copy(alpha = 0.02f)
+                    )
                 )
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceEvenly
+            ),
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+        ) {
+            Box(modifier = Modifier.background(TranslucentGlass)) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    NumberPickerColumn(
-                        label = "Hari",
-                        value = selectedDay,
-                        range = 1..31,
-                        onValueChange = { selectedDay = it }
+                    Text(
+                        text = "Pilih Tanggal Transaksi",
+                        style = MaterialTheme.typography.titleLarge,
+                        color = GhostWhite,
+                        fontWeight = FontWeight.Bold
                     )
 
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("Bulan", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
-                        IconButton(onClick = { if (selectedMonth < 11) selectedMonth++ else selectedMonth = 0 }) {
-                            Icon(Icons.Default.KeyboardArrowUp, contentDescription = "Bulan berikutnya")
-                        }
-                        Text(
-                            text = months[selectedMonth].substring(0, 3),
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(vertical = 4.dp)
+                    Text(
+                        text = String.format(Locale.forLanguageTag("id-ID"), "%02d %s %d", selectedDay, months[selectedMonth], selectedYear),
+                        style = MaterialTheme.typography.headlineMedium,
+                        color = SteelBlue,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceEvenly
+                    ) {
+                        NumberPickerColumn(
+                            label = "Hari",
+                            value = selectedDay,
+                            range = 1..31,
+                            onValueChange = { selectedDay = it }
                         )
-                        IconButton(onClick = { if (selectedMonth > 0) selectedMonth-- else selectedMonth = 11 }) {
-                            Icon(Icons.Default.KeyboardArrowDown, contentDescription = "Bulan sebelumnya")
+
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("Bulan", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
+                            IconButton(onClick = { if (selectedMonth < 11) selectedMonth++ else selectedMonth = 0 }) {
+                                Icon(Icons.Default.KeyboardArrowUp, contentDescription = "Bulan berikutnya", tint = GhostWhite)
+                            }
+                            Text(
+                                text = months[selectedMonth].substring(0, 3),
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = GhostWhite,
+                                modifier = Modifier.padding(vertical = 4.dp)
+                            )
+                            IconButton(onClick = { if (selectedMonth > 0) selectedMonth-- else selectedMonth = 11 }) {
+                                Icon(Icons.Default.KeyboardArrowDown, contentDescription = "Bulan sebelumnya", tint = GhostWhite)
+                            }
                         }
+
+                        NumberPickerColumn(
+                            label = "Tahun",
+                            value = selectedYear,
+                            range = 2020..2035,
+                            onValueChange = { selectedYear = it }
+                        )
                     }
 
-                    NumberPickerColumn(
-                        label = "Tahun",
-                        value = selectedYear,
-                        range = 2020..2035,
-                        onValueChange = { selectedYear = it }
-                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        PremiumButton(
+                            text = "Batal",
+                            onClick = onDismissRequest,
+                            isActive = false,
+                            modifier = Modifier.weight(1f)
+                        )
+                        PremiumButton(
+                            text = "Pilih",
+                            onClick = {
+                                val outCal = Calendar.getInstance().apply {
+                                    set(Calendar.YEAR, selectedYear)
+                                    set(Calendar.MONTH, selectedMonth)
+                                    val maxDay = getActualMaximum(Calendar.DAY_OF_MONTH)
+                                    set(Calendar.DAY_OF_MONTH, selectedDay.coerceAtMost(maxDay))
+                                    set(Calendar.HOUR_OF_DAY, 12)
+                                    set(Calendar.MINUTE, 0)
+                                    set(Calendar.SECOND, 0)
+                                    set(Calendar.MILLISECOND, 0)
+                                }
+                                onDateSelected(outCal.timeInMillis)
+                            },
+                            isActive = true,
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
                 }
             }
         }
-    )
+    }
 }
 
 @Composable
@@ -239,16 +268,17 @@ fun NumberPickerColumn(
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
         IconButton(onClick = { if (value < range.last) onValueChange(value + 1) }) {
-            Icon(Icons.Default.KeyboardArrowUp, contentDescription = "Tambah")
+            Icon(Icons.Default.KeyboardArrowUp, contentDescription = "Tambah", tint = GhostWhite)
         }
         Text(
             text = value.toString(),
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold,
+            color = GhostWhite,
             modifier = Modifier.padding(vertical = 4.dp)
         )
         IconButton(onClick = { if (value > range.first) onValueChange(value - 1) }) {
-            Icon(Icons.Default.KeyboardArrowDown, contentDescription = "Kurangi")
+            Icon(Icons.Default.KeyboardArrowDown, contentDescription = "Kurangi", tint = GhostWhite)
         }
     }
 }

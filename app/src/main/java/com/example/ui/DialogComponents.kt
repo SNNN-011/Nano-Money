@@ -13,6 +13,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -34,16 +35,59 @@ fun MessageAlertDialog(
     message: String,
     onDismissRequest: () -> Unit
 ) {
-    AlertDialog(
-        onDismissRequest = onDismissRequest,
-        title = { Text(title) },
-        text = { Text(message) },
-        confirmButton = {
-            TextButton(onClick = onDismissRequest) {
-                Text("OK")
+    Dialog(onDismissRequest = onDismissRequest) {
+        Card(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = MidnightAbyss),
+            border = BorderStroke(
+                width = 1.dp,
+                brush = Brush.verticalGradient(
+                    colors = listOf(
+                        GhostWhite.copy(alpha = 0.2f),
+                        GhostWhite.copy(alpha = 0.02f)
+                    )
+                )
+            ),
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+        ) {
+            Box(modifier = Modifier.background(TranslucentGlass)) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Info,
+                        contentDescription = null,
+                        tint = SteelBlue,
+                        modifier = Modifier.size(40.dp).padding(bottom = 8.dp)
+                    )
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                        color = GhostWhite,
+                        modifier = Modifier.padding(bottom = 12.dp)
+                    )
+                    Text(
+                        text = message,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = GhostWhite.copy(alpha = 0.8f),
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                        modifier = Modifier.padding(bottom = 24.dp)
+                    )
+                    PremiumButton(
+                        text = "OK",
+                        onClick = onDismissRequest,
+                        modifier = Modifier.fillMaxWidth(),
+                        isActive = true,
+                        testTag = "message_dialog_ok"
+                    )
+                }
             }
         }
-    )
+    }
 }
 
 @Composable
@@ -132,193 +176,208 @@ fun CategoryManagementDialog(
     var newCategoryName by remember { mutableStateOf("") }
     var categoryNameError by remember { mutableStateOf<String?>(null) }
 
-    AlertDialog(
-        onDismissRequest = onDismissRequest,
-        containerColor = MidnightAbyss,
-        titleContentColor = GhostWhite,
-        textContentColor = GhostWhite,
-        shape = RoundedCornerShape(24.dp),
-        title = {
-            Text(
-                text = "Kelola Kategori ${if (formType == "income") "Pendapatan" else "Pengeluaran"}",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.ExtraBold,
-                color = GhostWhite
-            )
-        },
-        text = {
-            Column(
-                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                Text(
-                    text = "Tambah atau hapus kategori kustom sesuai dengan preferensi Anda.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = GhostWhite.copy(alpha = 0.7f),
-                    lineHeight = 20.sp
-                )
-
-                // Add Category Input Form
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    OutlinedTextField(
-                        value = newCategoryName,
-                        onValueChange = {
-                            newCategoryName = it
-                            categoryNameError = null
-                        },
-                        placeholder = { Text("Nama Kategori Baru", style = MaterialTheme.typography.bodyMedium) },
-                        singleLine = true,
-                        isError = categoryNameError != null,
-                        modifier = Modifier.weight(1f).testTag("new_category_input"),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = GhostWhite,
-                            unfocusedTextColor = GhostWhite,
-                            focusedLabelColor = GhostWhite,
-                            unfocusedLabelColor = GhostWhite.copy(alpha = 0.5f),
-                            focusedBorderColor = MaterialTheme.colorScheme.primary,
-                            unfocusedBorderColor = GhostWhite.copy(alpha = 0.2f),
-                            focusedContainerColor = GhostWhite.copy(alpha = 0.05f),
-                            unfocusedContainerColor = GhostWhite.copy(alpha = 0.02f),
-                            errorBorderColor = MaterialTheme.colorScheme.error,
-                            errorTextColor = GhostWhite
-                        )
+    Dialog(onDismissRequest = onDismissRequest) {
+        Card(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = MidnightAbyss),
+            border = BorderStroke(
+                width = 1.dp,
+                brush = Brush.verticalGradient(
+                    colors = listOf(
+                        GhostWhite.copy(alpha = 0.2f),
+                        GhostWhite.copy(alpha = 0.02f)
                     )
-                    Button(
-                        onClick = {
-                            val trimmed = newCategoryName.trim()
-                            if (trimmed.isEmpty()) {
-                                categoryNameError = "Nama tidak boleh kosong"
-                            } else if (currentCategories.contains(trimmed)) {
-                                categoryNameError = "Kategori sudah ada"
-                            } else {
-                                onAddCategory(trimmed)
-                                newCategoryName = ""
-                                categoryNameError = null
-                            }
-                        },
-                        shape = RoundedCornerShape(12.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = MaterialTheme.colorScheme.primary,
-                            contentColor = MaterialTheme.colorScheme.onPrimary
-                        ),
-                        contentPadding = PaddingValues(0.dp),
-                        modifier = Modifier.size(52.dp).testTag("add_category_confirm_button")
-                    ) {
-                        Icon(Icons.Default.Add, contentDescription = "Tambah", modifier = Modifier.size(24.dp))
-                    }
-                }
-                if (categoryNameError != null) {
-                    Text(
-                        text = categoryNameError ?: "",
-                        color = MaterialTheme.colorScheme.error,
-                        style = MaterialTheme.typography.labelMedium,
-                        modifier = Modifier.padding(start = 4.dp, top = 2.dp)
-                    )
-                }
-
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(1.dp)
-                        .background(TranslucentBorder)
                 )
-
-                Text(
-                    text = "Daftar Kategori Saat Ini",
-                    style = MaterialTheme.typography.labelLarge.copy(
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 0.5.sp
-                    ),
-                    color = GhostWhite.copy(alpha = 0.8f)
-                )
-
-                // Categories List inside Scrollable column
+            ),
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+        ) {
+            Box(modifier = Modifier.background(TranslucentGlass)) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .heightIn(max = 240.dp)
-                        .verticalScroll(rememberScrollState()),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                        .padding(24.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    currentCategories.forEach { cat ->
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(8.dp),
-                            colors = CardDefaults.cardColors(
-                                containerColor = TranslucentInput
+                    Text(
+                        text = "Kelola Kategori ${if (formType == "income") "Pendapatan" else "Pengeluaran"}",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = GhostWhite
+                    )
+
+                    Text(
+                        text = "Tambah atau hapus kategori kustom sesuai dengan preferensi Anda.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = GhostWhite.copy(alpha = 0.7f),
+                        lineHeight = 20.sp
+                    )
+
+                    // Add Category Input Form
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = newCategoryName,
+                            onValueChange = {
+                                newCategoryName = it
+                                categoryNameError = null
+                            },
+                            placeholder = { Text("Nama Kategori Baru", style = MaterialTheme.typography.bodyMedium) },
+                            singleLine = true,
+                            isError = categoryNameError != null,
+                            modifier = Modifier.weight(1f).testTag("new_category_input"),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = GhostWhite,
+                                unfocusedTextColor = GhostWhite,
+                                focusedLabelColor = GhostWhite,
+                                unfocusedLabelColor = GhostWhite.copy(alpha = 0.5f),
+                                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                unfocusedBorderColor = GhostWhite.copy(alpha = 0.2f),
+                                focusedContainerColor = GhostWhite.copy(alpha = 0.05f),
+                                unfocusedContainerColor = GhostWhite.copy(alpha = 0.02f),
+                                errorBorderColor = MaterialTheme.colorScheme.error,
+                                errorTextColor = GhostWhite
+                            )
+                        )
+                        Button(
+                            onClick = {
+                                val trimmed = newCategoryName.trim()
+                                if (trimmed.isEmpty()) {
+                                    categoryNameError = "Nama tidak boleh kosong"
+                                } else if (currentCategories.contains(trimmed)) {
+                                    categoryNameError = "Kategori sudah ada"
+                                } else {
+                                    onAddCategory(trimmed)
+                                    newCategoryName = ""
+                                    categoryNameError = null
+                                }
+                            },
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = MaterialTheme.colorScheme.primary,
+                                contentColor = MaterialTheme.colorScheme.onPrimary
                             ),
-                            border = BorderStroke(1.dp, GhostWhite.copy(alpha = 0.05f))
+                            contentPadding = PaddingValues(0.dp),
+                            modifier = Modifier.size(52.dp).testTag("add_category_confirm_button")
                         ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(start = 12.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
+                            Icon(Icons.Default.Add, contentDescription = "Tambah", modifier = Modifier.size(24.dp))
+                        }
+                    }
+                    if (categoryNameError != null) {
+                        Text(
+                            text = categoryNameError ?: "",
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.labelMedium,
+                            modifier = Modifier.padding(start = 4.dp, top = 2.dp)
+                        )
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(1.dp)
+                            .background(TranslucentBorder)
+                    )
+
+                    Text(
+                        text = "Daftar Kategori Saat Ini",
+                        style = MaterialTheme.typography.labelLarge.copy(
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 0.5.sp
+                        ),
+                        color = GhostWhite.copy(alpha = 0.8f)
+                    )
+
+                    // Categories List inside Scrollable column
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 240.dp)
+                            .verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        currentCategories.forEach { cat ->
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(8.dp),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = TranslucentInput
+                                ),
+                                border = BorderStroke(1.dp, GhostWhite.copy(alpha = 0.05f))
                             ) {
                                 Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                                ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(8.dp)
-                                            .background(
-                                                color = if (formType == "income") Color(0xFF4CAF50) else Color(0xFFF44336),
-                                                shape = CircleShape
-                                            )
-                                    )
-                                    Text(
-                                        text = cat,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = GhostWhite
-                                    )
-                                }
-                                IconButton(
-                                    onClick = {
-                                        if (currentCategories.size <= 1) {
-                                            categoryNameError = "Tidak bisa menghapus kategori terakhir!"
-                                        } else {
-                                            val deleted = onDeleteCategory(cat)
-                                            if (!deleted) {
-                                                categoryNameError = "Gagal menghapus kategori!"
-                                            }
-                                        }
-                                    },
                                     modifier = Modifier
-                                        .size(32.dp)
-                                        .testTag("delete_category_button_${cat.lowercase(Locale.ROOT)}")
+                                        .fillMaxWidth()
+                                        .padding(start = 12.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Icon(
-                                        imageVector = Icons.Default.DeleteOutline,
-                                        contentDescription = "Hapus Kategori $cat",
-                                        tint = MaterialTheme.colorScheme.error.copy(alpha = 0.8f),
-                                        modifier = Modifier.size(18.dp)
-                                    )
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(8.dp)
+                                                .background(
+                                                    color = if (formType == "income") Color(0xFF4CAF50) else Color(0xFFF44336),
+                                                    shape = CircleShape
+                                                )
+                                        )
+                                        Text(
+                                            text = cat,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = GhostWhite
+                                        )
+                                    }
+                                    IconButton(
+                                        onClick = {
+                                            if (currentCategories.size <= 1) {
+                                                categoryNameError = "Tidak bisa menghapus kategori terakhir!"
+                                            } else {
+                                                val deleted = onDeleteCategory(cat)
+                                                if (!deleted) {
+                                                    categoryNameError = "Gagal menghapus kategori!"
+                                                }
+                                            }
+                                        },
+                                        modifier = Modifier
+                                            .size(32.dp)
+                                            .testTag("delete_category_button_${cat.lowercase(Locale.ROOT)}")
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.DeleteOutline,
+                                            contentDescription = "Hapus Kategori $cat",
+                                            tint = MaterialTheme.colorScheme.error.copy(alpha = 0.8f),
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
                                 }
                             }
                         }
                     }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        PremiumButton(
+                            text = "Selesai",
+                            onClick = onDismissRequest,
+                            modifier = Modifier.testTag("close_category_dialog_button"),
+                            isActive = true,
+                            fillMaxWidth = false
+                        )
+                    }
                 }
             }
-        },
-        confirmButton = {
-            PremiumButton(
-                text = "Selesai",
-                onClick = onDismissRequest,
-                modifier = Modifier.padding(end = 8.dp, bottom = 8.dp),
-                isActive = true,
-                testTag = "close_category_dialog_button",
-                fillMaxWidth = false
-            )
         }
-    )
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -364,22 +423,57 @@ fun MonthlyBudgetDialog(
 
     var showCategoryPickerPopup by remember { mutableStateOf(false) }
     var showDeleteConfirmation by remember { mutableStateOf(false) }
+    var showMonthlyBudgetInfo by remember { mutableStateOf(false) }
+    var showCategoryBudgetInfo by remember { mutableStateOf(false) }
 
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = MidnightAbyss,
-        titleContentColor = GhostWhite,
-        textContentColor = GhostWhite,
-        shape = RoundedCornerShape(24.dp),
-        title = {
-            Text(
-                text = "Atur Anggaran Bulanan",
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.ExtraBold,
-                color = GhostWhite
-            )
-        },
-        text = {
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = MidnightAbyss),
+            border = BorderStroke(
+                width = 1.dp,
+                brush = Brush.verticalGradient(
+                    colors = listOf(
+                        GhostWhite.copy(alpha = 0.2f),
+                        GhostWhite.copy(alpha = 0.02f)
+                    )
+                )
+            ),
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+        ) {
+            Box(modifier = Modifier.background(TranslucentGlass)) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(24.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = "Atur Anggaran Bulanan",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = GhostWhite,
+                    modifier = Modifier.weight(1f)
+                )
+                IconButton(
+                    onClick = { showMonthlyBudgetInfo = !showMonthlyBudgetInfo },
+                    modifier = Modifier.size(28.dp).padding(start = 4.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Info,
+                        contentDescription = "Informasi Anggaran Bulanan",
+                        tint = SteelBlue,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+            Spacer(modifier = Modifier.height(8.dp))
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -388,6 +482,32 @@ fun MonthlyBudgetDialog(
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
+                if (showMonthlyBudgetInfo) {
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = SteelBlue.copy(alpha = 0.12f)),
+                        shape = RoundedCornerShape(12.dp),
+                        border = BorderStroke(1.dp, SteelBlue.copy(alpha = 0.25f)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text(
+                                text = "Mengenai Anggaran Bulanan",
+                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                                color = SteelBlue
+                            )
+                            Text(
+                                text = "Batas Anggaran Bulanan menetapkan batas pengeluaran maksimum Anda untuk seluruh pengeluaran dalam satu bulan berjalan. Aplikasi ini membantu mengontrol pengeluaran agar Anda tidak boros dan tetap hemat.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = GhostWhite.copy(alpha = 0.85f),
+                                lineHeight = 16.sp
+                            )
+                        }
+                    }
+                }
+
                 Text(
                     text = "Tentukan batas pengeluaran maksimum Anda untuk bulan ini.",
                     style = MaterialTheme.typography.bodyMedium,
@@ -484,15 +604,58 @@ fun MonthlyBudgetDialog(
                 }
 
                 // Section for category budget targeting
-                Text(
-                    text = "Batas Anggaran Per Kategori (Opsional)",
-                    style = MaterialTheme.typography.labelLarge.copy(
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 0.5.sp
-                    ),
-                    color = GhostWhite.copy(alpha = 0.8f),
-                    modifier = Modifier.padding(top = 8.dp)
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = "Batas Anggaran Per Kategori (Opsional)",
+                        style = MaterialTheme.typography.labelLarge.copy(
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 0.5.sp
+                        ),
+                        color = GhostWhite.copy(alpha = 0.8f),
+                        modifier = Modifier.weight(1f)
+                    )
+                    IconButton(
+                        onClick = { showCategoryBudgetInfo = !showCategoryBudgetInfo },
+                        modifier = Modifier.size(24.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Info,
+                            contentDescription = "Informasi Anggaran Kategori",
+                            tint = SteelBlue,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
+
+                if (showCategoryBudgetInfo) {
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = SteelBlue.copy(alpha = 0.12f)),
+                        shape = RoundedCornerShape(12.dp),
+                        border = BorderStroke(1.dp, SteelBlue.copy(alpha = 0.25f)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text(
+                                text = "Mengenai Anggaran Kategori",
+                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                                color = SteelBlue
+                            )
+                            Text(
+                                text = "Anggaran Kategori memungkinkan Anda memberikan porsi batasan khusus untuk kategori pengeluaran tertentu (misalnya saja: Makanan, Belanja, Hiburan, dll.). Ini sangat berguna untuk menganalisis dan mencegah keborosan pada sektor pengeluaran tertentu yang spesifik.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = GhostWhite.copy(alpha = 0.85f),
+                                lineHeight = 16.sp
+                            )
+                        }
+                    }
+                }
 
                 Row(
                     modifier = Modifier
@@ -540,91 +703,102 @@ fun MonthlyBudgetDialog(
                     Dialog(onDismissRequest = { showCategoryPickerPopup = false }) {
                         Card(
                             colors = CardDefaults.cardColors(containerColor = MidnightAbyss),
-                            shape = RoundedCornerShape(16.dp),
-                            border = BorderStroke(1.dp, GhostWhite.copy(alpha = 0.08f)),
+                            shape = RoundedCornerShape(24.dp),
+                            border = BorderStroke(
+                                width = 1.dp,
+                                brush = Brush.verticalGradient(
+                                    colors = listOf(
+                                        GhostWhite.copy(alpha = 0.2f),
+                                        GhostWhite.copy(alpha = 0.02f)
+                                    )
+                                )
+                            ),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(16.dp)
                         ) {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(16.dp),
-                                verticalArrangement = Arrangement.spacedBy(12.dp)
-                            ) {
-                                Text(
-                                    text = "Pilih Kategori Anggaran",
-                                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                                    color = GhostWhite
-                                )
-
-                                Box(
+                            Box(modifier = Modifier.background(TranslucentGlass)) {
+                                Column(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .heightIn(max = 240.dp)
-                                        .verticalScroll(rememberScrollState())
+                                        .padding(24.dp),
+                                    verticalArrangement = Arrangement.spacedBy(16.dp)
                                 ) {
-                                    Column(
-                                        verticalArrangement = Arrangement.spacedBy(4.dp)
-                                    ) {
-                                        for (category in expenseCategories) {
-                                            val isChecked = selectedEnabledCategories.contains(category)
-                                            Row(
-                                                modifier = Modifier
-                                                    .fillMaxWidth()
-                                                    .background(if (isChecked) SteelBlue.copy(alpha = 0.1f) else Color.Transparent, RoundedCornerShape(8.dp))
-                                                    .clickable {
-                                                        if (isChecked) {
-                                                            selectedEnabledCategories.remove(category)
-                                                            localCategoryBudgets[category] = ""
-                                                        } else {
-                                                            selectedEnabledCategories.add(category)
-                                                        }
-                                                    }
-                                                    .padding(horizontal = 8.dp, vertical = 6.dp),
-                                                verticalAlignment = Alignment.CenterVertically,
-                                                horizontalArrangement = Arrangement.SpaceBetween
-                                            ) {
-                                                Text(
-                                                    text = category,
-                                                    style = MaterialTheme.typography.bodyMedium,
-                                                    color = if (isChecked) SteelBlue else GhostWhite.copy(alpha = 0.8f)
-                                                )
+                                    Text(
+                                        text = "Pilih Kategori Anggaran",
+                                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                                        color = GhostWhite
+                                    )
 
-                                                Checkbox(
-                                                    checked = isChecked,
-                                                    onCheckedChange = { checked ->
-                                                        if (!checked) {
-                                                            selectedEnabledCategories.remove(category)
-                                                            localCategoryBudgets[category] = ""
-                                                        } else {
-                                                            selectedEnabledCategories.add(category)
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .heightIn(max = 240.dp)
+                                            .verticalScroll(rememberScrollState())
+                                    ) {
+                                        Column(
+                                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                                        ) {
+                                            for (category in expenseCategories) {
+                                                val isChecked = selectedEnabledCategories.contains(category)
+                                                Row(
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .background(if (isChecked) SteelBlue.copy(alpha = 0.1f) else Color.Transparent, RoundedCornerShape(8.dp))
+                                                        .clickable {
+                                                            if (isChecked) {
+                                                                selectedEnabledCategories.remove(category)
+                                                                localCategoryBudgets[category] = ""
+                                                            } else {
+                                                                selectedEnabledCategories.add(category)
+                                                            }
                                                         }
-                                                    },
-                                                    colors = CheckboxDefaults.colors(
-                                                        checkedColor = SteelBlue,
-                                                        uncheckedColor = GhostWhite.copy(alpha = 0.2f),
-                                                        checkmarkColor = MidnightAbyss
-                                                    ),
-                                                    modifier = Modifier.size(36.dp)
-                                                )
+                                                        .padding(horizontal = 8.dp, vertical = 6.dp),
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.SpaceBetween
+                                                ) {
+                                                    Text(
+                                                        text = category,
+                                                        style = MaterialTheme.typography.bodyMedium,
+                                                        color = if (isChecked) SteelBlue else GhostWhite.copy(alpha = 0.8f)
+                                                    )
+
+                                                    Checkbox(
+                                                        checked = isChecked,
+                                                        onCheckedChange = { checked ->
+                                                            if (!checked) {
+                                                                selectedEnabledCategories.remove(category)
+                                                                localCategoryBudgets[category] = ""
+                                                            } else {
+                                                                selectedEnabledCategories.add(category)
+                                                            }
+                                                        },
+                                                        colors = CheckboxDefaults.colors(
+                                                            checkedColor = SteelBlue,
+                                                            uncheckedColor = GhostWhite.copy(alpha = 0.2f),
+                                                            checkmarkColor = MidnightAbyss
+                                                        ),
+                                                        modifier = Modifier.size(36.dp)
+                                                    )
+                                                }
                                             }
                                         }
                                     }
-                                }
 
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.End
-                                ) {
-                                    PremiumButton(
-                                        text = "Selesai",
-                                        onClick = { showCategoryPickerPopup = false },
-                                        fillMaxWidth = false,
-                                        horizontalPadding = 20.dp,
-                                        verticalPadding = 6.dp,
-                                        modifier = Modifier.height(40.dp)
-                                    )
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.End
+                                    ) {
+                                        PremiumButton(
+                                            text = "Selesai",
+                                            onClick = { showCategoryPickerPopup = false },
+                                            fillMaxWidth = false,
+                                            horizontalPadding = 20.dp,
+                                            verticalPadding = 6.dp,
+                                            modifier = Modifier.height(40.dp)
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -638,59 +812,91 @@ fun MonthlyBudgetDialog(
                     ) {
                         for (category in selectedEnabledCategories) {
                             val localState = remember(category) { mutableStateOf(localCategoryBudgets[category] ?: "") }
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .background(TranslucentInput, RoundedCornerShape(10.dp))
-                                    .border(1.dp, GhostWhite.copy(alpha = 0.03f), RoundedCornerShape(10.dp))
-                                    .padding(horizontal = 10.dp, vertical = 3.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(8.dp),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = TranslucentInput
+                                ),
+                                border = BorderStroke(1.dp, GhostWhite.copy(alpha = 0.05f))
                             ) {
-                                Box(
+                                Row(
                                     modifier = Modifier
-                                        .size(5.dp)
-                                        .background(SteelBlue, CircleShape)
-                                )
-
-                                Text(
-                                    text = category,
-                                    style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold),
-                                    color = GhostWhite,
-                                    modifier = Modifier.weight(1f)
-                                )
-
-                                OutlinedTextField(
-                                    value = localState.value,
-                                    onValueChange = { newValue: String ->
-                                        if (newValue.all { char -> char.isDigit() } || newValue.isEmpty()) {
-                                            localState.value = newValue
-                                            localCategoryBudgets[category] = newValue
-                                        }
-                                    },
-                                    placeholder = {
-                                        Text(
-                                            text = "Limit Rp",
-                                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
-                                            color = GhostWhite.copy(alpha = 0.3f)
+                                        .fillMaxWidth()
+                                        .padding(start = 12.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(8.dp)
+                                                .background(
+                                                    color = Color(0xFFF44336),
+                                                    shape = CircleShape
+                                                )
                                         )
-                                    },
-                                    singleLine = true,
-                                    textStyle = MaterialTheme.typography.bodySmall.copy(color = GhostWhite, fontSize = 12.sp),
-                                    modifier = Modifier
-                                        .width(135.dp)
-                                        .height(46.dp)
-                                        .testTag("category_budget_input_${category.lowercase()}"),
-                                    shape = RoundedCornerShape(8.dp),
-                                    colors = OutlinedTextFieldDefaults.colors(
-                                        focusedTextColor = GhostWhite,
-                                        unfocusedTextColor = GhostWhite,
-                                        focusedBorderColor = MaterialTheme.colorScheme.primary,
-                                        unfocusedBorderColor = GhostWhite.copy(alpha = 0.1f),
-                                        focusedContainerColor = GhostWhite.copy(alpha = 0.03f),
-                                        unfocusedContainerColor = GhostWhite.copy(alpha = 0.01f)
+                                        Text(
+                                            text = category,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = GhostWhite
+                                        )
+                                    }
+
+                                    OutlinedTextField(
+                                        value = localState.value,
+                                        onValueChange = { newValue: String ->
+                                            if (newValue.all { char -> char.isDigit() } || newValue.isEmpty()) {
+                                                localState.value = newValue
+                                                localCategoryBudgets[category] = newValue
+                                            }
+                                        },
+                                        placeholder = {
+                                            Text(
+                                                text = "Limit Rp",
+                                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
+                                                color = GhostWhite.copy(alpha = 0.3f)
+                                            )
+                                        },
+                                        singleLine = true,
+                                        textStyle = MaterialTheme.typography.bodySmall.copy(color = GhostWhite, fontSize = 12.sp),
+                                        modifier = Modifier
+                                            .width(120.dp)
+                                            .height(46.dp)
+                                            .testTag("category_budget_input_${category.lowercase()}"),
+                                        shape = RoundedCornerShape(8.dp),
+                                        colors = OutlinedTextFieldDefaults.colors(
+                                            focusedTextColor = GhostWhite,
+                                            unfocusedTextColor = GhostWhite,
+                                            focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                            unfocusedBorderColor = GhostWhite.copy(alpha = 0.1f),
+                                            focusedContainerColor = GhostWhite.copy(alpha = 0.03f),
+                                            unfocusedContainerColor = GhostWhite.copy(alpha = 0.01f)
+                                        )
                                     )
-                                )
+
+                                    IconButton(
+                                        onClick = {
+                                            selectedEnabledCategories.remove(category)
+                                            localCategoryBudgets[category] = ""
+                                        },
+                                        modifier = Modifier
+                                            .size(32.dp)
+                                            .testTag("delete_category_budget_button_${category.lowercase()}")
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.DeleteOutline,
+                                            contentDescription = "Hapus Batas Kategori $category",
+                                            tint = MaterialTheme.colorScheme.error.copy(alpha = 0.8f),
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
@@ -703,20 +909,17 @@ fun MonthlyBudgetDialog(
                     )
                 }
             }
-        },
-        confirmButton = {
+            Spacer(modifier = Modifier.height(16.dp))
             Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp),
+                modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 PremiumButton(
-                    text = "Hapus Batas",
-                    onClick = {
-                        showDeleteConfirmation = true
-                    },
+                    text = "Batal",
+                    onClick = onDismiss,
                     modifier = Modifier.weight(1f),
                     isActive = false,
-                    testTag = "delete_budget_button"
+                    testTag = "cancel_budget_button"
                 )
                 PremiumButton(
                     text = "Simpan",
@@ -747,54 +950,79 @@ fun MonthlyBudgetDialog(
                 )
             }
         }
-    )
+    }
+}
+}
 
     if (showDeleteConfirmation) {
-        AlertDialog(
-            onDismissRequest = { showDeleteConfirmation = false },
-            containerColor = MidnightAbyss,
-            titleContentColor = GhostWhite,
-            textContentColor = GhostWhite,
-            shape = RoundedCornerShape(16.dp),
-            title = {
-                Text(
-                    text = "Hapus Batas Anggaran?",
-                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                    color = GhostWhite
-                )
-            },
-            text = {
-                Text(
-                    text = "Apakah Anda yakin ingin menghapus semua batasan anggaran bulanan serta batasan kategori yang telah diatur?",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = GhostWhite.copy(alpha = 0.7f)
-                )
-            },
-            confirmButton = {
-                PremiumButton(
-                    text = "Ya, Hapus",
-                    onClick = {
-                        showDeleteConfirmation = false
-                        onConfirm(0.0, emptyMap())
-                    },
-                    modifier = Modifier.width(110.dp).height(38.dp),
-                    fillMaxWidth = false,
-                    horizontalPadding = 12.dp,
-                    verticalPadding = 6.dp
-                )
-            },
-            dismissButton = {
-                PremiumButton(
-                    text = "Batal",
-                    onClick = { showDeleteConfirmation = false },
-                    modifier = Modifier.width(100.dp).height(38.dp),
-                    isActive = false,
-                    fillMaxWidth = false,
-                    horizontalPadding = 12.dp,
-                    verticalPadding = 6.dp
-                )
+        Dialog(onDismissRequest = { showDeleteConfirmation = false }) {
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(containerColor = MidnightAbyss),
+                border = BorderStroke(
+                    width = 1.dp,
+                    brush = Brush.verticalGradient(
+                        colors = listOf(
+                            GhostWhite.copy(alpha = 0.2f),
+                            GhostWhite.copy(alpha = 0.02f)
+                        )
+                    )
+                ),
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+            ) {
+                Box(modifier = Modifier.background(TranslucentGlass)) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(24.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.DeleteOutline,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.error,
+                            modifier = Modifier.size(40.dp).padding(bottom = 8.dp)
+                        )
+                        Text(
+                            text = "Hapus Batas Anggaran?",
+                            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
+                            color = GhostWhite,
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+                        Text(
+                            text = "Apakah Anda yakin ingin menghapus semua batasan anggaran bulanan serta batasan kategori yang telah diatur?",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = GhostWhite.copy(alpha = 0.8f),
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                            modifier = Modifier.padding(bottom = 24.dp)
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            PremiumButton(
+                                text = "Batal",
+                                onClick = { showDeleteConfirmation = false },
+                                modifier = Modifier.weight(1f),
+                                isActive = false,
+                                testTag = "dismiss_delete_budget_confirm"
+                            )
+                            PremiumButton(
+                                text = "Ya, Hapus",
+                                onClick = {
+                                    showDeleteConfirmation = false
+                                    onConfirm(0.0, emptyMap())
+                                },
+                                modifier = Modifier.weight(1f),
+                                isActive = true,
+                                testTag = "confirm_delete_budget_confirm"
+                            )
+                        }
+                    }
+                }
             }
-        )
+        }
     }
 }
 
@@ -828,13 +1056,29 @@ fun RecurringTransactionManagementDialog(
     var amountError by remember { mutableStateOf<String?>(null) }
     var dayError by remember { mutableStateOf<String?>(null) }
 
-    AlertDialog(
-        onDismissRequest = onDismissRequest,
-        containerColor = MidnightAbyss,
-        titleContentColor = GhostWhite,
-        textContentColor = GhostWhite,
-        shape = RoundedCornerShape(24.dp),
-        title = {
+    Dialog(onDismissRequest = onDismissRequest) {
+        Card(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = MidnightAbyss),
+            border = BorderStroke(
+                width = 1.dp,
+                brush = Brush.verticalGradient(
+                    colors = listOf(
+                        GhostWhite.copy(alpha = 0.2f),
+                        GhostWhite.copy(alpha = 0.02f)
+                    )
+                )
+            ),
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+        ) {
+            Box(modifier = Modifier.background(TranslucentGlass)) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(24.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -852,13 +1096,13 @@ fun RecurringTransactionManagementDialog(
                     color = GhostWhite
                 )
             }
-        },
-        text = {
+            Spacer(modifier = Modifier.height(8.dp))
             if (isAddingNew) {
                 // FORM MODE
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .weight(1f, fill = false)
                         .verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
@@ -1153,11 +1397,10 @@ fun RecurringTransactionManagementDialog(
                     )
                 }
             }
-        },
-        confirmButton = {
+            Spacer(modifier = Modifier.height(16.dp))
             if (isAddingNew) {
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 8.dp),
+                    modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     PremiumButton(
@@ -1211,12 +1454,14 @@ fun RecurringTransactionManagementDialog(
                 PremiumButton(
                     text = "Tutup",
                     onClick = onDismissRequest,
-                    modifier = Modifier.fillMaxWidth().padding(start = 8.dp, end = 8.dp, bottom = 8.dp),
+                    modifier = Modifier.fillMaxWidth(),
                     isActive = false,
                     fillMaxWidth = true
                 )
             }
         }
-    )
+    }
+}
+}
 }
 
