@@ -120,6 +120,36 @@ class FinancialTrackerViewModel(
     val monthlyBudgetLimit = MutableStateFlow(prefs.getFloat("monthly_budget_limit", 0f).toDouble())
     val selectedBudgetOffset = MutableStateFlow(0)
 
+    // Map of expense category name to its customized budget limit
+    private val _categoryBudgets = MutableStateFlow<Map<String, Double>>(emptyMap())
+    val categoryBudgets: StateFlow<Map<String, Double>> = _categoryBudgets.asStateFlow()
+
+    // Map of category name to current month's expenses for that category
+    val categorySpending: StateFlow<Map<String, Double>> = combine(allRecords, selectedBudgetOffset) { records, offset ->
+        val currentCal = java.util.Calendar.getInstance()
+        currentCal.add(java.util.Calendar.MONTH, offset)
+        val recordCal = java.util.Calendar.getInstance()
+        records.filter { it.type == "expense" }
+            .filter { record ->
+                recordCal.timeInMillis = record.date
+                recordCal.get(java.util.Calendar.YEAR) == currentCal.get(java.util.Calendar.YEAR) &&
+                recordCal.get(java.util.Calendar.MONTH) == currentCal.get(java.util.Calendar.MONTH)
+            }
+            .groupBy { it.category }
+            .mapValues { entry -> entry.value.sumOf { it.amount } }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
+
+    fun updateCategoryBudget(category: String, limit: Double) {
+        prefs.edit().putFloat("category_budget_$category", limit.toFloat()).apply()
+        val currentBudgets = _categoryBudgets.value.toMutableMap()
+        if (limit <= 0.0) {
+            currentBudgets.remove(category)
+        } else {
+            currentBudgets[category] = limit
+        }
+        _categoryBudgets.value = currentBudgets
+    }
+
     fun changeBudgetMonthOffset(offset: Int) {
         selectedBudgetOffset.value = offset
     }
@@ -190,6 +220,18 @@ class FinancialTrackerViewModel(
                     formCategory.value = expenseCategories.value.firstOrNull() ?: "Makanan"
                 }
             }
+        }.launchIn(viewModelScope)
+
+        // Reactively load category budgets when expenseCategories changes
+        expenseCategories.onEach { categories ->
+            val budgets = mutableMapOf<String, Double>()
+            categories.forEach { cat ->
+                val limit = prefs.getFloat("category_budget_$cat", 0f).toDouble()
+                if (limit > 0.0) {
+                    budgets[cat] = limit
+                }
+            }
+            _categoryBudgets.value = budgets
         }.launchIn(viewModelScope)
 
         // One-time cleanup for old categories that were saved with emojis:
@@ -979,7 +1021,64 @@ class FinancialTrackerViewModel(
 
             y += 155f
 
+            val activeCatBudgets = categoryBudgets.value.filter { it.value > 0.0 }
+            if (activeCatBudgets.isNotEmpty()) {
+                checkPageBreak(30f + activeCatBudgets.size * 14f)
+                paint.color = android.graphics.Color.parseColor("#0F172A")
+                paint.textSize = 10f
+                paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                canvas.drawText("ANGGARAN KATEGORI DETAIL", 40f, y, paint)
+                
+                y += 10f
+                
+                paint.color = android.graphics.Color.parseColor("#475569")
+                canvas.drawRect(40f, y, 555f, y + 16f, paint)
+                
+                paint.color = android.graphics.Color.WHITE
+                paint.textSize = 8f
+                paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                canvas.drawText("Kategori", 45f, y + 11f, paint)
+                canvas.drawText("Terpakai", 200f, y + 11f, paint)
+                canvas.drawText("Limit Anggaran", 310f, y + 11f, paint)
+                canvas.drawText("Status / Sisa", 430f, y + 11f, paint)
+                
+                y += 16f
+                
+                activeCatBudgets.forEach { (cat, limit) ->
+                    val spent = categorySpending.value[cat] ?: 0.0
+                    val isOver = spent > limit
+                    val remaining = limit - spent
+                    
+                    paint.color = android.graphics.Color.parseColor("#F8FAFC")
+                    canvas.drawRect(40f, y, 555f, y + 14f, paint)
+                    
+                    paint.textSize = 7.5f
+                    paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
+                    
+                    paint.color = android.graphics.Color.parseColor("#0F172A")
+                    canvas.drawText(cat, 45f, y + 10f, paint)
+                    canvas.drawText(FormatUtils.formatRupiah(spent), 200f, y + 10f, paint)
+                    canvas.drawText(FormatUtils.formatRupiah(limit), 310f, y + 10f, paint)
+                    
+                    if (isOver) {
+                        paint.color = android.graphics.Color.parseColor("#B91C1C")
+                        paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+                        canvas.drawText("Overbudget (${FormatUtils.formatRupiah(spent - limit)})", 430f, y + 10f, paint)
+                    } else {
+                        paint.color = android.graphics.Color.parseColor("#15803D")
+                        canvas.drawText("Sisa: ${FormatUtils.formatRupiah(remaining)}", 430f, y + 10f, paint)
+                    }
+                    
+                    paint.color = android.graphics.Color.parseColor("#E2E8F0")
+                    canvas.drawLine(40f, y + 14f, 555f, y + 14f, paint)
+                    
+                    y += 14f
+                }
+                y += 20f
+            }
+
             // Table title
+            checkPageBreak(40f)
             paint.color = android.graphics.Color.parseColor("#0F172A")
             paint.textSize = 10f
             paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)

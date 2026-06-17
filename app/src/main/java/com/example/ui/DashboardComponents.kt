@@ -37,6 +37,8 @@ fun DashboardStatsSection(
     currentBalance: Double,
     monthlySpendingTotal: Double,
     monthlyBudgetLimit: Double,
+    categoryBudgets: Map<String, Double> = emptyMap(),
+    categorySpending: Map<String, Double> = emptyMap(),
     selectedBudgetOffset: Int = 0,
     onBudgetOffsetChange: (Int) -> Unit = {},
     onSetBudgetClick: () -> Unit,
@@ -485,6 +487,162 @@ fun DashboardStatsSection(
                             fontWeight = FontWeight.Bold,
                             color = progressColor
                         )
+                    }
+                }
+
+                val activeCategoryBudgets = categoryBudgets.filter { it.value > 0.0 }
+                if (activeCategoryBudgets.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(14.dp))
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(1.dp)
+                            .background(GhostWhite.copy(alpha = 0.05f))
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    var isExpanded by remember { mutableStateOf(false) }
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { isExpanded = !isExpanded }
+                            .padding(vertical = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(6.dp)
+                                    .background(SteelBlue, shape = CircleShape)
+                            )
+                            Text(
+                                text = "ANGGARAN PER KATEGORI",
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    letterSpacing = 1.2.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 10.sp
+                                ),
+                                color = SteelBlue
+                            )
+                        }
+
+                        Icon(
+                            imageVector = if (isExpanded) Icons.Default.ArrowUpward else Icons.Default.ArrowDownward,
+                            contentDescription = if (isExpanded) "Sembunyikan" else "Tampilkan",
+                            tint = GhostWhite.copy(alpha = 0.5f),
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+
+                    if (isExpanded) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            activeCategoryBudgets.forEach { (cat, limit) ->
+                                val spent = if (balanceVisible) (categorySpending[cat] ?: 0.0) else 0.0
+                                val catProgress = if (limit > 0.0) (spent / limit).coerceIn(0.0, 1.0).toFloat() else 0f
+                                val isCatOver = spent > limit
+                                val isCatWarning = (spent / limit) >= 0.8
+                                
+                                val catPercent = ((spent / limit) * 100).toInt()
+
+                                val catColor = when {
+                                    !balanceVisible -> GhostWhite.copy(alpha = 0.2f)
+                                    isCatOver -> NeonRed
+                                    isCatWarning -> Color(0xFFFFA000)
+                                    else -> SteelBlue
+                                }
+
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .background(TranslucentInput, RoundedCornerShape(12.dp))
+                                        .border(1.dp, GhostWhite.copy(alpha = 0.02f), RoundedCornerShape(12.dp))
+                                        .padding(horizontal = 12.dp, vertical = 8.dp)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(6.dp)
+                                                    .background(catColor, CircleShape)
+                                            )
+                                            Text(
+                                                text = cat,
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                fontWeight = FontWeight.Bold,
+                                                color = GhostWhite
+                                            )
+                                        }
+                                        Text(
+                                            text = if (balanceVisible) {
+                                                if (isCatOver) "Over Rp ${FormatUtils.formatRupiahCompact(spent - limit)}" else "Sisa Rp ${FormatUtils.formatRupiahCompact(limit - spent)}"
+                                            } else "Rp ••••••",
+                                            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold),
+                                            color = if (isCatOver && balanceVisible) NeonRed else GhostWhite.copy(alpha = 0.5f),
+                                            fontSize = 11.sp
+                                        )
+                                    }
+
+                                    Spacer(modifier = Modifier.height(6.dp))
+
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(6.dp)
+                                            .clip(RoundedCornerShape(3.dp))
+                                            .background(GhostWhite.copy(alpha = 0.05f))
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .fillMaxWidth(catProgress)
+                                                .fillMaxHeight()
+                                                .clip(RoundedCornerShape(3.dp))
+                                                .background(catColor)
+                                                .testTag("category_budget_progress_fill_${cat.lowercase()}")
+                                        )
+                                    }
+
+                                    Spacer(modifier = Modifier.height(4.dp))
+
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = if (balanceVisible) {
+                                                "${FormatUtils.formatRupiahCompact(spent)} terpakai dari ${FormatUtils.formatRupiahCompact(limit)}"
+                                            } else "Rp •••••• terpakai",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = GhostWhite.copy(alpha = 0.4f),
+                                            fontSize = 10.sp
+                                        )
+
+                                        Text(
+                                            text = if (balanceVisible) "$catPercent%" else "••%",
+                                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                                            color = catColor,
+                                            fontSize = 10.sp
+                                        )
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }

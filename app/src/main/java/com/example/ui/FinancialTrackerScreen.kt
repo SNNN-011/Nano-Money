@@ -108,6 +108,8 @@ fun FinancialTrackerScreen(
     val monthlyBudgetLimit by viewModel.monthlyBudgetLimit.collectAsState()
     val monthlySpendingTotal by viewModel.monthlySpendingTotal.collectAsState()
     val selectedBudgetOffset by viewModel.selectedBudgetOffset.collectAsState()
+    val categoryBudgets by viewModel.categoryBudgets.collectAsState()
+    val categorySpending by viewModel.categorySpending.collectAsState()
 
     var showBudgetDialog by remember { mutableStateOf(false) }
 
@@ -253,8 +255,18 @@ fun FinancialTrackerScreen(
     if (showBudgetDialog) {
         MonthlyBudgetDialog(
             currentBudgetLimit = monthlyBudgetLimit,
-            onConfirm = { limit ->
+            categoryBudgets = categoryBudgets,
+            expenseCategories = expenseCategoriesState,
+            onConfirm = { limit, updatedCategoryBudgets ->
                 viewModel.updateMonthlyBudgetLimit(limit)
+                updatedCategoryBudgets.forEach { (cat, valDouble) ->
+                    viewModel.updateCategoryBudget(cat, valDouble)
+                }
+                expenseCategoriesState.forEach { cat ->
+                    if (!updatedCategoryBudgets.containsKey(cat)) {
+                        viewModel.updateCategoryBudget(cat, 0.0)
+                    }
+                }
                 showBudgetDialog = false
             },
             onDismiss = { showBudgetDialog = false }
@@ -491,6 +503,8 @@ fun FinancialTrackerScreen(
                             currentBalance = currentBalance,
                             monthlySpendingTotal = monthlySpendingTotal,
                             monthlyBudgetLimit = monthlyBudgetLimit,
+                            categoryBudgets = categoryBudgets,
+                            categorySpending = categorySpending,
                             selectedBudgetOffset = selectedBudgetOffset,
                             onBudgetOffsetChange = { viewModel.changeBudgetMonthOffset(it) },
                             onSetBudgetClick = { showBudgetDialog = true },

@@ -2,7 +2,9 @@ package com.example.ui
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -323,7 +325,9 @@ fun CategoryManagementDialog(
 @Composable
 fun MonthlyBudgetDialog(
     currentBudgetLimit: Double,
-    onConfirm: (Double) -> Unit,
+    categoryBudgets: Map<String, Double>,
+    expenseCategories: List<String>,
+    onConfirm: (Double, Map<String, Double>) -> Unit,
     onDismiss: () -> Unit
 ) {
     var budgetInput by remember {
@@ -334,6 +338,32 @@ fun MonthlyBudgetDialog(
         )
     }
     var budgetError by remember { mutableStateOf<String?>(null) }
+
+    // Map input states for category budgets in a mutable map
+    val localCategoryBudgets = remember {
+        mutableStateMapOf<String, String>().apply {
+            expenseCategories.forEach { cat ->
+                val value = categoryBudgets[cat]
+                put(cat, if (value != null && value > 0.0) {
+                    if (value % 1.0 == 0.0) value.toLong().toString() else value.toString()
+                } else "")
+            }
+        }
+    }
+
+    val selectedEnabledCategories = remember {
+        mutableStateListOf<String>().apply {
+            expenseCategories.forEach { cat ->
+                val value = categoryBudgets[cat]
+                if (value != null && value > 0.0) {
+                    add(cat)
+                }
+            }
+        }
+    }
+
+    var showCategoryPickerPopup by remember { mutableStateOf(false) }
+    var showDeleteConfirmation by remember { mutableStateOf(false) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -351,7 +381,11 @@ fun MonthlyBudgetDialog(
         },
         text = {
             Column(
-                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp)
+                    .heightIn(max = 420.dp)
+                    .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 Text(
@@ -448,6 +482,226 @@ fun MonthlyBudgetDialog(
                         }
                     }
                 }
+
+                // Section for category budget targeting
+                Text(
+                    text = "Batas Anggaran Per Kategori (Opsional)",
+                    style = MaterialTheme.typography.labelLarge.copy(
+                        fontWeight = FontWeight.Bold,
+                        letterSpacing = 0.5.sp
+                    ),
+                    color = GhostWhite.copy(alpha = 0.8f),
+                    modifier = Modifier.padding(top = 8.dp)
+                )
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(TranslucentInput, RoundedCornerShape(12.dp))
+                        .border(1.dp, GhostWhite.copy(alpha = 0.05f), RoundedCornerShape(12.dp))
+                        .clickable { showCategoryPickerPopup = true }
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(2.dp)
+                    ) {
+                        Text(
+                            text = "Pilih Kategori Anggaran",
+                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                            color = GhostWhite
+                        )
+                        Text(
+                            text = if (selectedEnabledCategories.isEmpty()) {
+                                "Ketuk untuk memilih kategori..."
+                            } else {
+                                "${selectedEnabledCategories.size} Kategori terpilih"
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = GhostWhite.copy(alpha = 0.5f)
+                        )
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .background(SteelBlue.copy(alpha = 0.15f), RoundedCornerShape(8.dp))
+                            .padding(horizontal = 10.dp, vertical = 5.dp)
+                    ) {
+                        Text(
+                            text = "Atur Kategori",
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                            color = SteelBlue
+                        )
+                    }
+                }
+
+                if (showCategoryPickerPopup) {
+                    Dialog(onDismissRequest = { showCategoryPickerPopup = false }) {
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = MidnightAbyss),
+                            shape = RoundedCornerShape(16.dp),
+                            border = BorderStroke(1.dp, GhostWhite.copy(alpha = 0.08f)),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp)
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                                verticalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                Text(
+                                    text = "Pilih Kategori Anggaran",
+                                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                                    color = GhostWhite
+                                )
+
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .heightIn(max = 240.dp)
+                                        .verticalScroll(rememberScrollState())
+                                ) {
+                                    Column(
+                                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        for (category in expenseCategories) {
+                                            val isChecked = selectedEnabledCategories.contains(category)
+                                            Row(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .background(if (isChecked) SteelBlue.copy(alpha = 0.1f) else Color.Transparent, RoundedCornerShape(8.dp))
+                                                    .clickable {
+                                                        if (isChecked) {
+                                                            selectedEnabledCategories.remove(category)
+                                                            localCategoryBudgets[category] = ""
+                                                        } else {
+                                                            selectedEnabledCategories.add(category)
+                                                        }
+                                                    }
+                                                    .padding(horizontal = 8.dp, vertical = 6.dp),
+                                                verticalAlignment = Alignment.CenterVertically,
+                                                horizontalArrangement = Arrangement.SpaceBetween
+                                            ) {
+                                                Text(
+                                                    text = category,
+                                                    style = MaterialTheme.typography.bodyMedium,
+                                                    color = if (isChecked) SteelBlue else GhostWhite.copy(alpha = 0.8f)
+                                                )
+
+                                                Checkbox(
+                                                    checked = isChecked,
+                                                    onCheckedChange = { checked ->
+                                                        if (!checked) {
+                                                            selectedEnabledCategories.remove(category)
+                                                            localCategoryBudgets[category] = ""
+                                                        } else {
+                                                            selectedEnabledCategories.add(category)
+                                                        }
+                                                    },
+                                                    colors = CheckboxDefaults.colors(
+                                                        checkedColor = SteelBlue,
+                                                        uncheckedColor = GhostWhite.copy(alpha = 0.2f),
+                                                        checkmarkColor = MidnightAbyss
+                                                    ),
+                                                    modifier = Modifier.size(36.dp)
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.End
+                                ) {
+                                    PremiumButton(
+                                        text = "Selesai",
+                                        onClick = { showCategoryPickerPopup = false },
+                                        fillMaxWidth = false,
+                                        horizontalPadding = 20.dp,
+                                        verticalPadding = 6.dp,
+                                        modifier = Modifier.height(40.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (selectedEnabledCategories.isNotEmpty()) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        for (category in selectedEnabledCategories) {
+                            val localState = remember(category) { mutableStateOf(localCategoryBudgets[category] ?: "") }
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(TranslucentInput, RoundedCornerShape(10.dp))
+                                    .border(1.dp, GhostWhite.copy(alpha = 0.03f), RoundedCornerShape(10.dp))
+                                    .padding(horizontal = 10.dp, vertical = 3.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(5.dp)
+                                        .background(SteelBlue, CircleShape)
+                                )
+
+                                Text(
+                                    text = category,
+                                    style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold),
+                                    color = GhostWhite,
+                                    modifier = Modifier.weight(1f)
+                                )
+
+                                OutlinedTextField(
+                                    value = localState.value,
+                                    onValueChange = { newValue: String ->
+                                        if (newValue.all { char -> char.isDigit() } || newValue.isEmpty()) {
+                                            localState.value = newValue
+                                            localCategoryBudgets[category] = newValue
+                                        }
+                                    },
+                                    placeholder = {
+                                        Text(
+                                            text = "Limit Rp",
+                                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp),
+                                            color = GhostWhite.copy(alpha = 0.3f)
+                                        )
+                                    },
+                                    singleLine = true,
+                                    textStyle = MaterialTheme.typography.bodySmall.copy(color = GhostWhite, fontSize = 12.sp),
+                                    modifier = Modifier
+                                        .width(135.dp)
+                                        .height(46.dp)
+                                        .testTag("category_budget_input_${category.lowercase()}"),
+                                    shape = RoundedCornerShape(8.dp),
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedTextColor = GhostWhite,
+                                        unfocusedTextColor = GhostWhite,
+                                        focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                        unfocusedBorderColor = GhostWhite.copy(alpha = 0.1f),
+                                        focusedContainerColor = GhostWhite.copy(alpha = 0.03f),
+                                        unfocusedContainerColor = GhostWhite.copy(alpha = 0.01f)
+                                    )
+                                )
+                            }
+                        }
+                    }
+                } else {
+                    Text(
+                        text = "Belum ada kategori dibatasi. Ketuk tombol 'Atur Kategori' di atas untuk membatasi anggaran kategori spesifik.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = GhostWhite.copy(alpha = 0.4f),
+                        modifier = Modifier.padding(vertical = 8.dp)
+                    )
+                }
             }
         },
         confirmButton = {
@@ -458,7 +712,7 @@ fun MonthlyBudgetDialog(
                 PremiumButton(
                     text = "Hapus Batas",
                     onClick = {
-                        onConfirm(0.0)
+                        showDeleteConfirmation = true
                     },
                     modifier = Modifier.weight(1f),
                     isActive = false,
@@ -475,7 +729,15 @@ fun MonthlyBudgetDialog(
                             if (parsed == null || parsed < 0.0) {
                                 budgetError = "Nilai harus berupa angka positif"
                             } else {
-                                onConfirm(parsed)
+                                val resultBudgets = mutableMapOf<String, Double>()
+                                selectedEnabledCategories.forEach { cat ->
+                                    val valStr = localCategoryBudgets[cat] ?: ""
+                                    val parsedVal = valStr.toDoubleOrNull()
+                                    if (parsedVal != null && parsedVal > 0.0) {
+                                        resultBudgets[cat] = parsedVal
+                                    }
+                                }
+                                onConfirm(parsed, resultBudgets)
                             }
                         }
                     },
@@ -486,6 +748,54 @@ fun MonthlyBudgetDialog(
             }
         }
     )
+
+    if (showDeleteConfirmation) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirmation = false },
+            containerColor = MidnightAbyss,
+            titleContentColor = GhostWhite,
+            textContentColor = GhostWhite,
+            shape = RoundedCornerShape(16.dp),
+            title = {
+                Text(
+                    text = "Hapus Batas Anggaran?",
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    color = GhostWhite
+                )
+            },
+            text = {
+                Text(
+                    text = "Apakah Anda yakin ingin menghapus semua batasan anggaran bulanan serta batasan kategori yang telah diatur?",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = GhostWhite.copy(alpha = 0.7f)
+                )
+            },
+            confirmButton = {
+                PremiumButton(
+                    text = "Ya, Hapus",
+                    onClick = {
+                        showDeleteConfirmation = false
+                        onConfirm(0.0, emptyMap())
+                    },
+                    modifier = Modifier.width(110.dp).height(38.dp),
+                    fillMaxWidth = false,
+                    horizontalPadding = 12.dp,
+                    verticalPadding = 6.dp
+                )
+            },
+            dismissButton = {
+                PremiumButton(
+                    text = "Batal",
+                    onClick = { showDeleteConfirmation = false },
+                    modifier = Modifier.width(100.dp).height(38.dp),
+                    isActive = false,
+                    fillMaxWidth = false,
+                    horizontalPadding = 12.dp,
+                    verticalPadding = 6.dp
+                )
+            }
+        )
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
