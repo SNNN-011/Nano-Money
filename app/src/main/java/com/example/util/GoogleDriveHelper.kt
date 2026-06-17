@@ -49,7 +49,10 @@ object GoogleDriveHelper {
      * Build the standard Google Sign In Client configured for Google Drive App Folder / Files access.
      */
     fun getGoogleSignInClient(context: Context): GoogleSignInClient {
+        val resId = context.resources.getIdentifier("default_web_client_id", "string", context.packageName)
+        val webClientId = if (resId != 0) context.getString(resId) else "185897841356-fsh9i9gqrpn6uspd3ktotvvjn5h15s1p.apps.googleusercontent.com"
         val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+            .requestIdToken(webClientId)
             .requestEmail()
             .requestScopes(Scope(DRIVE_SCOPE))
             .build()

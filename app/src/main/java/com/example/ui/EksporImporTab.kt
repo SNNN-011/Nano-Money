@@ -171,7 +171,14 @@ fun EksporImporTabContent(
         try {
             val account = task.getResult(ApiException::class.java)
             connectedGoogleAccount = account
-            Toast.makeText(context, "Berhasil menghubungkan Google Drive!", Toast.LENGTH_SHORT).show()
+            coroutineScope.launch {
+                val firebaseResult = com.example.util.FirebaseSyncHelper.signInWithGoogleInFirebase(context, account)
+                if (firebaseResult.isSuccess) {
+                    Toast.makeText(context, "Berhasil menghubungkan Google Drive & sinkronisasi cloud!", Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(context, "Google Drive terhubung, tetapi server sinkronisasi gagal: ${firebaseResult.exceptionOrNull()?.localizedMessage}", Toast.LENGTH_LONG).show()
+                }
+            }
         } catch (e: ApiException) {
             val statusCode = e.statusCode
             android.util.Log.e("GoogleDrive", "Google Sign-In failed: StatusCode=$statusCode", e)
@@ -270,17 +277,40 @@ fun EksporImporTabContent(
                             .commit()
                         Toast.makeText(context, "Kunci PIN dinonaktifkan", Toast.LENGTH_SHORT).show()
                     } else {
-                        pinInputText = ""
-                        securityAnswerInput = ""
-                        pinDialogErrorText = ""
-                        selectedQuestionIndex = 0
-                        isSetPinDialogOpen = true
+                        val storedPin = securityPrefs.getString("saved_pin", "") ?: ""
+                        val storedQuestion = securityPrefs.getString("security_question", "") ?: ""
+                        val storedAnswer = securityPrefs.getString("security_answer", "") ?: ""
+                        
+                        if (storedPin.isNotEmpty() && storedAnswer.isNotEmpty()) {
+                            isPinEnabled = true
+                            securityPrefs.edit()
+                                .putBoolean("pin_enabled", true)
+                                .commit()
+                            Toast.makeText(context, "Kunci PIN diaktifkan", Toast.LENGTH_SHORT).show()
+                        } else {
+                            pinInputText = ""
+                            securityAnswerInput = ""
+                            pinDialogErrorText = ""
+                            selectedQuestionIndex = 0
+                            isSetPinDialogOpen = true
+                        }
                     }
                 },
                 isBiometricEnabled = isBiometricEnabled,
                 onBiometricToggle = { checked ->
                     isBiometricEnabled = checked
                     securityPrefs.edit().putBoolean("biometric_enabled", checked).commit()
+                },
+                onEditSecurity = {
+                    val storedPin = securityPrefs.getString("saved_pin", "") ?: ""
+                    val storedQuestion = securityPrefs.getString("security_question", "") ?: ""
+                    val storedAnswer = securityPrefs.getString("security_answer", "") ?: ""
+                    
+                    pinInputText = storedPin
+                    securityAnswerInput = storedAnswer
+                    pinDialogErrorText = ""
+                    selectedQuestionIndex = securityQuestions.indexOf(storedQuestion).let { if (it == -1) 0 else it }
+                    isSetPinDialogOpen = true
                 }
             )
 

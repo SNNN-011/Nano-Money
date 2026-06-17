@@ -453,9 +453,12 @@ class FinancialTrackerViewModel(
             try {
                 if (editingRecordId != null) {
                     repository.update(record)
+                    com.example.util.FirebaseSyncHelper.uploadRecordToFirestoreDirectly(record)
                     uiEvent.emit(UiEvent.ShowToast("Transaksi berhasil diperbarui!"))
                 } else {
-                    repository.insert(record)
+                    val newId = repository.insert(record)
+                    val insertedRecord = record.copy(id = newId.toInt())
+                    com.example.util.FirebaseSyncHelper.uploadRecordToFirestoreDirectly(insertedRecord)
                     uiEvent.emit(UiEvent.ShowToast("Transaksi baru berhasil disimpan!"))
                 }
                 resetForm()
@@ -470,6 +473,7 @@ class FinancialTrackerViewModel(
         viewModelScope.launch {
             try {
                 repository.delete(record)
+                com.example.util.FirebaseSyncHelper.deleteRecordFromFirestoreDirectly(record.id)
                 uiEvent.emit(UiEvent.ShowToast("Transaksi berhasil dihapus!"))
                 if (editingRecordId == record.id) {
                     resetForm()

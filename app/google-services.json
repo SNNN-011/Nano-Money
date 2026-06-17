@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "185897841356",
+    "project_id": "nano-money-a44b0",
+    "storage_bucket": "nano-money-a44b0.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:185897841356:android:dfc5a9899c87fed1750869",
+        "android_client_info": {
+          "package_name": "com.aistudio.pencatatkeuangan.nnomny"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "185897841356-fsh9i9gqrpn6uspd3ktotvvjn5h15s1p.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDD2LJg8HYyyanVXn_skw-Al0kZHhpXrzM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "185897841356-fsh9i9gqrpn6uspd3ktotvvjn5h15s1p.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -21,6 +21,7 @@ import androidx.compose.material3.Text
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
@@ -87,6 +88,7 @@ fun PremiumButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     isActive: Boolean = true,
+    enabled: Boolean = true,
     icon: ImageVector? = null,
     testTag: String = "",
     fillMaxWidth: Boolean = true,
@@ -94,7 +96,7 @@ fun PremiumButton(
     verticalPadding: Dp = 10.dp
 ) {
     Card(
-        modifier = modifier,
+        modifier = modifier.then(if (!enabled) Modifier.alpha(0.5f) else Modifier),
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = TranslucentGlass),
         border = BorderStroke(
@@ -123,7 +125,7 @@ fun PremiumButton(
                         Modifier.background(Color.Transparent)
                     }
                 )
-                .clickable { onClick() }
+                .clickable(enabled = enabled) { onClick() }
                 .then(if (testTag.isNotEmpty()) Modifier.testTag(testTag) else Modifier),
             contentAlignment = Alignment.Center
         ) {

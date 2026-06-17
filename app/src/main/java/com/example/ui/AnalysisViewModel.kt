@@ -164,13 +164,15 @@ class AnalysisViewModel(
     private fun getStatsTimeRange(period: PeriodFilter, calendarMonth: YearMonth): Pair<Long?, Long?> {
         val zoneId = ZoneId.systemDefault()
         val now = LocalDate.now()
-        val endMs = now.plusDays(1).atStartOfDay(zoneId).toInstant().toEpochMilli() - 1
 
         return when (period) {
             PeriodFilter.THIS_WEEK -> {
-                val currentDayOfWeek = now.dayOfWeek.value
-                val firstDayOfWeek = now.minusDays((currentDayOfWeek - 1).toLong())
+                val referenceDate = if (calendarMonth == YearMonth.now()) now else calendarMonth.atDay(1)
+                val currentDayOfWeek = referenceDate.dayOfWeek.value
+                val firstDayOfWeek = referenceDate.minusDays((currentDayOfWeek - 1).toLong())
+                val lastDayOfWeek = firstDayOfWeek.plusDays(6)
                 val startMs = firstDayOfWeek.atStartOfDay(zoneId).toInstant().toEpochMilli()
+                val endMs = lastDayOfWeek.plusDays(1).atStartOfDay(zoneId).toInstant().toEpochMilli() - 1
                 startMs to endMs
             }
             PeriodFilter.THIS_MONTH -> {
@@ -179,7 +181,9 @@ class AnalysisViewModel(
                 startMs to endMsSelected
             }
             PeriodFilter.LAST_3_MONTHS -> {
-                val startMs = now.minusMonths(3).withDayOfMonth(1).atStartOfDay(zoneId).toInstant().toEpochMilli()
+                val referenceDate = if (calendarMonth == YearMonth.now()) now else calendarMonth.atEndOfMonth()
+                val startMs = referenceDate.minusMonths(3).withDayOfMonth(1).atStartOfDay(zoneId).toInstant().toEpochMilli()
+                val endMs = referenceDate.plusDays(1).atStartOfDay(zoneId).toInstant().toEpochMilli() - 1
                 startMs to endMs
             }
             PeriodFilter.ALL_TIME -> null to null
@@ -187,28 +191,7 @@ class AnalysisViewModel(
     }
 
     private fun getChartTimeRange(period: PeriodFilter, calendarMonth: YearMonth): Pair<Long?, Long?> {
-        val zoneId = ZoneId.systemDefault()
-        val now = LocalDate.now()
-
-        return when (period) {
-            PeriodFilter.THIS_WEEK -> {
-                val currentMonth = YearMonth.now()
-                val startMs = currentMonth.atDay(1).atStartOfDay(zoneId).toInstant().toEpochMilli()
-                val endMs = currentMonth.atEndOfMonth().plusDays(1).atStartOfDay(zoneId).toInstant().toEpochMilli() - 1
-                startMs to endMs
-            }
-            PeriodFilter.THIS_MONTH -> {
-                val startMs = calendarMonth.atDay(1).atStartOfDay(zoneId).toInstant().toEpochMilli()
-                val endMsSelected = calendarMonth.atEndOfMonth().plusDays(1).atStartOfDay(zoneId).toInstant().toEpochMilli() - 1
-                startMs to endMsSelected
-            }
-            PeriodFilter.LAST_3_MONTHS -> {
-                val startMs = now.minusMonths(3).withDayOfMonth(1).atStartOfDay(zoneId).toInstant().toEpochMilli()
-                val endMs = YearMonth.now().atEndOfMonth().plusDays(1).atStartOfDay(zoneId).toInstant().toEpochMilli() - 1
-                startMs to endMs
-            }
-            PeriodFilter.ALL_TIME -> null to null
-        }
+        return getStatsTimeRange(period, calendarMonth)
     }
 
     companion object {

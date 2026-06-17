@@ -1052,9 +1052,10 @@ fun DatabaseBackupSection(
                                         onClick = {
                                             showDisconnectConfirmation = false
                                             GoogleDriveHelper.signOut(context) {
+                                                com.example.util.FirebaseSyncHelper.signOut()
                                                 onConnectedGoogleAccountChanged(null)
                                                 onDriveBackupListChanged(emptyList())
-                                                Toast.makeText(context, "Akses Google Drive terputus.", Toast.LENGTH_SHORT).show()
+                                                Toast.makeText(context, "Akses Google Drive & penyelarasan cloud terputus.", Toast.LENGTH_SHORT).show()
                                             }
                                         },
                                         isActive = true,
@@ -1163,6 +1164,55 @@ fun DatabaseBackupSection(
                             CircularProgressIndicator(color = SteelBlue)
                         }
                     }
+
+                    HorizontalDivider(color = GhostWhite.copy(alpha = 0.08f), modifier = Modifier.padding(vertical = 4.dp))
+                    
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Sync,
+                            contentDescription = null,
+                            tint = NeonViolet,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Sinkronisasi Realtime (Cloud Firestore)",
+                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold, fontSize = 13.sp),
+                            color = GhostWhite
+                        )
+                    }
+
+                    Text(
+                        text = "Sinkronkan seluruh catatan transaksi finansial Anda secara aman ke database awan Firestore. Saling sinkron otomatis ketika Anda berpindah dari atau ke perangkat lain.",
+                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp, lineHeight = 16.sp),
+                        color = GhostWhite.copy(alpha = 0.55f)
+                    )
+
+                    var isSyncingByFirebase by remember { mutableStateOf(false) }
+                    
+                    PremiumButton(
+                        text = if (isSyncingByFirebase) "MENYINKRONKAN..." else "SINKRONKAN TRANSAKSI SEKARANG",
+                        onClick = {
+                            coroutineScope.launch {
+                                isSyncingByFirebase = true
+                                val syncRes = com.example.util.FirebaseSyncHelper.syncFinancialRecordsWithFirestore(context)
+                                if (syncRes.isSuccess) {
+                                    Toast.makeText(context, syncRes.getOrNull() ?: "Sinkronisasi Sukses!", Toast.LENGTH_LONG).show()
+                                } else {
+                                    Toast.makeText(context, "Gagal sinkronisasi: ${syncRes.exceptionOrNull()?.localizedMessage ?: "kesalahan jaringan"}", Toast.LENGTH_LONG).show()
+                                }
+                                isSyncingByFirebase = false
+                            }
+                        },
+                        isActive = !isSyncingByFirebase,
+                        icon = Icons.Default.Sync,
+                        modifier = Modifier.fillMaxWidth().testTag("sync_firestore_button")
+                    )
+
+                    HorizontalDivider(color = GhostWhite.copy(alpha = 0.08f), modifier = Modifier.padding(vertical = 4.dp))
 
                     if (driveBackupList.isEmpty() && !isDriveProcessing) {
                         Text(

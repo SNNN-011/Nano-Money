@@ -21,7 +21,8 @@ fun SecuritySettingsSection(
     isPinEnabled: Boolean,
     onPinToggle: (Boolean) -> Unit,
     isBiometricEnabled: Boolean,
-    onBiometricToggle: (Boolean) -> Unit
+    onBiometricToggle: (Boolean) -> Unit,
+    onEditSecurity: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
 
@@ -100,6 +101,25 @@ fun SecuritySettingsSection(
                         onPinToggle(checked)
                     }
                 )
+            }
+
+            if (isPinEnabled && onEditSecurity != null) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(
+                        onClick = onEditSecurity,
+                        contentPadding = PaddingValues(0.dp),
+                        modifier = Modifier.height(28.dp)
+                    ) {
+                        Text(
+                            text = "Ubah PIN & Pertanyaan Pemulihan",
+                            color = SteelBlue,
+                            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold, fontSize = 11.sp)
+                        )
+                    }
+                }
             }
 
             HorizontalDivider(color = GhostWhite.copy(alpha = 0.08f))

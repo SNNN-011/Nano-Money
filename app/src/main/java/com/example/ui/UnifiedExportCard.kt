@@ -278,6 +278,7 @@ fun UnifiedExportCard(
                 text = "UNDUH LAPORAN PDF",
                 onClick = { onExportPdfFile(selectedMonths.toList()) },
                 isActive = selectedMonths.isNotEmpty(),
+                enabled = selectedMonths.isNotEmpty(),
                 icon = Icons.Default.PictureAsPdf,
                 testTag = "export_pdf_button",
                 modifier = Modifier.fillMaxWidth()
@@ -294,6 +295,7 @@ fun UnifiedExportCard(
                     text = "Ekspor Excel",
                     onClick = { onExportCsvFile(selectedMonths.toList()) },
                     isActive = selectedMonths.isNotEmpty(),
+                    enabled = selectedMonths.isNotEmpty(),
                     icon = Icons.Default.Assessment,
                     testTag = "export_csv_button",
                     modifier = Modifier.weight(1f),
