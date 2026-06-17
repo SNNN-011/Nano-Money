@@ -272,7 +272,9 @@ class ChatViewModel(
                         date = pending.dateMillis,
                         notes = grp.description
                     )
-                    repository.insert(record)
+                    val insertedId = repository.insert(record)
+                    val insertedRecord = record.copy(id = insertedId.toInt())
+                    com.example.util.FirebaseSyncHelper.uploadRecordToFirestoreDirectly(insertedRecord)
                     count++
                 }
             }
@@ -435,6 +437,7 @@ class ChatViewModel(
         // Simpan ke database
         val rowId = repository.insert(record)
         val savedRecord = record.copy(id = rowId.toInt())
+        com.example.util.FirebaseSyncHelper.uploadRecordToFirestoreDirectly(savedRecord)
 
         // Format teks konfirmasi
         val displayType = if (recordType == "income") "Pemasukan" else "Pengeluaran"

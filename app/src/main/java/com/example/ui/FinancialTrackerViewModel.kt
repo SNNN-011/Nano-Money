@@ -1281,7 +1281,9 @@ class FinancialTrackerViewModel(
                                 date = targetTs,
                                 notes = recurring.notes.ifBlank { "Diproses otomatis dari transaksi berulang" }
                             )
-                            repository.insert(record)
+                            val insertedId = repository.insert(record)
+                            val insertedRecord = record.copy(id = insertedId.toInt())
+                            com.example.util.FirebaseSyncHelper.uploadRecordToFirestoreDirectly(insertedRecord)
                             
                             lastSelectedRunMs = targetTs
                             processedAny = true
