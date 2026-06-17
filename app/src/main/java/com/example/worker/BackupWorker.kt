@@ -35,9 +35,10 @@ class BackupWorker(
                         .putLong("last_auto_backup_local_time", now)
                         .apply()
                     
+                    val isDriveBackupEnabled = securityPrefs.getBoolean("drive_backup_enabled", true)
                     var driveStatus = "Tidak Aktif"
-                    // Silently upload to Google Drive if account is connected
-                    if (GoogleDriveHelper.getSignedInAccount(context) != null) {
+                    // Silently upload to Google Drive if account is connected and backup is enabled
+                    if (isDriveBackupEnabled && GoogleDriveHelper.getSignedInAccount(context) != null) {
                         try {
                             val backupDir = BackupHelper.getBackupDirectory(context)
                             val backupFile = File(backupDir, result.fileName)
@@ -74,11 +75,19 @@ class BackupWorker(
                             }
                         }
                     } else {
-                        securityPrefs.edit()
-                            .putString("last_auto_backup_drive_status", "Tidak Aktif (Google Drive belum terhubung)")
-                            .putLong("last_auto_backup_drive_time", 0L)
-                            .apply()
-                        driveStatus = "Tidak Aktif (Belum Terhubung)"
+                        if (!isDriveBackupEnabled) {
+                            securityPrefs.edit()
+                                .putString("last_auto_backup_drive_status", "Dinonaktifkan oleh pengguna")
+                                .putLong("last_auto_backup_drive_time", now)
+                                .apply()
+                            driveStatus = "Dinonaktifkan"
+                        } else {
+                            securityPrefs.edit()
+                                .putString("last_auto_backup_drive_status", "Tidak Aktif (Google Drive belum terhubung)")
+                                .putLong("last_auto_backup_drive_time", 0L)
+                                .apply()
+                            driveStatus = "Tidak Aktif (Belum Terhubung)"
+                        }
                     }
                     showSuccessNotification(context, result.fileName, driveStatus)
                 }

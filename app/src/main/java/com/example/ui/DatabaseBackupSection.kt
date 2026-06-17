@@ -88,6 +88,8 @@ fun DatabaseBackupSection(
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
+    val securityPrefs = remember { context.getSharedPreferences("security_prefs", Context.MODE_PRIVATE) }
+    var isDriveBackupEnabled by remember { mutableStateOf(securityPrefs.getBoolean("drive_backup_enabled", true)) }
     var showBackupHelpInfo by remember { mutableStateOf(false) }
     var showDisconnectConfirmation by remember { mutableStateOf(false) }
     var backupFileToDelete by remember { mutableStateOf<File?>(null) }
@@ -109,8 +111,12 @@ fun DatabaseBackupSection(
         }
     }
 
-    Card(
-        modifier = Modifier.fillMaxWidth().testTag("database_backup_card"),
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        Card(
+            modifier = Modifier.fillMaxWidth().testTag("database_backup_card"),
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = TranslucentForm.copy(alpha = 0.65f)),
         border = BorderStroke(
@@ -255,8 +261,6 @@ fun DatabaseBackupSection(
 
             // Choose Backup Schedule (Interval and Time) under a single collapsible header if auto backup is enabled
             if (isAutoBackupEnabled) {
-                val securityPrefs = remember { context.getSharedPreferences("security_prefs", android.content.Context.MODE_PRIVATE) }
-                
                 var lastLocalTime by remember { mutableStateOf(securityPrefs.getLong("last_auto_backup_local_time", 0L)) }
                 var lastLocalStatus by remember { mutableStateOf(securityPrefs.getString("last_auto_backup_local_status", "Belum ada riwayat") ?: "Belum ada riwayat") }
                 var lastDriveTime by remember { mutableStateOf(securityPrefs.getLong("last_auto_backup_drive_time", 0L)) }
@@ -817,8 +821,8 @@ fun DatabaseBackupSection(
                                 onBackupListChanged(BackupHelper.getBackups(context))
                                 Toast.makeText(context, "Database berhasil dicadangkan secara lokal!", Toast.LENGTH_SHORT).show()
                                 
-                                // Jika akun Google terhubung, unggah juga ke Drive otomatis
-                                if (connectedGoogleAccount != null) {
+                                // Jika akun Google terhubung dan pencadangan drive aktif, unggah juga ke Drive otomatis
+                                if (isDriveBackupEnabled && connectedGoogleAccount != null) {
                                     Toast.makeText(context, "Mengunggah cadangan ke Google Drive...", Toast.LENGTH_SHORT).show()
                                     onIsDriveProcessingChanged(true)
                                     val backupDir = BackupHelper.getBackupDirectory(context)
@@ -921,13 +925,19 @@ fun DatabaseBackupSection(
                             ) {
                                 if (connectedGoogleAccount != null) {
                                     IconButton(
-                                        onClick = { onSelectedLocalBackupToUploadChange(file) },
+                                        onClick = {
+                                            if (isDriveBackupEnabled) {
+                                                onSelectedLocalBackupToUploadChange(file)
+                                            } else {
+                                                Toast.makeText(context, "Pengunggahan ke Google Drive dinonaktifkan. Silakan aktifkan kembali sakelar pengunggahan di unit bawah.", Toast.LENGTH_LONG).show()
+                                            }
+                                        },
                                         modifier = Modifier.size(28.dp)
                                     ) {
                                         Icon(
                                             imageVector = Icons.Default.CloudUpload,
                                             contentDescription = "Unggah ke Google Drive",
-                                            tint = SteelBlue,
+                                            tint = if (isDriveBackupEnabled) SteelBlue else GhostWhite.copy(alpha = 0.25f),
                                             modifier = Modifier.size(16.dp)
                                         )
                                     }
@@ -1095,6 +1105,37 @@ fun DatabaseBackupSection(
                     )
 
                     Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(GhostWhite.copy(alpha = 0.03f), shape = RoundedCornerShape(12.dp))
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Pengunggahan Google Drive",
+                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                                color = GhostWhite
+                            )
+                            Text(
+                                text = if (isDriveBackupEnabled) "Mengaktifkan pencadangan otomatis & manual ke Drive" else "Menonaktifkan pengunggahan database ke cloud Drive",
+                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
+                                color = GhostWhite.copy(alpha = 0.5f)
+                            )
+                        }
+                        PremiumSwitch(
+                            checked = isDriveBackupEnabled,
+                            onCheckedChange = { checked ->
+                                isDriveBackupEnabled = checked
+                                securityPrefs.edit().putBoolean("drive_backup_enabled", checked).apply()
+                                Toast.makeText(context, if (checked) "Pencadangan ke Drive Diaktifkan!" else "Pencadangan ke Drive Dinonaktifkan!", Toast.LENGTH_SHORT).show()
+                            },
+                            modifier = Modifier.testTag("drive_backup_switch")
+                        )
+                    }
+
+                    Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically
@@ -1164,53 +1205,6 @@ fun DatabaseBackupSection(
                             CircularProgressIndicator(color = SteelBlue)
                         }
                     }
-
-                    HorizontalDivider(color = GhostWhite.copy(alpha = 0.08f), modifier = Modifier.padding(vertical = 4.dp))
-                    
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Sync,
-                            contentDescription = null,
-                            tint = NeonViolet,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "Sinkronisasi Realtime (Cloud Firestore)",
-                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold, fontSize = 13.sp),
-                            color = GhostWhite
-                        )
-                    }
-
-                    Text(
-                        text = "Sinkronkan seluruh catatan transaksi finansial Anda secara aman ke database awan Firestore. Saling sinkron otomatis ketika Anda berpindah dari atau ke perangkat lain.",
-                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp, lineHeight = 16.sp),
-                        color = GhostWhite.copy(alpha = 0.55f)
-                    )
-
-                    var isSyncingByFirebase by remember { mutableStateOf(false) }
-                    
-                    PremiumButton(
-                        text = if (isSyncingByFirebase) "MENYINKRONKAN..." else "SINKRONKAN TRANSAKSI SEKARANG",
-                        onClick = {
-                            coroutineScope.launch {
-                                isSyncingByFirebase = true
-                                val syncRes = com.example.util.FirebaseSyncHelper.syncFinancialRecordsWithFirestore(context)
-                                if (syncRes.isSuccess) {
-                                    Toast.makeText(context, syncRes.getOrNull() ?: "Sinkronisasi Sukses!", Toast.LENGTH_LONG).show()
-                                } else {
-                                    Toast.makeText(context, "Gagal sinkronisasi: ${syncRes.exceptionOrNull()?.localizedMessage ?: "kesalahan jaringan"}", Toast.LENGTH_LONG).show()
-                                }
-                                isSyncingByFirebase = false
-                            }
-                        },
-                        isActive = !isSyncingByFirebase,
-                        icon = Icons.Default.Sync,
-                        modifier = Modifier.fillMaxWidth().testTag("sync_firestore_button")
-                    )
 
                     HorizontalDivider(color = GhostWhite.copy(alpha = 0.08f), modifier = Modifier.padding(vertical = 4.dp))
 
@@ -1286,6 +1280,74 @@ fun DatabaseBackupSection(
                         }
                     }
                 }
+            }
+        }
+    }
+        
+        Card(
+            modifier = Modifier.fillMaxWidth().testTag("realtime_firestore_card"),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = TranslucentForm.copy(alpha = 0.65f)),
+            border = BorderStroke(
+                width = 1.dp,
+                brush = Brush.verticalGradient(
+                    colors = listOf(GhostWhite.copy(alpha = 0.15f), GhostWhite.copy(alpha = 0.02f))
+                )
+            )
+        ) {
+            Column(
+                modifier = Modifier.padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .width(3.dp)
+                            .height(20.dp)
+                            .background(
+                                brush = Brush.verticalGradient(
+                                    colors = listOf(NeonViolet, NeonViolet.copy(alpha = 0.4f))
+                                ),
+                                shape = RoundedCornerShape(2.dp)
+                            )
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text(
+                        text = "Sinkronisasi Realtime (Cloud Firestore)",
+                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold, fontSize = 14.sp),
+                        color = GhostWhite
+                    )
+                }
+
+                Text(
+                    text = "Sinkronkan seluruh catatan transaksi finansial Anda secara aman ke database awan Firestore. Saling sinkron otomatis ketika Anda berpindah dari atau ke perangkat lain.",
+                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp, lineHeight = 16.sp),
+                    color = GhostWhite.copy(alpha = 0.55f)
+                )
+
+                var isSyncingByFirebase by remember { mutableStateOf(false) }
+                
+                PremiumButton(
+                    text = if (isSyncingByFirebase) "MENYINKRONKAN..." else "SINKRONKAN TRANSAKSI SEKARANG",
+                    onClick = {
+                        coroutineScope.launch {
+                            isSyncingByFirebase = true
+                            val syncRes = com.example.util.FirebaseSyncHelper.syncFinancialRecordsWithFirestore(context)
+                            if (syncRes.isSuccess) {
+                                Toast.makeText(context, syncRes.getOrNull() ?: "Sinkronisasi Sukses!", Toast.LENGTH_LONG).show()
+                            } else {
+                                Toast.makeText(context, "Gagal sinkronisasi: ${syncRes.exceptionOrNull()?.localizedMessage ?: "kesalahan jaringan"}", Toast.LENGTH_LONG).show()
+                            }
+                            isSyncingByFirebase = false
+                        }
+                    },
+                    isActive = !isSyncingByFirebase,
+                    icon = Icons.Default.Sync,
+                    modifier = Modifier.fillMaxWidth().testTag("sync_firestore_button")
+                )
             }
         }
     }
