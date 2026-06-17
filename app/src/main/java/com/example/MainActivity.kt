@@ -155,7 +155,7 @@ class MainActivity : FragmentActivity() {
                             )
 
                             Text(
-                                text = "Aplikasi memerlukan beberapa izin untuk kelancaran fitur:",
+                                text = "Demi kelancaran pelacakan keuangan, pencadangan otomatis harian, dan notifikasi pengingat tepat waktu, aplikasi memerlukan beberapa izin akses operasional:",
                                 style = MaterialTheme.typography.bodyMedium.copy(
                                     color = GhostWhite.copy(alpha = 0.7f),
                                     lineHeight = 20.sp
@@ -193,7 +193,7 @@ class MainActivity : FragmentActivity() {
                                         style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold, color = GhostWhite)
                                     )
                                     Text(
-                                        text = "Agar pengingat masuk dapat muncul tepat waktu.",
+                                        text = "Mengingatkan Anda mencatat pemasukan & pengeluaran di jam yang Anda tentukan agar keuangan tetap terkontrol.",
                                         style = MaterialTheme.typography.bodySmall.copy(color = GhostWhite.copy(alpha = 0.5f), lineHeight = 16.sp)
                                     )
                                 }
@@ -223,11 +223,11 @@ class MainActivity : FragmentActivity() {
                                 Spacer(modifier = Modifier.width(16.dp))
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
-                                        text = "Akses Kamera",
+                                        text = "Akses Kamera (Scan)",
                                         style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold, color = GhostWhite)
                                     )
                                     Text(
-                                        text = "Untuk mendeteksi atau scan foto struk belanja.",
+                                        text = "Memudahkan pengunggahan atau pemindaian foto kuitansi/nota secara instan melalui asisten obrolan AI.",
                                         style = MaterialTheme.typography.bodySmall.copy(color = GhostWhite.copy(alpha = 0.5f), lineHeight = 16.sp)
                                     )
                                 }
@@ -256,9 +256,6 @@ class MainActivity : FragmentActivity() {
                                             val permissions = mutableListOf<String>()
                                             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
                                                 permissions.add(android.Manifest.permission.POST_NOTIFICATIONS)
-                                                permissions.add(android.Manifest.permission.READ_MEDIA_IMAGES)
-                                            } else {
-                                                permissions.add(android.Manifest.permission.READ_EXTERNAL_STORAGE)
                                             }
                                             permissions.add(android.Manifest.permission.CAMERA)
                                             permissionLauncher.launch(permissions.toTypedArray())
