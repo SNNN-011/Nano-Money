@@ -55,6 +55,7 @@ fun ChatScreen(
     modifier: Modifier = Modifier
 ) {
     val messages by viewModel.messages.collectAsState()
+    val isAiProcessing = messages.any { it is ChatMessage.TypingIndicator || it is ChatMessage.ScanningReceiptIndicator }
     val focusManager = LocalFocusManager.current
     var inputText by remember { mutableStateOf("") }
     val listState = rememberLazyListState()
@@ -317,7 +318,7 @@ fun ChatScreen(
                                             Modifier.background(Color.Transparent)
                                         }
                                     )
-                                    .clickable { viewModel.updateSelectedModel(AiModelConfig.GEMMA_MODEL) }
+                                    .clickable(enabled = !isAiProcessing) { viewModel.updateSelectedModel(AiModelConfig.GEMMA_MODEL) }
                                     .padding(horizontal = 12.dp, vertical = 6.dp)
                                     .testTag("model_switch_gemma"),
                                 contentAlignment = Alignment.Center
@@ -346,7 +347,7 @@ fun ChatScreen(
                                             Modifier.background(Color.Transparent)
                                         }
                                     )
-                                    .clickable { viewModel.updateSelectedModel(AiModelConfig.GEMINI_MODEL) }
+                                    .clickable(enabled = !isAiProcessing) { viewModel.updateSelectedModel(AiModelConfig.GEMINI_MODEL) }
                                     .padding(horizontal = 12.dp, vertical = 6.dp)
                                     .testTag("model_switch_gemini"),
                                 contentAlignment = Alignment.Center
@@ -1076,7 +1077,7 @@ fun ChatScreen(
             ) {
                 IconButton(
                     onClick = { showSourceSelector = true },
-                    enabled = !hasPending,
+                    enabled = !hasPending && !isAiProcessing,
                     modifier = Modifier
                         .size(46.dp)
                         .clip(CircleShape)
@@ -1086,18 +1087,25 @@ fun ChatScreen(
                     Icon(
                         imageVector = Icons.Default.AddAPhoto,
                         contentDescription = "Pindai Struk Belanja",
-                        tint = if (hasPending) GhostWhite.copy(alpha = 0.2f) else SteelBlue
+                        tint = if (hasPending || isAiProcessing) GhostWhite.copy(alpha = 0.2f) else SteelBlue
                     )
                 }
 
                 TextField(
                     value = inputText,
                     onValueChange = { inputText = it },
-                    enabled = !hasPending,
+                    enabled = !hasPending && !isAiProcessing,
                     placeholder = {
+                        val isScanning = messages.any { it is ChatMessage.ScanningReceiptIndicator }
+                        val placeholderText = when {
+                            isAiProcessing && isScanning -> "Sedang menganalisis struk..."
+                            isAiProcessing -> "AI sedang memproses..."
+                            hasPending -> "Selesaikan konfirmasi transaksi..."
+                            else -> "Ketik pesan transaksimu..."
+                        }
                         Text(
-                            if (hasPending) "Selesaikan konfirmasi transaksi..." else "Ketik pesan transaksimu...",
-                            color = if (hasPending) GhostWhite.copy(alpha = 0.2f) else GhostWhite.copy(alpha = 0.4f),
+                            placeholderText,
+                            color = if (hasPending || isAiProcessing) GhostWhite.copy(alpha = 0.2f) else GhostWhite.copy(alpha = 0.4f),
                             fontSize = 14.sp
                         )
                     },
@@ -1123,7 +1131,7 @@ fun ChatScreen(
                     ),
                     keyboardActions = KeyboardActions(
                         onSend = {
-                            if (inputText.trim().isNotEmpty() && !hasPending) {
+                            if (inputText.trim().isNotEmpty() && !hasPending && !isAiProcessing) {
                                 viewModel.sendMessage(inputText)
                                 inputText = ""
                                 focusManager.clearFocus()
@@ -1134,7 +1142,7 @@ fun ChatScreen(
 
                 IconButton(
                     onClick = {
-                        if (inputText.trim().isNotEmpty() && !hasPending) {
+                        if (inputText.trim().isNotEmpty() && !hasPending && !isAiProcessing) {
                             viewModel.sendMessage(inputText)
                             inputText = ""
                             focusManager.clearFocus()
@@ -1144,19 +1152,19 @@ fun ChatScreen(
                         .size(46.dp)
                         .clip(CircleShape)
                         .background(
-                            if (inputText.trim().isEmpty() || hasPending) {
+                            if (inputText.trim().isEmpty() || hasPending || isAiProcessing) {
                                 GhostWhite.copy(alpha = 0.08f)
                             } else {
                                 SteelBlue
                             }
                         )
                         .testTag("chat_send_button"),
-                    enabled = !hasPending && inputText.trim().isNotEmpty()
+                    enabled = !hasPending && !isAiProcessing && inputText.trim().isNotEmpty()
                 ) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.Send,
                         contentDescription = "Kirim",
-                        tint = if (inputText.trim().isEmpty() || hasPending) {
+                        tint = if (inputText.trim().isEmpty() || hasPending || isAiProcessing) {
                             GhostWhite.copy(alpha = 0.3f)
                         } else {
                             MidnightAbyss
