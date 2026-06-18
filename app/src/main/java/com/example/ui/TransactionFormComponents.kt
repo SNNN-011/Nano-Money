@@ -254,8 +254,9 @@ fun TransactionFormCard(
                     TextField(
                         value = amount,
                         onValueChange = { input ->
-                            if (input.isEmpty() || input.all { it.isDigit() || it == '.' }) {
-                                onAmountChanged(input)
+                            val cleanInput = input.replace(".", "")
+                            if (cleanInput.length <= 11 && (cleanInput.isEmpty() || cleanInput.all { it.isDigit() })) {
+                                onAmountChanged(FormatUtils.formatInputNumber(cleanInput))
                             }
                         },
                         textStyle = MaterialTheme.typography.displayMedium.copy(
@@ -380,7 +381,7 @@ fun TransactionFormCard(
                     Spacer(modifier = Modifier.height(4.dp))
                     OutlinedTextField(
                         value = description,
-                        onValueChange = onDescriptionChanged,
+                        onValueChange = { if (it.length <= 20) onDescriptionChanged(it) },
                         isError = descriptionError != null,
                         placeholder = { Text("cth: Makan Siang Restoran") },
                         modifier = Modifier.fillMaxWidth().testTag("form_description_input"),
@@ -446,7 +447,7 @@ fun TransactionFormCard(
                     Spacer(modifier = Modifier.height(4.dp))
                     OutlinedTextField(
                         value = notes,
-                        onValueChange = onNotesChanged,
+                        onValueChange = { if (it.length <= 100) onNotesChanged(it) },
                         placeholder = { Text("Ketik catatan di sini...") },
                         modifier = Modifier.fillMaxWidth().testTag("form_notes_input"),
                         shape = RoundedCornerShape(16.dp),

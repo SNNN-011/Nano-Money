@@ -557,7 +557,6 @@ fun FinancialTrackerScreen(
                                 }
                             },
                             onReset = { 
-                                viewModel.resetForm() 
                                 if (!navController.popBackStack()) {
                                     navController.navigate(TrackerTab.BERANDA.name) {
                                         popUpTo(TrackerTab.BERANDA.name) { inclusive = true }

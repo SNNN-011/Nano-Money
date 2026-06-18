@@ -222,8 +222,10 @@ fun CategoryManagementDialog(
                         OutlinedTextField(
                             value = newCategoryName,
                             onValueChange = {
-                                newCategoryName = it
-                                categoryNameError = null
+                                if (it.length <= 20) {
+                                    newCategoryName = it
+                                    categoryNameError = null
+                                }
                             },
                             placeholder = { Text("Nama Kategori Baru", style = MaterialTheme.typography.bodyMedium) },
                             singleLine = true,
@@ -392,7 +394,12 @@ fun MonthlyBudgetDialog(
     var budgetInput by remember {
         mutableStateOf(
             if (currentBudgetLimit > 0.0) {
-                if (currentBudgetLimit % 1.0 == 0.0) currentBudgetLimit.toLong().toString() else currentBudgetLimit.toString()
+                val rawAmt = if (currentBudgetLimit % 1.0 == 0.0) {
+                    currentBudgetLimit.toLong().toString()
+                } else {
+                    currentBudgetLimit.toString().substringBefore(".")
+                }
+                FormatUtils.formatInputNumber(rawAmt)
             } else ""
         )
     }
@@ -518,11 +525,14 @@ fun MonthlyBudgetDialog(
                 OutlinedTextField(
                     value = budgetInput,
                     onValueChange = {
-                        budgetInput = it
+                        val clean = it.replace(".", "")
+                        if (clean.length <= 11 && (clean.isEmpty() || clean.all { c -> c.isDigit() })) {
+                            budgetInput = FormatUtils.formatInputNumber(clean)
+                        }
                         budgetError = null
                     },
                     label = { Text("Batas Anggaran (Rupiah)", style = MaterialTheme.typography.bodyMedium) },
-                    placeholder = { Text("Misal: 5000000", style = MaterialTheme.typography.bodyMedium) },
+                    placeholder = { Text("Misal: 5.000.000", style = MaterialTheme.typography.bodyMedium) },
                     singleLine = true,
                     isError = budgetError != null,
                     modifier = Modifier.fillMaxWidth().testTag("budget_limit_input"),
@@ -572,7 +582,7 @@ fun MonthlyBudgetDialog(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     presets.forEach { (value, label) ->
-                        val isSelected = budgetInput == value.toLong().toString()
+                        val isSelected = budgetInput.replace(".", "") == value.toLong().toString()
                         val containerCol = if (isSelected) SteelBlue.copy(alpha = 0.2f) else TranslucentInput
                         val borderCol = if (isSelected) SteelBlue else GhostWhite.copy(alpha = 0.1f)
                         val textCol = if (isSelected) SteelBlue else GhostWhite.copy(alpha = 0.8f)
@@ -581,7 +591,7 @@ fun MonthlyBudgetDialog(
                             modifier = Modifier
                                 .weight(1f)
                                 .clickable {
-                                    budgetInput = value.toLong().toString()
+                                    budgetInput = FormatUtils.formatInputNumber(value.toLong().toString())
                                     budgetError = null
                                 }
                                 .testTag("budget_preset_${value.toLong()}"),
@@ -851,7 +861,7 @@ fun MonthlyBudgetDialog(
                                     OutlinedTextField(
                                         value = localState.value,
                                         onValueChange = { newValue: String ->
-                                            if (newValue.all { char -> char.isDigit() } || newValue.isEmpty()) {
+                                            if (newValue.length <= 11 && (newValue.all { char -> char.isDigit() } || newValue.isEmpty())) {
                                                 localState.value = newValue
                                                 localCategoryBudgets[category] = newValue
                                             }
@@ -924,7 +934,7 @@ fun MonthlyBudgetDialog(
                 PremiumButton(
                     text = "Simpan",
                     onClick = {
-                        val trimmed = budgetInput.trim()
+                        val trimmed = budgetInput.trim().replace(".", "")
                         if (trimmed.isEmpty()) {
                             budgetError = "Harap masukkan nilai anggaran"
                         } else {
@@ -1151,8 +1161,10 @@ fun RecurringTransactionManagementDialog(
                     OutlinedTextField(
                         value = descInput,
                         onValueChange = {
-                            descInput = it
-                            descError = null
+                            if (it.length <= 20) {
+                                descInput = it
+                                descError = null
+                            }
                         },
                         label = { Text("Deskripsi/Nama Rutinitas") },
                         isError = descError != null,
@@ -1173,7 +1185,10 @@ fun RecurringTransactionManagementDialog(
                     OutlinedTextField(
                         value = amountInput,
                         onValueChange = {
-                            amountInput = it
+                            val clean = it.replace(".", "")
+                            if (clean.length <= 11 && (clean.isEmpty() || clean.all { c -> c.isDigit() })) {
+                                amountInput = FormatUtils.formatInputNumber(clean)
+                            }
                             amountError = null
                         },
                         label = { Text("Jumlah (Rp)") },
@@ -1238,8 +1253,10 @@ fun RecurringTransactionManagementDialog(
                     OutlinedTextField(
                         value = dayInput,
                         onValueChange = {
-                            dayInput = it
-                            dayError = null
+                            if (it.length <= 2) {
+                                dayInput = it
+                                dayError = null
+                            }
                         },
                         label = { Text("Setiap Tanggal (1-31)") },
                         placeholder = { Text("Contoh: 6") },
@@ -1263,7 +1280,7 @@ fun RecurringTransactionManagementDialog(
                     // Notes Input
                     OutlinedTextField(
                         value = notesInput,
-                        onValueChange = { notesInput = it },
+                        onValueChange = { if (it.length <= 100) notesInput = it },
                         label = { Text("Catatan Tambahan (Opsional)") },
                         modifier = Modifier.fillMaxWidth().testTag("recurring_notes_input"),
                         shape = RoundedCornerShape(12.dp),
@@ -1417,7 +1434,7 @@ fun RecurringTransactionManagementDialog(
                                 descError = "Harap masukkan deskripsi"
                                 valid = false
                             }
-                            val amt = amountInput.trim().toDoubleOrNull()
+                            val amt = amountInput.replace(".", "").trim().toDoubleOrNull()
                             if (amt == null || amt <= 0.0) {
                                 amountError = "Nilai harus berupa angka positif"
                                 valid = false

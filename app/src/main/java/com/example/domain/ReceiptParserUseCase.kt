@@ -65,6 +65,7 @@ class ReceiptParserUseCase {
                 1. Tentukan nama Toko/Merchant/Tempat transaksi/Aplikasi yang tertera pada bukti tersebut. Gunakan huruf kapital di awal setiap kata (misal: "Indomaret", "Shopee", "Tokopedia", "DANA", "Google Play").
                 2. Cari tanggal transaksi dan format menjadi "YYYY-MM-DD". Jika tidak ada, kembalikan null atau kosong.
                 3. Ekstrak daftar seluruh barang (produk) atau rincian transaksi beserta harga/jumlah masing-masing (harga akhir per barang setelah potong diskon jika ada). TIDAK PERLU menghitung total dari keseluruhan transaksi.
+                   *PENTING*: Jika data transaksi atau barang yang ada di struk sedikit (misal kurang dari atau sama dengan 4 jenis barang), pastikan isi 'name' dari masing-masing item adalah nama produk/barang spesifik yang dibeli (bukan nama toko). Nama toko harus diletakkan pada field 'title' saja.
                 4. Klasifikasikan / kategorikan setiap entri tersebut. (SANGAT PENTING) Utamakan memetakan ke daftar kategori saat ini jika cocok:
                    [$categoriesStr]
                    HANYA buat kategori baru jika benar-benar tidak ada yang pas (SANGAT DIHINDARI). Jika membuat baru, gunakan huruf awal kapital dan maksimal 2 kata. JANGAN menambahkan emoji pada nama kategori. Biarkan emoji masuk ke field 'emoji' saja.

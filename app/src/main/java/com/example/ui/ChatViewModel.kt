@@ -264,13 +264,25 @@ class ChatViewModel(
 
                     val recordCategory = finalCategoryName
 
+                    val isFewItems = pending.items.size <= 3
+                    val recordDesc = if (isFewItems && grp.description.isNotEmpty()) {
+                        grp.description
+                    } else {
+                        "${pending.title} - $finalCategoryName"
+                    }
+                    val recordNotes = if (isFewItems) {
+                        pending.title
+                    } else {
+                        grp.description
+                    }
+
                     val record = FinancialRecord(
-                        description = "${pending.title} - $finalCategoryName",
+                        description = recordDesc,
                         amount = grp.amount,
                         type = grp.type,
                         category = recordCategory,
                         date = pending.dateMillis,
-                        notes = grp.description
+                        notes = recordNotes
                     )
                     val insertedId = repository.insert(record)
                     val insertedRecord = record.copy(id = insertedId.toInt())

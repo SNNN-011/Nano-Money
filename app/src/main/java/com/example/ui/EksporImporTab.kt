@@ -852,7 +852,7 @@ fun EksporImporTabContent(
 
                                     OutlinedTextField(
                                         value = securityAnswerInput,
-                                        onValueChange = { securityAnswerInput = it },
+                                        onValueChange = { if (it.length <= 30) securityAnswerInput = it },
                                         placeholder = { Text("Jawaban Anda...", color = GhostWhite.copy(alpha = 0.3f)) },
                                         label = { Text("Jawaban Pemulihan PIN", color = GhostWhite.copy(alpha = 0.6f)) },
                                         singleLine = true,

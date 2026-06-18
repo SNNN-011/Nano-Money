@@ -5,6 +5,13 @@ import java.text.SimpleDateFormat
 import java.util.*
 
 object FormatUtils {
+    fun formatInputNumber(input: String): String {
+        val cleanString = input.replace(".", "").replace(",", "")
+        if (cleanString.isEmpty()) return ""
+        val parsed = cleanString.toLongOrNull() ?: return input
+        return NumberFormat.getNumberInstance(Locale.forLanguageTag("id-ID")).format(parsed)
+    }
+
     fun formatRupiah(amount: Double): String {
         return try {
             val format = NumberFormat.getCurrencyInstance(Locale.forLanguageTag("id-ID"))

@@ -619,7 +619,7 @@ fun ChatScreen(
                                 }
 
                                 // Amount block (compact basic input field)
-                                val amtStr = if (pending.amount == null || pending.amount == 0.0) "" else pending.amount.toInt().toString()
+                                val amtStr = if (pending.amount == null || pending.amount == 0.0) "" else FormatUtils.formatInputNumber(pending.amount.toLong().toString())
                                 Row(
                                     modifier = Modifier
                                         .weight(1f)
@@ -634,8 +634,11 @@ fun ChatScreen(
                                     androidx.compose.foundation.text.BasicTextField(
                                         value = amtStr,
                                         onValueChange = { newValue ->
-                                            val parsedAmt = newValue.toDoubleOrNull() ?: 0.0
-                                            viewModel.updatePendingTransaction(pending.copy(amount = parsedAmt))
+                                            val clean = newValue.replace(".", "")
+                                            if (clean.length <= 11) {
+                                                val parsedAmt = clean.toDoubleOrNull() ?: 0.0
+                                                viewModel.updatePendingTransaction(pending.copy(amount = parsedAmt))
+                                            }
                                         },
                                         textStyle = MaterialTheme.typography.bodySmall.copy(color = GhostWhite, fontWeight = FontWeight.Bold),
                                         cursorBrush = androidx.compose.ui.graphics.SolidColor(GhostWhite),
@@ -661,7 +664,7 @@ fun ChatScreen(
                                 androidx.compose.foundation.text.BasicTextField(
                                     value = pending.description ?: "",
                                     onValueChange = { newValue ->
-                                        viewModel.updatePendingTransaction(pending.copy(description = newValue))
+                                        if (newValue.length <= 20) viewModel.updatePendingTransaction(pending.copy(description = newValue))
                                     },
                                     textStyle = MaterialTheme.typography.bodySmall.copy(color = GhostWhite),
                                     cursorBrush = androidx.compose.ui.graphics.SolidColor(GhostWhite),
@@ -685,7 +688,7 @@ fun ChatScreen(
                                 androidx.compose.foundation.text.BasicTextField(
                                     value = pending.notes ?: "",
                                     onValueChange = { newValue ->
-                                        viewModel.updatePendingTransaction(pending.copy(notes = newValue))
+                                        if (newValue.length <= 100) viewModel.updatePendingTransaction(pending.copy(notes = newValue))
                                     },
                                     textStyle = MaterialTheme.typography.bodySmall.copy(color = GhostWhite.copy(alpha = 0.6f)),
                                     cursorBrush = androidx.compose.ui.graphics.SolidColor(GhostWhite),
@@ -1025,7 +1028,7 @@ fun ChatScreen(
                                             }
 
                                             // Item Amount basic numeric field
-                                            val grpAmtStr = if (grp.amount == 0.0) "" else grp.amount.toInt().toString()
+                                            val grpAmtStr = if (grp.amount == 0.0) "" else FormatUtils.formatInputNumber(grp.amount.toLong().toString())
                                             Row(
                                                 modifier = Modifier
                                                     .weight(1f)
@@ -1040,11 +1043,14 @@ fun ChatScreen(
                                                 androidx.compose.foundation.text.BasicTextField(
                                                     value = grpAmtStr,
                                                     onValueChange = { newValue ->
-                                                        val parsedAmt = newValue.toDoubleOrNull() ?: 0.0
-                                                        val updatedGrouped = receipt.grouped.toMutableList()
-                                                        updatedGrouped[index] = grp.copy(amount = parsedAmt)
-                                                        val newTotal = updatedGrouped.sumOf { it.amount }
-                                                        viewModel.updatePendingReceipt(receipt.copy(grouped = updatedGrouped, total = newTotal))
+                                                        val clean = newValue.replace(".", "")
+                                                        if (clean.length <= 11) {
+                                                            val parsedAmt = clean.toDoubleOrNull() ?: 0.0
+                                                            val updatedGrouped = receipt.grouped.toMutableList()
+                                                            updatedGrouped[index] = grp.copy(amount = parsedAmt)
+                                                            val newTotal = updatedGrouped.sumOf { it.amount }
+                                                            viewModel.updatePendingReceipt(receipt.copy(grouped = updatedGrouped, total = newTotal))
+                                                        }
                                                     },
                                                     textStyle = MaterialTheme.typography.bodySmall.copy(color = GhostWhite, fontSize = 11.sp, fontWeight = FontWeight.Bold),
                                                     cursorBrush = androidx.compose.ui.graphics.SolidColor(GhostWhite),
@@ -1072,9 +1078,11 @@ fun ChatScreen(
                                             androidx.compose.foundation.text.BasicTextField(
                                                 value = grp.description,
                                                 onValueChange = { newValue ->
-                                                    val updatedGrouped = receipt.grouped.toMutableList()
-                                                    updatedGrouped[index] = grp.copy(description = newValue)
-                                                    viewModel.updatePendingReceipt(receipt.copy(grouped = updatedGrouped))
+                                                    if (newValue.length <= 20) {
+                                                        val updatedGrouped = receipt.grouped.toMutableList()
+                                                        updatedGrouped[index] = grp.copy(description = newValue)
+                                                        viewModel.updatePendingReceipt(receipt.copy(grouped = updatedGrouped))
+                                                    }
                                                 },
                                                 textStyle = MaterialTheme.typography.bodySmall.copy(color = GhostWhite, fontSize = 11.sp),
                                                 cursorBrush = androidx.compose.ui.graphics.SolidColor(GhostWhite),

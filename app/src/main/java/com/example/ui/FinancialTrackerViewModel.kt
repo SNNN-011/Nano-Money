@@ -372,11 +372,12 @@ class FinancialTrackerViewModel(
         if (record != null) {
             editingRecordId = record.id
             formDescription.value = record.description
-            if (record.amount % 1.0 == 0.0) {
-                formAmount.value = record.amount.toLong().toString()
+            val rawAmt = if (record.amount % 1.0 == 0.0) {
+                record.amount.toLong().toString()
             } else {
-                formAmount.value = record.amount.toString()
+                record.amount.toString().substringBefore(".")
             }
+            formAmount.value = FormatUtils.formatInputNumber(rawAmt)
             formType.value = record.type
             formCategory.value = record.category
             formDate.value = record.date
@@ -417,7 +418,7 @@ class FinancialTrackerViewModel(
             descriptionError.value = null
         }
 
-        val amtStr = formAmount.value.trim()
+        val amtStr = formAmount.value.trim().replace(".", "")
         val amt = amtStr.toDoubleOrNull()
         if (amtStr.isEmpty()) {
             amountError.value = "Jumlah tidak boleh kosong"
