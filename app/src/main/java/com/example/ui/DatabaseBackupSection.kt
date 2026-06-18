@@ -115,6 +115,237 @@ fun DatabaseBackupSection(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
+        // --- REALTIME FIRESTORE CARD ---
+        Card(
+            modifier = Modifier.fillMaxWidth().testTag("realtime_firestore_card"),
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = TranslucentForm.copy(alpha = 0.65f)),
+            border = BorderStroke(
+                width = 1.dp,
+                brush = Brush.verticalGradient(
+                    colors = listOf(GhostWhite.copy(alpha = 0.15f), GhostWhite.copy(alpha = 0.02f))
+                )
+            )
+        ) {
+            Column(
+                modifier = Modifier.padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                var showFirestoreHelpInfo by remember { mutableStateOf(false) }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .width(3.dp)
+                                .height(20.dp)
+                                .background(
+                                    brush = Brush.verticalGradient(
+                                        colors = listOf(NeonViolet, NeonViolet.copy(alpha = 0.4f))
+                                    ),
+                                    shape = RoundedCornerShape(2.dp)
+                                )
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text(
+                            text = "Sinkronisasi Realtime",
+                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold, fontSize = 14.sp),
+                            color = GhostWhite
+                        )
+                    }
+
+                    IconButton(
+                        onClick = { showFirestoreHelpInfo = !showFirestoreHelpInfo },
+                        modifier = Modifier.size(24.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Info,
+                            contentDescription = "Panduan Informasi Sinkronisasi Realtime",
+                            tint = if (showFirestoreHelpInfo) NeonViolet else GhostWhite.copy(alpha = 0.6f),
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+
+                Text(
+                    text = "Sinkronkan catatan transaksi Anda secara otomatis ke cloud.",
+                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp, lineHeight = 16.sp),
+                    color = GhostWhite.copy(alpha = 0.55f)
+                )
+
+                if (showFirestoreHelpInfo) {
+                    Dialog(onDismissRequest = { showFirestoreHelpInfo = false }) {
+                        Card(
+                            modifier = Modifier.fillMaxWidth().padding(16.dp),
+                            shape = RoundedCornerShape(24.dp),
+                            colors = CardDefaults.cardColors(containerColor = MidnightAbyss),
+                            border = BorderStroke(
+                                width = 1.dp,
+                                brush = Brush.verticalGradient(
+                                    colors = listOf(GhostWhite.copy(alpha = 0.2f), GhostWhite.copy(alpha = 0.02f))
+                                )
+                            ),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+                        ) {
+                            Box(modifier = Modifier.background(TranslucentGlass)) {
+                                Column(
+                                    modifier = Modifier.fillMaxWidth().padding(24.dp),
+                                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                                ) {
+                                    Text(
+                                        text = "Panduan Sinkronisasi Realtime",
+                                        color = GhostWhite,
+                                        style = MaterialTheme.typography.titleLarge,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Text(
+                                        text = "Sinkronkan seluruh catatan transaksi finansial Anda secara aman ke database awan Firestore. Secara otomatis menyinkronkan data antar perangkat yang terhubung ke akun yang sama.\n\nHubungkan akun Google Anda untuk mengaktifkan sinkronisasi mutakhir secara realtime.",
+                                        color = GhostWhite.copy(alpha = 0.8f),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        lineHeight = 20.sp
+                                    )
+                                    PremiumButton(
+                                        text = "Tutup",
+                                        onClick = { showFirestoreHelpInfo = false },
+                                        isActive = true,
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (connectedGoogleAccount == null) {
+                    PremiumButton(
+                        text = "HUBUNGKAN AKUN GOOGLE",
+                        onClick = onConnectGoogleDrive,
+                        isActive = true,
+                        icon = Icons.Default.Cloud,
+                        modifier = Modifier.fillMaxWidth().testTag("connect_firestore_button")
+                    )
+                } else {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = "Akun: ${connectedGoogleAccount.email ?: "Terhubung"}",
+                            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold, color = SteelBlue),
+                        )
+                        IconButton(
+                            onClick = { showDisconnectConfirmation = true },
+                            modifier = Modifier.size(28.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.CloudOff,
+                                contentDescription = "Putuskan Akun",
+                                tint = Color.Red.copy(alpha = 0.7f),
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+
+                    var isSyncingByFirebase by remember { mutableStateOf(false) }
+                    
+                    PremiumButton(
+                        text = if (isSyncingByFirebase) "MENYINKRONKAN..." else "SINKRONKAN TRANSAKSI SEKARANG",
+                        onClick = {
+                            coroutineScope.launch {
+                                isSyncingByFirebase = true
+                                val syncRes = com.example.util.FirebaseSyncHelper.syncFinancialRecordsWithFirestore(context)
+                                if (syncRes.isSuccess) {
+                                    Toast.makeText(context, syncRes.getOrNull() ?: "Sinkronisasi Sukses!", Toast.LENGTH_LONG).show()
+                                } else {
+                                    Toast.makeText(context, "Gagal sinkronisasi: ${syncRes.exceptionOrNull()?.localizedMessage ?: "kesalahan jaringan"}", Toast.LENGTH_LONG).show()
+                                }
+                                isSyncingByFirebase = false
+                            }
+                        },
+                        isActive = !isSyncingByFirebase,
+                        icon = Icons.Default.Sync,
+                        modifier = Modifier.fillMaxWidth().testTag("sync_firestore_button")
+                    )
+                }
+            }
+        }
+        
+        // Disconnect Account Dialog handled within realtime context now
+        if (showDisconnectConfirmation) {
+            Dialog(onDismissRequest = { showDisconnectConfirmation = false }) {
+                Card(
+                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                    shape = RoundedCornerShape(24.dp),
+                    colors = CardDefaults.cardColors(containerColor = MidnightAbyss),
+                    border = BorderStroke(
+                        width = 1.dp,
+                        brush = Brush.verticalGradient(
+                            colors = listOf(
+                                GhostWhite.copy(alpha = 0.2f),
+                                GhostWhite.copy(alpha = 0.02f)
+                            )
+                        )
+                    ),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+                ) {
+                    Box(modifier = Modifier.background(TranslucentGlass)) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(24.dp),
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            Text(
+                                text = "Putuskan Akun Google?",
+                                color = GhostWhite,
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "Anda akan keluar dari akun Google yang terhubung dan tidak dapat melakukan sinkronisasi otomatis lagi.",
+                                color = GhostWhite.copy(alpha = 0.8f),
+                                style = MaterialTheme.typography.bodyMedium,
+                                lineHeight = 20.sp
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                PremiumButton(
+                                    text = "Batal",
+                                    onClick = { showDisconnectConfirmation = false },
+                                    isActive = false,
+                                    modifier = Modifier.weight(1f),
+                                    testTag = "cancel_disconnect_button"
+                                )
+                                PremiumButton(
+                                    text = "Putuskan",
+                                    onClick = {
+                                        showDisconnectConfirmation = false
+                                        GoogleDriveHelper.signOut(context) {
+                                            com.example.util.FirebaseSyncHelper.signOut()
+                                            onConnectedGoogleAccountChanged(null)
+                                            onDriveBackupListChanged(emptyList())
+                                            Toast.makeText(context, "Akses Google & penyelarasan cloud terputus.", Toast.LENGTH_SHORT).show()
+                                        }
+                                    },
+                                    isActive = true,
+                                    modifier = Modifier.weight(1.2f),
+                                    testTag = "confirm_disconnect_button"
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         Card(
             modifier = Modifier.fillMaxWidth().testTag("database_backup_card"),
         shape = RoundedCornerShape(20.dp),
@@ -174,7 +405,7 @@ fun DatabaseBackupSection(
             }
 
             Text(
-                text = "Amankan database catatan transaksi Anda dari kegagalan penyimpanan lokal. Salinan database dapat dicadangkan secara harian atau mingguan ke penyimpanan aman lokal.",
+                text = "Cadangkan database Anda secara lokal ke memori internal.",
                 style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp, lineHeight = 16.sp),
                 color = GhostWhite.copy(alpha = 0.55f)
             )
@@ -204,13 +435,13 @@ fun DatabaseBackupSection(
                                 verticalArrangement = Arrangement.spacedBy(16.dp)
                             ) {
                                 Text(
-                                    text = "Mulai Pencadangan Data",
+                                    text = "Panduan Cadangkan & Pulihkan",
                                     color = GhostWhite,
                                     style = MaterialTheme.typography.titleLarge,
                                     fontWeight = FontWeight.Bold
                                 )
                                 Text(
-                                    text = "Fitur ini memungkinkan Anda menyimpan seluruh data transaksi ke Google Drive secara otomatis maupun manual, sehingga data tetap aman meski aplikasi dihapus atau ganti perangkat.\n\n• Backup Otomatis: Data dicadangkan secara berkala sesuai jadwal yang Anda pilih (Harian/Mingguan).\n• Backup Manual: Ketuk tombol 'Cadangkan Sekarang' kapan saja untuk menyimpan data terbaru.\n• Pulihkan Data: Pilih file cadangan dari daftar untuk mengembalikan data ke kondisi tersebut.\n\nJika Anda tidak bisa login ke Google Drive atau mengalami masalah sinkronisasi, silakan hubungi developer untuk bantuan lebih lanjut.",
+                                    text = "Amankan database catatan transaksi Anda dari kegagalan penyimpanan lokal. Salinan database dapat dicadangkan secara harian atau mingguan ke penyimpanan aman lokal sebagai antisipasi apabila sewaktu-waktu aplikasi ini dihapus.\n\n• Backup Otomatis: Data dicadangkan secara berkala sesuai jadwal yang Anda pilih (Harian/Mingguan).\n• Backup Manual: Ketuk tombol 'Cadangkan Sekarang' kapan saja untuk menyimpan data terbaru.\n• Pulihkan Data: Pilih file cadangan dari daftar untuk mengembalikan data ke kondisi tersebut.",
                                     color = GhostWhite.copy(alpha = 0.8f),
                                     style = MaterialTheme.typography.bodyMedium,
                                     lineHeight = 20.sp
@@ -295,77 +526,93 @@ fun DatabaseBackupSection(
                     return sdf.format(java.util.Date(timestamp))
                 }
 
+                var isHistoryExpanded by remember { mutableStateOf(false) }
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(GhostWhite.copy(alpha = 0.03f), shape = RoundedCornerShape(12.dp))
                         .border(1.dp, GhostWhite.copy(alpha = 0.08f), shape = RoundedCornerShape(12.dp))
+                        .clickable { isHistoryExpanded = !isHistoryExpanded }
                         .padding(12.dp)
                 ) {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Default.Info,
+                                    contentDescription = null,
+                                    tint = SteelBlue,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "Riwayat Pencadangan Otomatis",
+                                    style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
+                                    color = SteelBlue
+                                )
+                            }
                             Icon(
-                                imageVector = Icons.Default.Info,
-                                contentDescription = null,
+                                imageVector = if (isHistoryExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                                contentDescription = "Tampilkan Riwayat",
                                 tint = SteelBlue,
-                                modifier = Modifier.size(14.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = "Riwayat Pencadangan Otomatis",
-                                style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
-                                color = SteelBlue
+                                modifier = Modifier.size(16.dp)
                             )
                         }
 
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
+                        if (isHistoryExpanded) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "Pencadangan Lokal:",
+                                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold, fontSize = 11.sp),
+                                        color = GhostWhite.copy(alpha = 0.7f)
+                                    )
+                                    Text(
+                                        text = lastLocalStatus,
+                                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
+                                        color = if (lastLocalStatus.startsWith("Sukses")) Color.Green.copy(alpha = 0.8f) else if (lastLocalStatus.startsWith("Gagal")) Color.Red.copy(alpha = 0.8f) else GhostWhite.copy(alpha = 0.5f)
+                                    )
+                                }
                                 Text(
-                                    text = "Pencadangan Lokal:",
-                                    style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold, fontSize = 11.sp),
-                                    color = GhostWhite.copy(alpha = 0.7f)
-                                )
-                                Text(
-                                    text = lastLocalStatus ?: "Belum ada riwayat",
+                                    text = formatTimestamp(lastLocalTime),
                                     style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
-                                    color = if (lastLocalStatus != null && lastLocalStatus.startsWith("Sukses")) Color.Green.copy(alpha = 0.8f) else if (lastLocalStatus != null && lastLocalStatus.startsWith("Gagal")) Color.Red.copy(alpha = 0.8f) else GhostWhite.copy(alpha = 0.5f)
+                                    color = GhostWhite.copy(alpha = 0.4f)
                                 )
                             }
-                            Text(
-                                text = formatTimestamp(lastLocalTime),
-                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
-                                color = GhostWhite.copy(alpha = 0.4f)
-                            )
-                        }
 
-                        HorizontalDivider(color = GhostWhite.copy(alpha = 0.05f))
+                            HorizontalDivider(color = GhostWhite.copy(alpha = 0.05f))
 
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "Mengunggah Cloud (Drive):",
+                                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold, fontSize = 11.sp),
+                                        color = GhostWhite.copy(alpha = 0.7f)
+                                    )
+                                    Text(
+                                        text = lastDriveStatus,
+                                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
+                                        color = if (lastDriveStatus.startsWith("Sukses")) Color.Green.copy(alpha = 0.8f) else if (lastDriveStatus.startsWith("Gagal")) Color.Red.copy(alpha = 0.8f) else GhostWhite.copy(alpha = 0.5f)
+                                    )
+                                }
                                 Text(
-                                    text = "Mengunggah Cloud (Drive):",
-                                    style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold, fontSize = 11.sp),
-                                    color = GhostWhite.copy(alpha = 0.7f)
-                                )
-                                Text(
-                                    text = lastDriveStatus ?: "Belum ada riwayat",
+                                    text = formatTimestamp(lastDriveTime),
                                     style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
-                                    color = if (lastDriveStatus != null && lastDriveStatus.startsWith("Sukses")) Color.Green.copy(alpha = 0.8f) else if (lastDriveStatus != null && lastDriveStatus.startsWith("Gagal")) Color.Red.copy(alpha = 0.8f) else GhostWhite.copy(alpha = 0.5f)
+                                    color = GhostWhite.copy(alpha = 0.4f)
                                 )
                             }
-                            Text(
-                                text = formatTimestamp(lastDriveTime),
-                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
-                                color = GhostWhite.copy(alpha = 0.4f)
-                            )
                         }
                     }
                 }
@@ -822,6 +1069,7 @@ fun DatabaseBackupSection(
                                 Toast.makeText(context, "Database berhasil dicadangkan secara lokal!", Toast.LENGTH_SHORT).show()
                                 
                                 // Jika akun Google terhubung dan pencadangan drive aktif, unggah juga ke Drive otomatis
+                                /* 
                                 if (isDriveBackupEnabled && connectedGoogleAccount != null) {
                                     Toast.makeText(context, "Mengunggah cadangan ke Google Drive...", Toast.LENGTH_SHORT).show()
                                     onIsDriveProcessingChanged(true)
@@ -842,6 +1090,7 @@ fun DatabaseBackupSection(
                                     }
                                     onIsDriveProcessingChanged(false)
                                 }
+                                */
                             }
                             is BackupHelper.BackupResult.Error -> {
                                 Toast.makeText(context, "Gagal mencadangkan database: ${result.message}", Toast.LENGTH_LONG).show()
@@ -856,114 +1105,111 @@ fun DatabaseBackupSection(
 
             Spacer(modifier = Modifier.height(4.dp))
 
-            // Backup copy list
-            Text(
-                text = "Salinan Cadangan yang Tersedia (${backupList.size}):",
-                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
-                color = GhostWhite
-            )
-
-            if (backupList.isEmpty()) {
+            var isBackupListExpanded by remember { mutableStateOf(false) }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { isBackupListExpanded = !isBackupListExpanded }
+                    .padding(vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
                 Text(
-                    text = "Belum ada salinan cadangan. Silakan buat cadangan manual atau aktifkan pencadangan otomatis.",
-                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
-                    color = GhostWhite.copy(alpha = 0.35f)
+                    text = "Salinan Cadangan yang Tersedia (${backupList.size}):",
+                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                    color = GhostWhite
                 )
-            } else {
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    backupList.take(5).forEach { file ->
-                        val format = java.text.SimpleDateFormat("dd MMM yyyy, HH:mm", Locale("id", "ID"))
-                        val dateStr = format.format(java.util.Date(file.lastModified()))
-                        val isAutoFromPrefix = file.name.startsWith("auto_")
-                        val sizeInKb = file.length() / 1024
+                Icon(
+                    imageVector = if (isBackupListExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                    contentDescription = "Tampilkan Daftar",
+                    tint = GhostWhite,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
 
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .background(GhostWhite.copy(alpha = 0.03f), shape = RoundedCornerShape(8.dp))
-                                .padding(horizontal = 12.dp, vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Box(
-                                        modifier = Modifier
-                                            .background(
-                                                if (isAutoFromPrefix) SteelBlue.copy(alpha = 0.15f) else Color.Magenta.copy(alpha = 0.15f),
-                                                shape = RoundedCornerShape(4.dp)
-                                            )
-                                            .padding(horizontal = 6.dp, vertical = 2.dp)
-                                    ) {
-                                        Text(
-                                            text = if (isAutoFromPrefix) "Otomatis" else "Manual",
-                                            style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp, fontWeight = FontWeight.Bold),
-                                            color = if (isAutoFromPrefix) SteelBlue else Color.Magenta
-                                        )
-                                    }
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text(
-                                        text = "$sizeInKb KB",
-                                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
-                                        color = GhostWhite.copy(alpha = 0.4f)
-                                    )
-                                }
-                                Spacer(modifier = Modifier.height(2.dp))
-                                Text(
-                                    text = dateStr,
-                                    style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
-                                    color = GhostWhite
-                                )
-                            }
+            if (isBackupListExpanded) {
+                if (backupList.isEmpty()) {
+                    Text(
+                        text = "Belum ada salinan cadangan. Silakan buat cadangan manual atau aktifkan pencadangan otomatis.",
+                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                        color = GhostWhite.copy(alpha = 0.35f)
+                    )
+                } else {
+                    Column(
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        backupList.take(5).forEach { file ->
+                            val format = java.text.SimpleDateFormat("dd MMM yyyy, HH:mm", Locale("id", "ID"))
+                            val dateStr = format.format(java.util.Date(file.lastModified()))
+                            val isAutoFromPrefix = file.name.startsWith("auto_")
+                            val sizeInKb = file.length() / 1024
 
                             Row(
-                                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                verticalAlignment = Alignment.CenterVertically
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(GhostWhite.copy(alpha = 0.03f), shape = RoundedCornerShape(8.dp))
+                                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                if (connectedGoogleAccount != null) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Box(
+                                            modifier = Modifier
+                                                .background(
+                                                    if (isAutoFromPrefix) SteelBlue.copy(alpha = 0.15f) else Color.Magenta.copy(alpha = 0.15f),
+                                                    shape = RoundedCornerShape(4.dp)
+                                                )
+                                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                                        ) {
+                                            Text(
+                                                text = if (isAutoFromPrefix) "Otomatis" else "Manual",
+                                                style = MaterialTheme.typography.labelSmall.copy(fontSize = 9.sp, fontWeight = FontWeight.Bold),
+                                                color = if (isAutoFromPrefix) SteelBlue else Color.Magenta
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = "$sizeInKb KB",
+                                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
+                                            color = GhostWhite.copy(alpha = 0.4f)
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = dateStr,
+                                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
+                                        color = GhostWhite
+                                    )
+                                }
+
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    PremiumButton(
+                                        text = "PULIHKAN",
+                                        onClick = { onSelectedBackupToRestoreChange(file) },
+                                        isActive = true,
+                                        fillMaxWidth = false,
+                                        horizontalPadding = 10.dp,
+                                        verticalPadding = 4.dp
+                                    )
+
                                     IconButton(
                                         onClick = {
-                                            if (isDriveBackupEnabled) {
-                                                onSelectedLocalBackupToUploadChange(file)
-                                            } else {
-                                                Toast.makeText(context, "Pengunggahan ke Google Drive dinonaktifkan. Silakan aktifkan kembali sakelar pengunggahan di unit bawah.", Toast.LENGTH_LONG).show()
-                                            }
+                                            backupFileToDelete = file
                                         },
                                         modifier = Modifier.size(28.dp)
                                     ) {
                                         Icon(
-                                            imageVector = Icons.Default.CloudUpload,
-                                            contentDescription = "Unggah ke Google Drive",
-                                            tint = if (isDriveBackupEnabled) SteelBlue else GhostWhite.copy(alpha = 0.25f),
+                                            imageVector = Icons.Default.Delete,
+                                            contentDescription = "Hapus Cadangan",
+                                            tint = Color.Red.copy(alpha = 0.7f),
                                             modifier = Modifier.size(16.dp)
                                         )
                                     }
-                                }
-
-                                PremiumButton(
-                                    text = "PULIHKAN",
-                                    onClick = { onSelectedBackupToRestoreChange(file) },
-                                    isActive = true,
-                                    fillMaxWidth = false,
-                                    horizontalPadding = 10.dp,
-                                    verticalPadding = 4.dp
-                                )
-
-                                IconButton(
-                                    onClick = {
-                                        backupFileToDelete = file
-                                    },
-                                    modifier = Modifier.size(28.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Delete,
-                                        contentDescription = "Hapus Cadangan",
-                                        tint = Color.Red.copy(alpha = 0.7f),
-                                        modifier = Modifier.size(16.dp)
-                                    )
                                 }
                             }
                         }
@@ -972,6 +1218,7 @@ fun DatabaseBackupSection(
             }
 
             // Google Drive Cloud Sync Section
+            /*
             HorizontalDivider(color = GhostWhite.copy(alpha = 0.08f))
 
             Row(
@@ -1282,9 +1529,11 @@ fun DatabaseBackupSection(
                 }
             }
         }
-    }
+        */
+        } // Closing Column database_backup_card
+    } // Closing Card database_backup_card
         
-        Card(
+        /* Card(
             modifier = Modifier.fillMaxWidth().testTag("realtime_firestore_card"),
             shape = RoundedCornerShape(20.dp),
             colors = CardDefaults.cardColors(containerColor = TranslucentForm.copy(alpha = 0.65f)),
@@ -1350,6 +1599,7 @@ fun DatabaseBackupSection(
                 )
             }
         }
+        */
     }
 
     if (backupFileToDelete != null) {

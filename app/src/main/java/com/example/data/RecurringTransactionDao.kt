@@ -19,4 +19,7 @@ interface RecurringTransactionDao {
 
     @Delete
     suspend fun deleteRecurring(recurring: RecurringTransaction)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertAll(recurringTransactions: List<RecurringTransaction>)
 }
