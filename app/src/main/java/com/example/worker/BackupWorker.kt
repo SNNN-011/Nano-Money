@@ -23,7 +23,7 @@ class BackupWorker(
     override suspend fun doWork(): Result {
         Log.d("BackupWorker", "Memulai pencadangan otomatis via WorkManager... Attempt: $runAttemptCount")
         val context = applicationContext
-        val securityPrefs = context.getSharedPreferences("security_prefs", Context.MODE_PRIVATE)
+        val securityPrefs = com.example.util.SecurePrefsHelper.getEncryptedPrefs(context, "security_prefs")
         val now = System.currentTimeMillis()
         var shouldRetry = false
         try {

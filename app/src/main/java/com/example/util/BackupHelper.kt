@@ -166,63 +166,131 @@ object BackupHelper {
 
     fun restoreBackup(context: Context, backupFile: File): Boolean {
         return try {
-            // 1. Reset singleton instance & close connections
+            val tempDbFile = File(context.cacheDir, "temp_restore.db")
+            if (tempDbFile.exists()) {
+                tempDbFile.delete()
+            }
+
+            if (isZipFile(backupFile)) {
+                ZipInputStream(backupFile.inputStream()).use { zis ->
+                    var entry = zis.nextEntry
+                    while (entry != null) {
+                        if (!entry.isDirectory && entry.name == "database/financial_tracker_database") {
+                            tempDbFile.parentFile?.mkdirs()
+                            tempDbFile.outputStream().use { output ->
+                                zis.copyTo(output)
+                            }
+                            break
+                        }
+                        zis.closeEntry()
+                        entry = zis.nextEntry
+                    }
+                }
+            } else {
+                backupFile.inputStream().use { input ->
+                    tempDbFile.parentFile?.mkdirs()
+                    tempDbFile.outputStream().use { output ->
+                        input.copyTo(output)
+                    }
+                }
+            }
+
+            if (!tempDbFile.exists() || tempDbFile.length() == 0L) {
+                throw IllegalStateException("File database cadangan tidak ditemukan atau kosong")
+            }
+
+            net.sqlcipher.database.SQLiteDatabase.loadLibs(context)
+            val passphraseBytes = DatabaseKeyManager.getOrCreatePassphrase(context)
+            var isValid = false
+
+            try {
+                val factory = net.sqlcipher.database.SupportFactory(passphraseBytes)
+                val configuration = androidx.sqlite.db.SupportSQLiteOpenHelper.Configuration.builder(context)
+                    .name(tempDbFile.absolutePath)
+                    .callback(object : androidx.sqlite.db.SupportSQLiteOpenHelper.Callback(1) {
+                        override fun onCreate(db: androidx.sqlite.db.SupportSQLiteDatabase) {}
+                        override fun onUpgrade(db: androidx.sqlite.db.SupportSQLiteDatabase, oldVersion: Int, newVersion: Int) {}
+                    })
+                    .build()
+                val helper = factory.create(configuration)
+                val db = helper.readableDatabase
+                db.close()
+                isValid = true
+            } catch (e: Exception) {
+                try {
+                    val factory = androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory()
+                    val configuration = androidx.sqlite.db.SupportSQLiteOpenHelper.Configuration.builder(context)
+                        .name(tempDbFile.absolutePath)
+                        .callback(object : androidx.sqlite.db.SupportSQLiteOpenHelper.Callback(1) {
+                            override fun onCreate(db: androidx.sqlite.db.SupportSQLiteDatabase) {}
+                            override fun onUpgrade(db: androidx.sqlite.db.SupportSQLiteDatabase, oldVersion: Int, newVersion: Int) {}
+                        })
+                        .build()
+                    val helper = factory.create(configuration)
+                    val db = helper.readableDatabase
+                    db.close()
+                    isValid = true
+                } catch (e2: Exception) {
+                    Log.e("BackupHelper", "Database validasi gagal: ${e2.message}", e2)
+                }
+            }
+
+            if (!isValid) {
+                if (tempDbFile.exists()) {
+                    tempDbFile.delete()
+                }
+                throw IllegalStateException("Format database rusak atau kata sandi enkripsi salah")
+            }
+
             AppDatabase.resetDatabaseInstance()
 
             val dbFile = context.getDatabasePath("financial_tracker_database")
-            
-            // 2. Clear out any WAL or SHM files so SQLite doesn't replay them and corrupt our restored database
             val walFile = File(dbFile.path + "-wal")
             val shmFile = File(dbFile.path + "-shm")
             if (walFile.exists()) walFile.delete()
             if (shmFile.exists()) shmFile.delete()
 
-            // 3. Extract from ZIP or copy database file directly if it's legacy non-zip format
+            if (dbFile.exists()) {
+                dbFile.delete()
+            }
+            dbFile.parentFile?.mkdirs()
+            val moved = tempDbFile.renameTo(dbFile)
+            if (!moved) {
+                tempDbFile.inputStream().use { input ->
+                    dbFile.outputStream().use { output ->
+                        input.copyTo(output)
+                    }
+                }
+                tempDbFile.delete()
+            }
+
             if (isZipFile(backupFile)) {
                 ZipInputStream(backupFile.inputStream()).use { zis ->
                     var entry = zis.nextEntry
                     while (entry != null) {
-                        if (!entry.isDirectory) {
-                            if (entry.name == "database/financial_tracker_database") {
-                                dbFile.parentFile?.mkdirs()
-                                dbFile.outputStream().use { output ->
-                                    zis.copyTo(output)
-                                }
-                            } else if (entry.name.startsWith("shared_prefs/")) {
-                                val fileName = entry.name.substringAfter("shared_prefs/")
-                                val dataDir = context.applicationContext.dataDir ?: context.filesDir.parentFile ?: context.dataDir
-                                val sharedPrefsDir = File(dataDir, "shared_prefs")
-                                if (!sharedPrefsDir.exists()) {
-                                    sharedPrefsDir.mkdirs()
-                                }
-                                val targetPrefFile = File(sharedPrefsDir, fileName)
-                                targetPrefFile.outputStream().use { output ->
-                                    zis.copyTo(output)
-                                }
+                        if (!entry.isDirectory && entry.name.startsWith("shared_prefs/")) {
+                            val fileName = entry.name.substringAfter("shared_prefs/")
+                            val dataDir = context.applicationContext.dataDir ?: context.filesDir.parentFile ?: context.dataDir
+                            val sharedPrefsDir = File(dataDir, "shared_prefs")
+                            if (!sharedPrefsDir.exists()) {
+                                sharedPrefsDir.mkdirs()
+                            }
+                            val targetPrefFile = File(sharedPrefsDir, fileName)
+                            targetPrefFile.outputStream().use { output ->
+                                zis.copyTo(output)
                             }
                         }
                         zis.closeEntry()
                         entry = zis.nextEntry
                     }
                 }
-                Log.d("BackupHelper", "Database and settings successfully restored from ZIP backup ${backupFile.name}")
-                TelemetryHelper.trackBackupAction("restore", true)
-            } else {
-                // Backwards compatible legacy restore: copy file directly
-                backupFile.inputStream().use { input ->
-                    dbFile.outputStream().use { output ->
-                        input.copyTo(output)
-                    }
-                }
-                Log.d("BackupHelper", "Database successfully restored from legacy backup ${backupFile.name}")
-                TelemetryHelper.trackBackupAction("restore", true)
             }
 
-            // 4. Restart the screen activity or the complete application to load restored data smoothly
+            TelemetryHelper.trackBackupAction("restore", true)
             restartApplication(context)
             true
         } catch (e: Exception) {
-            Log.e("BackupHelper", "Error during restore: ${e.message}", e)
+            Log.e("BackupHelper", "Gagal mengembalikan cadangan: ${e.message}", e)
             TelemetryHelper.trackBackupAction("restore", false, e.message)
             TelemetryHelper.logNonFatal(e, "Restore failed")
             false

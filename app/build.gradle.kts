@@ -114,6 +114,7 @@ dependencies {
   implementation(libs.androidx.room.runtime)
   implementation(libs.sqlcipher.android)
   implementation(libs.androidx.biometric)
+  implementation(libs.androidx.security.crypto)
   implementation(libs.androidx.work.runtime.ktx)
   implementation(libs.play.services.auth)
   // implementation(libs.coil.compose)

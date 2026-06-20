@@ -94,7 +94,7 @@ fun DatabaseBackupSection(
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
-    val securityPrefs = remember { context.getSharedPreferences("security_prefs", Context.MODE_PRIVATE) }
+    val securityPrefs = remember { com.example.util.SecurePrefsHelper.getEncryptedPrefs(context, "security_prefs") }
     var isDriveBackupEnabled by remember { mutableStateOf(securityPrefs.getBoolean("drive_backup_enabled", true)) }
     var showBackupHelpInfo by remember { mutableStateOf(false) }
     var showDisconnectConfirmation by remember { mutableStateOf(false) }

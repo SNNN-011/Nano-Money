@@ -286,7 +286,7 @@ object FirebaseSyncHelper {
             val prefNames = listOf("financial_tracker_prefs", "app_security_prefs", "security_prefs")
             
             for (prefName in prefNames) {
-                val prefs = context.getSharedPreferences(prefName, Context.MODE_PRIVATE)
+                val prefs = com.example.util.SecurePrefsHelper.getEncryptedPrefs(context, prefName)
                 val settingsDocRef = userDocRef.collection("settings").document(prefName)
                 
                 val settingsSnapshot = suspendCancellableCoroutine { continuation ->

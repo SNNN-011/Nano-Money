@@ -125,7 +125,7 @@ fun EksporImporTabContent(
     var isMonthsExpanded by remember { mutableStateOf(false) }
 
     // Security preferences and states
-    val securityPrefs = remember { context.getSharedPreferences("app_security_prefs", android.content.Context.MODE_PRIVATE) }
+    val securityPrefs = remember { com.example.util.SecurePrefsHelper.getEncryptedPrefs(context, "app_security_prefs") }
     var isPinEnabled by remember { mutableStateOf(securityPrefs.getBoolean("pin_enabled", false)) }
     var savedPin by remember { mutableStateOf(securityPrefs.getString("saved_pin", "") ?: "") }
     var isBiometricEnabled by remember { mutableStateOf(securityPrefs.getBoolean("biometric_enabled", false)) }

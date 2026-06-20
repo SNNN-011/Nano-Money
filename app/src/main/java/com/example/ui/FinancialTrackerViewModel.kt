@@ -106,7 +106,7 @@ class FinancialTrackerViewModel(
         data class ShowAlert(val title: String, val message: String) : UiEvent
     }
 
-    private val prefs = application.getSharedPreferences("financial_tracker_prefs", android.content.Context.MODE_PRIVATE)
+    private val prefs = com.example.util.SecurePrefsHelper.getEncryptedPrefs(application, "financial_tracker_prefs")
 
     val incomeCategories = MutableStateFlow<List<String>>(
         prefs.getString("income_categories_list", "Gaji,Investasi,Freelance,Lainnya")

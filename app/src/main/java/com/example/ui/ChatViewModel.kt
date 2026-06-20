@@ -33,7 +33,7 @@ class ChatViewModel(
     private val repository: FinancialRecordRepository
 ) : ViewModel() {
 
-    private val prefs = application.getSharedPreferences("financial_tracker_prefs", android.content.Context.MODE_PRIVATE)
+    private val prefs = com.example.util.SecurePrefsHelper.getEncryptedPrefs(application, "financial_tracker_prefs")
 
     private val _incomeCategories = MutableStateFlow<List<String>>(
         prefs.getString("income_categories_list", "Gaji,Investasi,Freelance,Lainnya")

@@ -63,7 +63,7 @@ class MainActivity : FragmentActivity() {
           if (securityStatus != com.example.util.SecurityUtil.SecurityStatus.SAFE) {
             com.example.ui.SecurityViolationScreen(securityStatus = securityStatus)
           } else {
-            val securityPrefs = remember { context.getSharedPreferences("app_security_prefs", android.content.Context.MODE_PRIVATE) }
+            val securityPrefs = remember { com.example.util.SecurePrefsHelper.getEncryptedPrefs(context, "app_security_prefs") }
             
             LaunchedEffect(Unit) {
               val isAutoBackup = securityPrefs.getBoolean("auto_backup_enabled", false)

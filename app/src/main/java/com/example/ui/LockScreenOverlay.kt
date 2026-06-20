@@ -37,7 +37,7 @@ fun LockScreenOverlay(
     onUnlock: () -> Unit,
     onTriggerBiometrics: () -> Unit
 ) {
-    val securityPrefs = remember { context.getSharedPreferences("app_security_prefs", Context.MODE_PRIVATE) }
+    val securityPrefs = remember { com.example.util.SecurePrefsHelper.getEncryptedPrefs(context, "app_security_prefs") }
     var enteredPin by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf("") }
 
