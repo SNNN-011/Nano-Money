@@ -93,6 +93,33 @@ object DatabaseKeyManager {
             context.contentResolver,
             android.provider.Settings.Secure.ANDROID_ID
         ) ?: "fallback_secure_key_financial_tracker"
-        return androidId.toByteArray(Charsets.UTF_8).copyOf(32)
+
+        val obfuscatedSalt = byteArrayOf(
+            (0x5F xor 0x1C).toByte(),
+            (0x3B xor 0x2A).toByte(),
+            (0x7D xor 0x34).toByte(),
+            (0x1E xor 0x48).toByte(),
+            (0x43 xor 0x56).toByte(),
+            (0x69 xor 0x21).toByte(),
+            (0x28 xor 0x7E).toByte(),
+            (0x0A xor 0x1B).toByte(),
+            (0x56 or 0x10).toByte(),
+            (0x2E xor 0x0A).toByte(),
+            (0x6B xor 0x0B).toByte(),
+            (0x1F xor 0x1C).toByte(),
+            (0x35 xor 0x0D).toByte(),
+            (0x4E xor 0x3E).toByte(),
+            (0x7A xor 0x5F).toByte(),
+            (0x11 xor 0x10).toByte()
+        )
+
+        return try {
+            val messageDigest = java.security.MessageDigest.getInstance("SHA-256")
+            messageDigest.update(androidId.toByteArray(Charsets.UTF_8))
+            messageDigest.update(obfuscatedSalt)
+            messageDigest.digest()
+        } catch (e: Exception) {
+            androidId.toByteArray(Charsets.UTF_8).copyOf(32)
+        }
     }
 }
