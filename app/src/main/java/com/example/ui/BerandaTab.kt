@@ -58,6 +58,9 @@ fun BerandaTabContent(
     onAddRecurring: (description: String, amount: Double, type: String, category: String, dayOfMonth: Int, notes: String) -> Unit = { _, _, _, _, _, _ -> },
     onDeleteRecurring: (RecurringTransaction) -> Unit = {},
     onToggleRecurringActive: (RecurringTransaction) -> Unit = {},
+    welcomeMessage: String = "",
+    welcomeMessageColor: String = "",
+    showNewFeature: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     var showRecurringDialog by remember { mutableStateOf(false) }
@@ -85,7 +88,10 @@ fun BerandaTabContent(
                     selectedBudgetOffset = selectedBudgetOffset,
                     onBudgetOffsetChange = onBudgetOffsetChange,
                     onSetBudgetClick = onSetBudgetClick,
-                    onRecurringClick = { showRecurringDialog = true }
+                    onRecurringClick = { showRecurringDialog = true },
+                    welcomeMessage = welcomeMessage,
+                    welcomeMessageColor = welcomeMessageColor,
+                    showNewFeature = showNewFeature
                 )
 
                 Card(
@@ -242,7 +248,10 @@ fun BerandaTabContent(
                 selectedBudgetOffset = selectedBudgetOffset,
                 onBudgetOffsetChange = onBudgetOffsetChange,
                 onSetBudgetClick = onSetBudgetClick,
-                onRecurringClick = { showRecurringDialog = true }
+                onRecurringClick = { showRecurringDialog = true },
+                welcomeMessage = welcomeMessage,
+                welcomeMessageColor = welcomeMessageColor,
+                showNewFeature = showNewFeature
             )
 
             FilterAndSortHeader(

@@ -12,7 +12,7 @@ class FinancialRecordRepository(private val dao: FinancialRecordDao) {
 
     suspend fun update(record: FinancialRecord) = dao.updateRecord(record)
 
-    suspend fun delete(record: FinancialRecord) = dao.deleteRecord(record)
+    suspend fun delete(record: FinancialRecord) = dao.updateRecord(record.copy(isDeleted = true))
 
     suspend fun replaceAll(records: List<FinancialRecord>) = dao.replaceAllRecords(records)
 

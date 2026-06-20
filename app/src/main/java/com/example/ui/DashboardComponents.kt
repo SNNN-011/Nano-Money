@@ -44,6 +44,9 @@ fun DashboardStatsSection(
     onBudgetOffsetChange: (Int) -> Unit = {},
     onSetBudgetClick: () -> Unit,
     onRecurringClick: () -> Unit,
+    welcomeMessage: String = "",
+    welcomeMessageColor: String = "",
+    showNewFeature: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     var balanceVisible by remember { mutableStateOf(true) }
@@ -88,6 +91,40 @@ fun DashboardStatsSection(
                 .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            if (welcomeMessage.isNotEmpty()) {
+                val parsedColor = remember(welcomeMessageColor) {
+                    try {
+                        androidx.compose.ui.graphics.Color(android.graphics.Color.parseColor(welcomeMessageColor))
+                    } catch (e: Exception) {
+                        SteelBlue // Fallback color
+                    }
+                }
+                
+                Text(
+                    text = welcomeMessage,
+                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                    color = parsedColor,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+            }
+            if (showNewFeature) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 12.dp)
+                        .background(NeonGreen.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
+                        .border(1.dp, NeonGreen.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
+                        .padding(8.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "✨ Fitur Baru Tersedia! ✨",
+                        color = NeonGreen,
+                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
+                    )
+                }
+            }
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,

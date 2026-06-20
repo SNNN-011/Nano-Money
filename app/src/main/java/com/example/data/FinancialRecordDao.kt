@@ -9,10 +9,13 @@ import java.time.Instant
 
 @Dao
 interface FinancialRecordDao {
-    @Query("SELECT * FROM financial_records ORDER BY date DESC")
+    @Query("SELECT * FROM financial_records WHERE isDeleted = 0 ORDER BY date DESC")
     fun getAllRecords(): Flow<List<FinancialRecord>>
 
-    @Query("SELECT * FROM financial_records WHERE date >= :startMs AND date <= :endMs ORDER BY date DESC")
+    @Query("SELECT * FROM financial_records ORDER BY date DESC")
+    fun getAllRecordsWithDeleted(): Flow<List<FinancialRecord>>
+
+    @Query("SELECT * FROM financial_records WHERE date >= :startMs AND date <= :endMs AND isDeleted = 0 ORDER BY date DESC")
     fun getTransactionsInTimeRange(startMs: Long, endMs: Long): Flow<List<FinancialRecord>>
 
     fun getTransactionsByMonth(year: Int, month: Int): Flow<List<FinancialRecord>> {
@@ -30,7 +33,7 @@ interface FinancialRecordDao {
         return getTransactionsInTimeRange(startMs, endMs)
     }
 
-    @Query("SELECT COUNT(*) FROM financial_records")
+    @Query("SELECT COUNT(*) FROM financial_records WHERE isDeleted = 0")
     suspend fun getRecordCount(): Int
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)

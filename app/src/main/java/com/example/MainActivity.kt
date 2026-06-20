@@ -37,6 +37,12 @@ class MainActivity : FragmentActivity() {
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
     
+    // Inisialisasi Firebase Remote Config
+    com.example.util.RemoteConfigHelper.initAndFetchConfig()
+    
+    // Inisialisasi Firebase Telemetry (Crashlytics dan Analytics)
+    com.example.util.TelemetryHelper.initialize(applicationContext)
+    
     enableEdgeToEdge()
     setContent {
       MyApplicationTheme {
@@ -46,6 +52,13 @@ class MainActivity : FragmentActivity() {
         ) {
           val context = androidx.compose.ui.platform.LocalContext.current
           val securityStatus = remember { com.example.util.SecurityUtil.checkSecurityStatus(context) }
+          
+          LaunchedEffect(securityStatus) {
+            com.example.util.TelemetryHelper.trackSecurityCheck(
+              status = securityStatus.name,
+              isSafe = securityStatus == com.example.util.SecurityUtil.SecurityStatus.SAFE
+            )
+          }
           
           if (securityStatus != com.example.util.SecurityUtil.SecurityStatus.SAFE) {
             com.example.ui.SecurityViolationScreen(securityStatus = securityStatus)

@@ -62,7 +62,8 @@ object FirebaseSyncHelper {
             "type" to record.type,
             "category" to record.category,
             "date" to record.date,
-            "notes" to record.notes
+            "notes" to record.notes,
+            "isDeleted" to record.isDeleted
         )
 
         suspendCancellableCoroutine<Unit> { continuation ->
@@ -82,7 +83,7 @@ object FirebaseSyncHelper {
         suspendCancellableCoroutine<Unit> { continuation ->
             db.collection("users").document(uid).collection("financial_records")
                 .document(recordId.toString())
-                .delete()
+                .set(hashMapOf("isDeleted" to true), com.google.firebase.firestore.SetOptions.merge())
                 .addOnCompleteListener {
                     continuation.resume(Unit)
                 }
@@ -103,7 +104,7 @@ object FirebaseSyncHelper {
         val recurringDao = appDb.recurringTransactionDao()
 
         return try {
-            val localRecords = dao.getAllRecords().first()
+            val localRecords = dao.getAllRecordsWithDeleted().first()
             val localRecurring = recurringDao.getAllRecurring().first()
 
             // 1. Sync Financial Records
@@ -128,7 +129,8 @@ object FirebaseSyncHelper {
                         type = doc.getString("type") ?: "",
                         category = doc.getString("category") ?: "",
                         date = doc.getLong("date") ?: 0L,
-                        notes = doc.getString("notes") ?: ""
+                        notes = doc.getString("notes") ?: "",
+                        isDeleted = doc.getBoolean("isDeleted") ?: false
                     )
                 } catch (e: Exception) {
                     null
@@ -139,24 +141,58 @@ object FirebaseSyncHelper {
             var uploadedCount = 0
             var downloadedCount = 0
 
+            val recordsToWrite = mutableListOf<Pair<String, Map<String, Any>>>()
+
             for (localRecord in localRecords) {
                 val firestoreRecord = firestoreRecordsMap[localRecord.id]
-                if (firestoreRecord == null || firestoreRecord != localRecord) {
-                    val docData = hashMapOf(
-                        "id" to localRecord.id,
-                        "description" to localRecord.description,
-                        "amount" to localRecord.amount,
-                        "type" to localRecord.type,
-                        "category" to localRecord.category,
-                        "date" to localRecord.date,
-                        "notes" to localRecord.notes
-                    )
+                if (localRecord.isDeleted) {
+                    if (firestoreRecord == null || !firestoreRecord.isDeleted) {
+                        val docData = hashMapOf<String, Any>(
+                            "id" to localRecord.id,
+                            "description" to localRecord.description,
+                            "amount" to localRecord.amount,
+                            "type" to localRecord.type,
+                            "category" to localRecord.category,
+                            "date" to localRecord.date,
+                            "notes" to localRecord.notes,
+                            "isDeleted" to true
+                        )
+                        recordsToWrite.add(localRecord.id.toString() to docData)
+                    }
+                } else {
+                    if (firestoreRecord != null && firestoreRecord.isDeleted) {
+                        dao.updateRecord(localRecord.copy(isDeleted = true))
+                    } else if (firestoreRecord == null || firestoreRecord != localRecord) {
+                        val docData = hashMapOf<String, Any>(
+                            "id" to localRecord.id,
+                            "description" to localRecord.description,
+                            "amount" to localRecord.amount,
+                            "type" to localRecord.type,
+                            "category" to localRecord.category,
+                            "date" to localRecord.date,
+                            "notes" to localRecord.notes,
+                            "isDeleted" to false
+                        )
+                        recordsToWrite.add(localRecord.id.toString() to docData)
+                    }
+                }
+            }
+
+            if (recordsToWrite.isNotEmpty()) {
+                val chunks = recordsToWrite.chunked(500)
+                for (chunk in chunks) {
                     suspendCancellableCoroutine<Unit> { continuation ->
-                        collectionRef.document(localRecord.id.toString()).set(docData)
-                            .addOnCompleteListener { task ->
-                                if (task.isSuccessful) uploadedCount++
-                                continuation.resume(Unit)
+                        val batch = db.batch()
+                        for ((docId, data) in chunk) {
+                            val docRef = collectionRef.document(docId)
+                            batch.set(docRef, data)
+                        }
+                        batch.commit().addOnCompleteListener { task ->
+                            if (task.isSuccessful) {
+                                uploadedCount += chunk.size
                             }
+                            continuation.resume(Unit)
+                        }
                     }
                 }
             }
@@ -202,6 +238,8 @@ object FirebaseSyncHelper {
 
             val localRecurringMap = localRecurring.associateBy { it.id }
 
+            val recurringToWrite = mutableListOf<Pair<String, Map<String, Any?>>>()
+
             for (localRec in localRecurring) {
                 val firestoreRec = firestoreRecurringMap[localRec.id]
                 if (firestoreRec == null || firestoreRec != localRec) {
@@ -216,8 +254,20 @@ object FirebaseSyncHelper {
                         "lastRunDate" to localRec.lastRunDate,
                         "isActive" to localRec.isActive
                     )
+                    recurringToWrite.add(localRec.id.toString() to docData)
+                }
+            }
+
+            if (recurringToWrite.isNotEmpty()) {
+                val chunks = recurringToWrite.chunked(500)
+                for (chunk in chunks) {
                     suspendCancellableCoroutine<Unit> { continuation ->
-                        recurringCollectionRef.document(localRec.id.toString()).set(docData).addOnCompleteListener { continuation.resume(Unit) }
+                        val batch = db.batch()
+                        for ((docId, data) in chunk) {
+                            val docRef = recurringCollectionRef.document(docId)
+                            batch.set(docRef, data)
+                        }
+                        batch.commit().addOnCompleteListener { continuation.resume(Unit) }
                     }
                 }
             }
@@ -232,45 +282,61 @@ object FirebaseSyncHelper {
                 recurringDao.insertAll(recurringToInsertLocally)
             }
 
-            // 3. Sync Settings / Preferences (financial_tracker_prefs)
-            val prefs = context.getSharedPreferences("financial_tracker_prefs", Context.MODE_PRIVATE)
-            val settingsDocRef = userDocRef.collection("settings").document("app_prefs")
+            // 3. Sync Settings / Preferences (financial_tracker_prefs, app_security_prefs, security_prefs)
+            val prefNames = listOf("financial_tracker_prefs", "app_security_prefs", "security_prefs")
             
-            val settingsSnapshot = suspendCancellableCoroutine { continuation ->
-                settingsDocRef.get().addOnCompleteListener { task ->
-                    if (task.isSuccessful) continuation.resume(task.result)
-                    else continuation.resume(null)
+            for (prefName in prefNames) {
+                val prefs = context.getSharedPreferences(prefName, Context.MODE_PRIVATE)
+                val settingsDocRef = userDocRef.collection("settings").document(prefName)
+                
+                val settingsSnapshot = suspendCancellableCoroutine { continuation ->
+                    settingsDocRef.get().addOnCompleteListener { task ->
+                        if (task.isSuccessful) continuation.resume(task.result)
+                        else continuation.resume(null)
+                    }
                 }
-            }
 
-            val firestoreSettingsMap = settingsSnapshot?.data ?: emptyMap<String, Any>()
-            val localSettingsMap = prefs.all
+                val firestoreSettingsMap = settingsSnapshot?.data ?: emptyMap<String, Any>()
+                val localSettingsMap = prefs.all
 
-            // Merge logic: if local has something different, we could upload it, or if firestore has something newer.
-            // A simple strategy is to push local to firestore, EXCEPT for settings that only exist in firestore (which we pull).
-            // Since SharedPreferences lacks granular timestamps, we will push all local keys to firestore, and pull any missing keys.
-            val mergedSettings = mutableMapOf<String, Any>()
-            mergedSettings.putAll(firestoreSettingsMap)
-            mergedSettings.putAll(localSettingsMap.filterValues { it != null } as Map<String, Any>)
-            
-            // Push merged to firestore
-            suspendCancellableCoroutine<Unit> { continuation ->
-                settingsDocRef.set(mergedSettings).addOnCompleteListener { continuation.resume(Unit) }
-            }
-            
-            // Apply merged settings to local
-            val editor = prefs.edit()
-            for ((key, value) in mergedSettings) {
-                when (value) {
-                    is String -> editor.putString(key, value)
-                    is Boolean -> editor.putBoolean(key, value)
-                    is Long -> editor.putLong(key, value)
-                    is Float -> editor.putFloat(key, value)
-                    is Double -> editor.putFloat(key, value.toFloat())
-                    is Int -> editor.putInt(key, value)
+                val mergedSettings = mutableMapOf<String, Any>()
+                mergedSettings.putAll(firestoreSettingsMap)
+                
+                for ((k, v) in localSettingsMap) {
+                    if (v != null) {
+                        if (v is Set<*>) {
+                            mergedSettings[k] = v.toList()
+                        } else {
+                            mergedSettings[k] = v
+                        }
+                    }
                 }
+                
+                suspendCancellableCoroutine<Unit> { continuation ->
+                    settingsDocRef.set(mergedSettings).addOnCompleteListener { continuation.resume(Unit) }
+                }
+                
+                val editor = prefs.edit()
+                for ((key, value) in mergedSettings) {
+                    when (value) {
+                        is String -> editor.putString(key, value)
+                        is Boolean -> editor.putBoolean(key, value)
+                        is Long -> editor.putLong(key, value)
+                        is Float -> editor.putFloat(key, value)
+                        is Double -> editor.putFloat(key, value.toFloat())
+                        is Int -> editor.putInt(key, value)
+                        is Set<*> -> {
+                            val stringSet = value.mapNotNull { it?.toString() }.toSet()
+                            editor.putStringSet(key, stringSet)
+                        }
+                        is List<*> -> {
+                            val stringSet = value.mapNotNull { it?.toString() }.toSet()
+                            editor.putStringSet(key, stringSet)
+                        }
+                    }
+                }
+                editor.apply()
             }
-            editor.apply()
 
             Result.success("Penyelarasan berhasil dinormalisasi! Seluruh data (Transaksi, Rutin, & Pengaturan) telah disinkronkan.")
         } catch (e: Exception) {

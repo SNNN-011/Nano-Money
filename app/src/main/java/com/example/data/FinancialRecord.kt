@@ -12,5 +12,6 @@ data class FinancialRecord(
     val type: String, // "income" or "expense"
     val category: String,
     val date: Long, // timestamp in ms
-    val notes: String
+    val notes: String,
+    val isDeleted: Boolean = false
 ) : Serializable

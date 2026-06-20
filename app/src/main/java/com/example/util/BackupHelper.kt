@@ -42,6 +42,7 @@ object BackupHelper {
                 false
             }
             if (inTransaction) {
+                TelemetryHelper.trackBackupAction("backup", false, "Database is in active transaction")
                 return@withContext BackupResult.Error("Database sedang dalam transaksi aktif oleh proses lain. Mohon tunggu sejenak.")
             }
 
@@ -53,6 +54,7 @@ object BackupHelper {
                     }
                 }
             } catch (e: Exception) {
+                TelemetryHelper.trackBackupAction("backup", false, "Database access failed: ${e.message}")
                 return@withContext BackupResult.Error("Database terkunci atau tidak dapat diakses untuk pencadangan: ${e.localizedMessage}")
             }
 
@@ -60,6 +62,7 @@ object BackupHelper {
             val dbFile = context.getDatabasePath("financial_tracker_database")
             if (!dbFile.exists()) {
                 Log.e("BackupHelper", "Database file does not exist!")
+                TelemetryHelper.trackBackupAction("backup", false, "Database file does not exist")
                 return@withContext BackupResult.Error("Database file belum terbentuk! Harap isi minimal satu catatan keuangan terlebih dahulu.")
             }
 
@@ -72,6 +75,7 @@ object BackupHelper {
             if (freeSpace < requiredSpace) {
                 val dbSizeMb = dbSize.toDouble() / (1024 * 1024)
                 val freeSpaceMb = freeSpace.toDouble() / (1024 * 1024)
+                TelemetryHelper.trackBackupAction("backup", false, "Insufficient storage space: db=${dbSizeMb}MB, free=${freeSpaceMb}MB")
                 return@withContext BackupResult.Error(
                     String.format(
                         Locale.getDefault(),
@@ -123,10 +127,14 @@ object BackupHelper {
             cleanOldBackups(context)
 
             Log.d("BackupHelper", "Settings and database successfully backed up to ${backupFile.absolutePath}")
+            TelemetryHelper.trackBackupAction("backup", true)
             BackupResult.Success(backupFile.name)
         } catch (e: Exception) {
             Log.e("BackupHelper", "Error during backup: ${e.message}", e)
-            BackupResult.Error(e.localizedMessage ?: e.toString())
+            val errMsg = e.localizedMessage ?: e.toString()
+            TelemetryHelper.trackBackupAction("backup", false, errMsg)
+            TelemetryHelper.logNonFatal(e, "Backup failed")
+            BackupResult.Error(errMsg)
         }
     }
 
@@ -198,6 +206,7 @@ object BackupHelper {
                     }
                 }
                 Log.d("BackupHelper", "Database and settings successfully restored from ZIP backup ${backupFile.name}")
+                TelemetryHelper.trackBackupAction("restore", true)
             } else {
                 // Backwards compatible legacy restore: copy file directly
                 backupFile.inputStream().use { input ->
@@ -206,6 +215,7 @@ object BackupHelper {
                     }
                 }
                 Log.d("BackupHelper", "Database successfully restored from legacy backup ${backupFile.name}")
+                TelemetryHelper.trackBackupAction("restore", true)
             }
 
             // 4. Restart the screen activity or the complete application to load restored data smoothly
@@ -213,6 +223,8 @@ object BackupHelper {
             true
         } catch (e: Exception) {
             Log.e("BackupHelper", "Error during restore: ${e.message}", e)
+            TelemetryHelper.trackBackupAction("restore", false, e.message)
+            TelemetryHelper.logNonFatal(e, "Restore failed")
             false
         }
     }

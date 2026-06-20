@@ -41,6 +41,12 @@ import com.example.util.BackupHelper
 import com.example.util.BackupScheduler
 import com.example.util.GoogleDriveHelper
 import com.example.util.NotificationScheduler
+import androidx.work.WorkManager
+import androidx.work.WorkInfo
+import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.ExistingWorkPolicy
+import androidx.work.Constraints
+import androidx.work.NetworkType
 import com.example.ui.theme.*
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount
 import kotlinx.coroutines.CoroutineScope
@@ -251,21 +257,56 @@ fun DatabaseBackupSection(
                         }
                     }
 
-                    var isSyncingByFirebase by remember { mutableStateOf(false) }
+                    val workManager = remember { WorkManager.getInstance(context) }
+                    val liveData = remember { workManager.getWorkInfosForUniqueWorkLiveData("SyncUniqueWork") }
+                    var workInfos by remember { mutableStateOf<List<WorkInfo>>(emptyList()) }
+                    DisposableEffect(liveData) {
+                        val observer = androidx.lifecycle.Observer<List<WorkInfo>> { list ->
+                            workInfos = list ?: emptyList()
+                        }
+                        liveData.observeForever(observer)
+                        onDispose {
+                            liveData.removeObserver(observer)
+                        }
+                    }
                     
+                    val syncWorkInfo = workInfos.firstOrNull()
+                    val isSyncingByFirebase = syncWorkInfo != null && (
+                        syncWorkInfo.state == WorkInfo.State.RUNNING || 
+                        syncWorkInfo.state == WorkInfo.State.ENQUEUED
+                    )
+
+                    var previousState by remember { mutableStateOf<WorkInfo.State?>(null) }
+                    LaunchedEffect(syncWorkInfo) {
+                        val state = syncWorkInfo?.state
+                        if (previousState == WorkInfo.State.RUNNING) {
+                            if (state == WorkInfo.State.SUCCEEDED) {
+                                val msg = syncWorkInfo.outputData.getString("message") ?: "Sinkronisasi Sukses!"
+                                Toast.makeText(context, msg, Toast.LENGTH_LONG).show()
+                            } else if (state == WorkInfo.State.FAILED) {
+                                val msg = syncWorkInfo.outputData.getString("message") ?: "kesalahan jaringan"
+                                Toast.makeText(context, "Gagal sinkronisasi: $msg", Toast.LENGTH_LONG).show()
+                            }
+                        }
+                        previousState = state
+                    }
+
                     PremiumButton(
                         text = if (isSyncingByFirebase) "MENYINKRONKAN..." else "SINKRONKAN TRANSAKSI SEKARANG",
                         onClick = {
-                            coroutineScope.launch {
-                                isSyncingByFirebase = true
-                                val syncRes = com.example.util.FirebaseSyncHelper.syncFinancialRecordsWithFirestore(context)
-                                if (syncRes.isSuccess) {
-                                    Toast.makeText(context, syncRes.getOrNull() ?: "Sinkronisasi Sukses!", Toast.LENGTH_LONG).show()
-                                } else {
-                                    Toast.makeText(context, "Gagal sinkronisasi: ${syncRes.exceptionOrNull()?.localizedMessage ?: "kesalahan jaringan"}", Toast.LENGTH_LONG).show()
-                                }
-                                isSyncingByFirebase = false
-                            }
+                            val constraints = Constraints.Builder()
+                                .setRequiredNetworkType(NetworkType.CONNECTED)
+                                .build()
+                            
+                            val syncWorkRequest = OneTimeWorkRequestBuilder<com.example.worker.SyncWorker>()
+                                .setConstraints(constraints)
+                                .build()
+                            
+                            workManager.enqueueUniqueWork(
+                                "SyncUniqueWork",
+                                ExistingWorkPolicy.REPLACE,
+                                syncWorkRequest
+                            )
                         },
                         isActive = !isSyncingByFirebase,
                         icon = Icons.Default.Sync,

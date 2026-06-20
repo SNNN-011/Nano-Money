@@ -111,6 +111,10 @@ fun FinancialTrackerScreen(
     val categoryBudgets by viewModel.categoryBudgets.collectAsState()
     val categorySpending by viewModel.categorySpending.collectAsState()
 
+    val welcomeMessage by com.example.util.RemoteConfigHelper.welcomeMessage.collectAsState()
+    val welcomeMessageColor by com.example.util.RemoteConfigHelper.welcomeMessageColor.collectAsState()
+    val showNewFeature by com.example.util.RemoteConfigHelper.showNewFeature.collectAsState()
+
     var showBudgetDialog by remember { mutableStateOf(false) }
 
     var showCategoryDialog by remember { mutableStateOf(false) }
@@ -158,6 +162,10 @@ fun FinancialTrackerScreen(
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route ?: TrackerTab.BERANDA.name
+
+    LaunchedEffect(currentRoute) {
+        com.example.util.TelemetryHelper.trackScreenView(currentRoute)
+    }
 
     var monthsToExport by remember { mutableStateOf<List<java.time.YearMonth>>(emptyList()) }
 
@@ -526,7 +534,10 @@ fun FinancialTrackerScreen(
                                 viewModel.addRecurringTransaction(desc, amt, type, cat, day, notes)
                             },
                             onDeleteRecurring = { viewModel.deleteRecurringTransaction(it) },
-                            onToggleRecurringActive = { viewModel.toggleRecurringTransactionActive(it) }
+                            onToggleRecurringActive = { viewModel.toggleRecurringTransactionActive(it) },
+                            welcomeMessage = welcomeMessage,
+                            welcomeMessageColor = welcomeMessageColor,
+                            showNewFeature = showNewFeature
                         )
                     }
 
