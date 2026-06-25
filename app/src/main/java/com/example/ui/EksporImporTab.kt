@@ -278,9 +278,9 @@ fun EksporImporTabContent(
                             .commit()
                         Toast.makeText(context, "Kunci PIN dinonaktifkan", Toast.LENGTH_SHORT).show()
                     } else {
-                        val storedPin = securityPrefs.getString("saved_pin", "") ?: ""
+                        val storedPin = securityPrefs.getString("pin_hash", "") ?: ""
                         val storedQuestion = securityPrefs.getString("security_question", "") ?: ""
-                        val storedAnswer = securityPrefs.getString("security_answer", "") ?: ""
+                        val storedAnswer = securityPrefs.getString("answer_hash", "") ?: ""
                         
                         if (storedPin.isNotEmpty() && storedAnswer.isNotEmpty()) {
                             isPinEnabled = true
@@ -303,12 +303,10 @@ fun EksporImporTabContent(
                     securityPrefs.edit().putBoolean("biometric_enabled", checked).commit()
                 },
                 onEditSecurity = {
-                    val storedPin = securityPrefs.getString("saved_pin", "") ?: ""
                     val storedQuestion = securityPrefs.getString("security_question", "") ?: ""
-                    val storedAnswer = securityPrefs.getString("security_answer", "") ?: ""
                     
-                    pinInputText = storedPin
-                    securityAnswerInput = storedAnswer
+                    pinInputText = ""
+                    securityAnswerInput = ""
                     pinDialogErrorText = ""
                     selectedQuestionIndex = securityQuestions.indexOf(storedQuestion).let { if (it == -1) 0 else it }
                     isSetPinDialogOpen = true
@@ -899,12 +897,22 @@ fun EksporImporTabContent(
                                                 pinDialogErrorText = "Jawaban pemulihan tidak boleh kosong!"
                                             } else {
                                                 isPinEnabled = true
-                                                savedPin = pinInputText
+                                                
+                                                val pinSalt = com.example.util.PinHashHelper.generateSalt()
+                                                val pinHash = com.example.util.PinHashHelper.hashValue(pinInputText, pinSalt)
+                                                
+                                                val answerSalt = com.example.util.PinHashHelper.generateSalt()
+                                                val answerHash = com.example.util.PinHashHelper.hashValue(securityAnswerInput.trim().lowercase(), answerSalt)
+                                                
                                                 securityPrefs.edit()
                                                     .putBoolean("pin_enabled", true)
-                                                    .putString("saved_pin", pinInputText)
+                                                    .putString("pin_salt", pinSalt)
+                                                    .putString("pin_hash", pinHash)
                                                     .putString("security_question", securityQuestions[selectedQuestionIndex])
-                                                    .putString("security_answer", securityAnswerInput.trim().lowercase())
+                                                    .putString("answer_salt", answerSalt)
+                                                    .putString("answer_hash", answerHash)
+                                                    .remove("saved_pin")
+                                                    .remove("security_answer")
                                                     .apply()
                                                 isSetPinDialogOpen = false
                                                 Toast.makeText(context, "Kunci PIN berhasil diatur!", Toast.LENGTH_SHORT).show()

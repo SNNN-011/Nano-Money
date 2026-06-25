@@ -49,8 +49,29 @@ fun LockScreenOverlay(
     // Dialog state
     var isResetPinDialogOpen by remember { mutableStateOf(false) }
 
-    // Auto trigger biometrics if enabled and not currently cooled down
+    // Migration to hash
     LaunchedEffect(Unit) {
+        val oldPin = securityPrefs.getString("saved_pin", null)
+        if (oldPin != null) {
+            val pinSalt = com.example.util.PinHashHelper.generateSalt()
+            val pinHash = com.example.util.PinHashHelper.hashValue(oldPin, pinSalt)
+            securityPrefs.edit()
+                .putString("pin_salt", pinSalt)
+                .putString("pin_hash", pinHash)
+                .remove("saved_pin")
+                .apply()
+        }
+        val oldAnswer = securityPrefs.getString("security_answer", null)
+        if (oldAnswer != null) {
+            val answerSalt = com.example.util.PinHashHelper.generateSalt()
+            val answerHash = com.example.util.PinHashHelper.hashValue(oldAnswer, answerSalt)
+            securityPrefs.edit()
+                .putString("answer_salt", answerSalt)
+                .putString("answer_hash", answerHash)
+                .remove("security_answer")
+                .apply()
+        }
+
         if (isBiometricEnabled && remainingCooldownSeconds == 0L) {
             onTriggerBiometrics()
         }
@@ -236,8 +257,10 @@ fun LockScreenOverlay(
                                                 if (enteredPin.length < 4) {
                                                     enteredPin += key
                                                     if (enteredPin.length == 4) {
-                                                        val freshPin = securityPrefs.getString("saved_pin", "") ?: ""
-                                                        if (enteredPin == freshPin) {
+                                                        val pinHash = securityPrefs.getString("pin_hash", "") ?: ""
+                                                        val pinSalt = securityPrefs.getString("pin_salt", "") ?: ""
+                                                        
+                                                        if (com.example.util.PinHashHelper.verifyValue(enteredPin, pinHash, pinSalt)) {
                                                             failedAttempts = 0
                                                             cooldownUntil = 0L
                                                             securityPrefs.edit()
@@ -294,7 +317,8 @@ fun LockScreenOverlay(
     // FORGOT PIN / RESET PIN DIALOG FLOW
     if (isResetPinDialogOpen) {
         val storedQuestion = remember { securityPrefs.getString("security_question", "") ?: "" }
-        val storedAnswer = remember { securityPrefs.getString("security_answer", "") ?: "" }
+        val answerHash = remember { securityPrefs.getString("answer_hash", "") ?: "" }
+        val answerSalt = remember { securityPrefs.getString("answer_salt", "") ?: "" }
 
         var answerInput by remember { mutableStateOf("") }
         var isAnswerVerified by remember { mutableStateOf(false) }
@@ -430,7 +454,7 @@ fun LockScreenOverlay(
                                     text = if (!isAnswerVerified) "Verifikasi" else "Simpan & Masuk",
                                     onClick = {
                                         if (!isAnswerVerified) {
-                                            if (answerInput.trim().lowercase() == storedAnswer.trim().lowercase()) {
+                                            if (com.example.util.PinHashHelper.verifyValue(answerInput.trim().lowercase(), answerHash, answerSalt)) {
                                                 isAnswerVerified = true
                                                 dialogError = ""
                                             } else {
@@ -441,8 +465,12 @@ fun LockScreenOverlay(
                                                 dialogError = "PIN baru harus terdiri dari 4 digit angka!"
                                             } else {
                                                 // Update PIN
+                                                val newPinSalt = com.example.util.PinHashHelper.generateSalt()
+                                                val newPinHash = com.example.util.PinHashHelper.hashValue(newPinInput, newPinSalt)
                                                 securityPrefs.edit()
-                                                    .putString("saved_pin", newPinInput)
+                                                    .putString("pin_salt", newPinSalt)
+                                                    .putString("pin_hash", newPinHash)
+                                                    .remove("saved_pin") // safeguard
                                                     .putInt("failed_pin_attempts", 0)
                                                     .putLong("cooldown_until", 0L)
                                                     .apply()

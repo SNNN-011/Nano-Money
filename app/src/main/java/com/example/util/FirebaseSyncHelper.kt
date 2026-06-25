@@ -319,9 +319,10 @@ object FirebaseSyncHelper {
                 val localSettingsMap = prefs.all
 
                 val mergedSettings = mutableMapOf<String, Any>()
-                mergedSettings.putAll(firestoreSettingsMap)
+                mergedSettings.putAll(firestoreSettingsMap.filterKeys { it != "saved_pin" && it != "security_answer" })
                 
                 for ((k, v) in localSettingsMap) {
+                    if (k == "saved_pin" || k == "security_answer") continue
                     if (v != null) {
                         if (v is Set<*>) {
                             mergedSettings[k] = v.toList()

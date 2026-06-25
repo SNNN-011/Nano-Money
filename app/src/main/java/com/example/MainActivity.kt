@@ -101,7 +101,6 @@ class MainActivity : FragmentActivity() {
           }
           
           val isPinEnabled = remember { securityPrefs.getBoolean("pin_enabled", false) }
-          val savedPin = remember { securityPrefs.getString("saved_pin", "") ?: "" }
           val isBiometricEnabled = remember { securityPrefs.getBoolean("biometric_enabled", false) }
           
           val needsLock = isPinEnabled || isBiometricEnabled
@@ -136,7 +135,7 @@ class MainActivity : FragmentActivity() {
           } else if (!isAppUnlocked) {
             LockScreenOverlay(
               context = context,
-              savedPin = savedPin,
+              savedPin = "", // Deprecated, unused but kept for signature
               isPinEnabled = isPinEnabled,
               isBiometricEnabled = isBiometricEnabled,
               onUnlock = { isAppUnlocked = true },
