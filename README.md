@@ -1,136 +1,121 @@
-# 💸 Nano Money — Mencatat Keuangan Semudah Chat Teman
+# 💸 Nano Money — Catat Keuangan Semudah Chat Teman
 
 [![Platform](https://img.shields.io/badge/Platform-Android-3DDC84?logo=android&logoColor=white&style=for-the-badge)](https://developer.android.com/)
 [![Kotlin](https://img.shields.io/badge/Language-Kotlin-7F52FF?logo=kotlin&logoColor=white&style=for-the-badge)](https://kotlinlang.org/)
 [![Compose](https://img.shields.io/badge/UI_Framework-Jetpack_Compose-4285F4?logo=jetpackcompose&logoColor=white&style=for-the-badge)](https://developer.android.com/jetpack/compose)
 [![Database](https://img.shields.io/badge/Database-Room_SQLite-005C84?logo=sqlite&logoColor=white&style=for-the-badge)](https://developer.android.com/training/data-storage/room)
 
-**Nano Money** adalah aplikasi asisten pencatat keuangan pintar berbasis Android yang dirancang dengan antarmuka yang sangat modern, intuitif, dan responsif menggunakan **Jetpack Compose** dan **Material Design 3**. 
+**Nano Money** adalah asisten pencatat keuangan pintar berbasis Android yang dirancang dengan antarmuka modern, intuitif, dan responsif menggunakan **Jetpack Compose** dan **Material Design 3**. 
 
-Aplikasi ini mendisrupsi cara pencatatan keuangan manual yang membosankan dengan menghadirkan fitur **AI Chat-to-Track**—memungkinkan Anda untuk mencatat pengeluaran atau pemasukan hanya dengan mengetik obrolan kasual layaknya berbicara dengan teman atau dengan mengambil foto struk cetak secara langsung!
-
----
-
-## 🌌 Desain Antarmuka: Midnight Abyss (Dark Theme)
-Nano Money mengusung tema visual **Midnight Abyss**, yang menggabungkan kegelapan pekat yang nyaman di mata dengan pendaran cahaya atmosferik (*atmospheric radial glows*) berwarna **Steel Blue** dan **Neon Violet**. Kombinasi ini menghadirkan estetika premium, elegan, dan profesional yang menonjolkan visualisasi data tanpa membuat mata lelah.
+Aplikasi ini mendisrupsi cara pencatatan keuangan manual konvensional dengan menghadirkan fitur **AI Chat-to-Track**—memungkinkan pengguna mencatat setiap pemasukan dan pengeluaran secara kasual seolah mengirimkan pesan teks kepada asisten pribadi atau melakukan pemotretan struk belanja fisik secara presisi!
 
 ---
 
-## ✨ Fitur-Fitur Unggulan
+## 🌌 Tema Visual: Midnight Abyss
+Nano Money mengusung tema visual **Midnight Abyss** (Dark Theme) yang elegan, dirancang khusus untuk kenyamanan mata pengguna:
+* **Slate Canvas Background**: Latar belakang pekat mengurangi emisi cahaya biru dan konsumsi energi baterai ponsel.
+* **Ambient Radial Glows**: Penerapan degradasi warna pendar cahaya (*ambient glow*) menggunakan warna **Steel Blue** (Utama) dan **Neon Violet** (Aksen) untuk menonjolkan visualisasi metrik data finansial penting.
+* **Dynamic Animations**: Sentuhan mikro-interaksi responsif dan visual riak halus (*Material Ripples*) saat komponen berinteraksi.
 
-### 💬 1. Obrolan Pintar AI (Chat-to-Track) & OCR Nota/Struk
-* **Input Teks Kasual**: Cukup ketik *"makan bakso 25 ribu siang ini"* atau *"gaji bulanan masuk 5 juta"*, AI akan secara otomatis mengenali nominal, jenis transaksi (pengeluaran/pemasukan), kategori (Makanan, Gaji, dll.), deskripsi, serta waktu transaksi.
-* **Scan Nota / Struk**: Potret struk belanjaan Anda langsung dari kamera. AI akan melakukan pembacaan presisi (*OCR & Semantic Processing*) untuk mengekstrak nominal akhir tanpa harus memasukkan angka satu per satu secara manual.
-* **Klarifikasi Interaktif**: Jika AI merasa instruksi kurang jelas, asisten chat akan menanyakan klarifikasi secara ramah sebelum memasukkan data ke database Anda.
+---
 
-### 📊 2. Dashboard Real-Time & Analisis Keuangan Mendalam
-* **Glow Metric Cards**: Ringkasan pengeluaran, pemasukan, dan saldo bersih dalam card modern berarsitektur visual bercahaya.
-* **Grafik Polarisasi Pengeluaran**: Distribusi pengeluaran per kategori yang direpresentasikan dengan persentase dan ikon dinamis.
-* **Visualisasi Riwayat**: Grafik harian dan mingguan interaktif untuk mendeteksi tren gaya hidup keuangan Anda.
+## ✨ Fitur Produksi Utama
 
-### 🛡️ 3. Keamanan Tingkat Tinggi (Lock Screen)
-* **PIN 4 Digit**: Amankan data finansial Anda dari tangan-tangan jahat.
-* **Sensor Biometrik**: Integrasi penuh dengan sistem sidik jari (*fingerprint*) atau pengenalan wajah (*face unlock*) bawaan ponsel Android Anda untuk membuka aplikasi secara instan dan aman.
+### 💬 1. AI Chat-to-Track & OCR Nota Pintar
+* **Asisten Chat Interaktif**: Berbincang secara ramah dengan model Gemini. AI dapat mengurai percakapan bebas seperti *"kemarin beli bensin 30 ribu"* menjadi entri data terstruktur secara otomatis.
+* **Kemampuan Multimodal OCR**: Unggah atau potret struk fisik Anda. AI melakukan pemindaian semantik (*Optical Character Recognition*) untuk mendeteksi item belanja dan nominal akhir secara instan.
+* **Keamanan URL Endpoint & Multi-Model**: Mendukung peralihan model AI secara aman (seperti Gemma 2B-it dan Gemini Flash Lite) tanpa membocorkan infrastruktur serverless utama Anda.
 
-### 💾 4. Privasi Data & Penyimpanan Lokal (Local First)
-* Seluruh data transaksi, data berulang, dan riwayat obrolan disimpan 100% secara lokal menggunakan **SQLite Room Database**.
-* Mengurangi latensi secara signifikan, menghemat kuota internet Anda, dan memastikan kerahasiaan riwayat finansial Anda terjaga seutuhnya.
+### 📈 2. Real-Time Dashboard & Batas Anggaran (Budgets)
+* **Glow Metric Cards**: Panel informasi dinamis yang memetakan akumulasi saldo, total pendapatan, dan total pengeluaran secara akurat dalam rupiah.
+* **Batas Anggaran Bulanan (Monthly Limit)**: Menetapkan batas atas total pengeluaran Anda.
+* **Anggaran Khusus Kategori (Category Limits)**: Mengontrol pengeluaran di bawah sektor atau kategori spesifik (Makanan, Belanja, Hiburan, dll.) lengkap dengan indikator grafis berupa persentase pemakaian dan pemberitahuan batas kritis.
 
-### 🔄 5. Ekspor-Impor CSV & Cloud Sync
-* **Ekspor/Impor CSV**: Memindahkan data Anda secara mudah ke software spreadsheet eksternal (Ms. Excel, Google Sheets).
-* **Backup Google Drive**: Sinkronisasikan database terenkripsi Anda ke akun Google Drive pribadi Anda untuk kemudahan migrasi antar perangkat.
+### 📄 3. Ekspor Laporan PDF Profesional
+* **Android Native Canvas Generator**: Menghasilkan dokumen laporan fisik berformat `.pdf` berkualitas tinggi tanpa ketergantungan library pihak ketiga yang besar.
+* **Sinkronisasi Filter Aktif**: Data finansial yang diekspor disesuaikan secara dinamas dengan filter aktif pada UI (pilihan rentang tanggal atau filter kategori khusus) guna menjamin kesesuaian dokumen yang diunduh.
 
-### ⏰ 6. Notifikasi Pengingat & Transaksi Berulang
-* **Jadwal Pengingat**: Dapat dipersonalisasi untuk mengirim pengingat harian pada jam tertentu agar Anda tetap konsisten mencatat keuangan.
-* **Sistem Transaksi Otomatis (Recurring)**: Mendukung pencatatan berulang harian, mingguan, bulanan, atau tahunan untuk kebutuhan pengeluaran wajib (listrik, paket internet, sewa kos) atau pendapatan rutin.
+### 💾 4. Sistem Backup & Restaurasi Lokal Pintar
+* **Local First Architecture**: Integritas data terjamin sepenuhnya di dalam penyimpanan lokal Room Database SQLite terenkripsi.
+* **Sistem Pencadangan (Backup System)**: Mengekspor file database internal serta file preferensi (*SharedPreferences*) secara aman ke media luar.
+* **Kompatibilitas Mundur & WAL Checkpointing**: Saat memproses pemulihan cadangan (*restore*), aplikasi melakukan checkpointing terhadap skema Room (WAL flush) untuk mencegah korupsi atau inkonsistensi struktur database di masa mendatang.
+
+### 🛡️ 5. Proteksi Keamanan Berlapis (Security Compliance)
+* **Root & Emulator Detection**: Mencegah jalannya aplikasi pada perangkat yang telah di-root atau lingkungan emulator tidak aman untuk menghindari eksploitasi data finansial.
+* **API Protection & Request Signing**: Setiap lalu-lintas request menuju peladen proxy Gemini disertakan dengan tanda tangan kriptografi tepercaya (*X-Worker-Secret*) yang terenkripsi dan diverifikasi di sisi serverless edge secara dinamis.
+* **Dynamic Lock Screen System**: Proteksi ganda berupa sandi PIN 4-digit khusus serta integrasi penuh dengan sensor Android Biometric (Sidik Jari / Pengenal Wajah) untuk membuka aplikasi secara instan dan tepercaya.
+* **Screen Capture Prevention (Remote Config Managed)**: Melarang sistem Android melakukan tangkapan layar (*screenshot*) atau perekaman layar guna menghindari kebocoran data finansial sensitif. Fitur pencegahan ini dapat dinyalakan atau dimatikan (*ON/OFF*) secara dinamis dari jauh melalui parameter `"prevent_screenshot"` di Firebase Remote Config.
 
 ---
 
 ## 🛠️ Arsitektur & Tech Stack
 
-Aplikasi ini dibangun menggunakan arsitektur modern Android yang direkomendasikan oleh Google (**MVVM + Clean UI Pattern**):
+Nano Money diimplementasikan menggunakan arsitektur modular yang direkomendasikan Google (**MVVM + Clean Architecture + State-Driven UI**):
 
 | Komponen | Teknologi | Keterangan |
 | :--- | :--- | :--- |
-| **Bahasa Utama** | Kotlin (100%) | Modern, aman, expresif, dan null-safe. |
-| **Arsitektur UI** | Jetpack Compose | Deklaratif UI toolkit, memangkas boilerplate XML. |
-| **Navigation** | Type-Safe Navigation | Navigasi aman berbasis `@Serializable` Kotlin Serialization. |
-| **Sandi & Keamanan**| Biometric & SharedPreferences | Autentikasi biometrik standar industri + SharedPrefs terenkripsi. |
-| **Database** | Room SQLite | Manajemen penyimpanan lokal yang cepat, aman, dan modular. |
-| **Background Task**| WorkManager & AlarmManager | Untuk sinkronisasi cadangan background & triggers notifikasi waktu. |
-| **Library HTTP** | Retrofit 2 & OkHttp3 | Konektivitas RESTful API berkinerja tinggi. |
-| **Keamanan API Key**| Cloudflare Workers Proxy | Menghindari hardcoding API Key di file `.apk` dengan memindahkannya ke Edge Server. |
+| **Pondasi Bahasa** | Kotlin (100%) | Null-safe, ekspresif, dan performa tinggi dengan Coroutines & Flow. |
+| **Arsitektur UI** | Jetpack Compose | Deklaratif toolkit modern berbasis Material Design 3. |
+| **Navigation** | Kotlinx Serialization | Navigasi aman berbasis objek tipe data asli (`@Serializable`). |
+| **Data Engine** | Room SQL Database | Local storage modular tepercaya dengan validasi query di waktu compile. |
+| **API Client** | Retrofit 2 & OkHttp3 | Pengiriman data terstruktur dengan interceptor header dinamis. |
+| **Asynchronous** | StateFlow & SharedFlow | Mekanisme transmisi status reaktif antara UI dan ViewModel. |
+
+```
+📁 app/src/main/java/com/example/
+├── data/           # Repositori, Sumber Data, Model Room & Cache Database
+├── ui/             # Jetpack Compose Screens, Tabs, ViewModels, Komponen UI & Dialogs
+└── util/           # Utilitas Keamanan (Root/Emulator Check), Formatter, & Helper Backup
+```
 
 ---
 
-## 🔒 Arsitektur Proxy API Key dengan Cloudflare Workers
+## 🔒 Proteksi API Key via Secure Cloudflare Workers Proxy
 
-Agar **API Key Gemini** tidak bocor saat aplikasi dicompile menjadi APK dan didistribusikan ke ponsel lain, Nano Money menggunakan skema **Secure Serverless Proxy** menggunakan **Cloudflare Workers**.
+Untuk menjaga kredensial orisinal API Key Google Gemini tetap aman dari bahaya dekompilasi aplikasi Android, Nano Money mendelegasikan proses pengiriman parameter otorisasi ke edge server melalui **Cloudflare Workers Proxy**:
 
-Alur kerja autentikasi:
 ```
-[ Aplikasi Android ] 📱 
-       │
-       │ (Request Tanpa API Key Asli)
-       ▼
-[ Cloudflare Workers Proxy ] ☁️ (Menyimpan API Key Gemini dengan aman di Environment Secrets)
-       │
-       │ (Menyisipkan parameter "key=GEMINI_API_KEY" di Edge Server)
-       ▼
-[ Google Gemini API Server ] 🤖
+[ Aplikasi Android ] 📱 ──(Kirim Metadata + X-Worker-Secret)──► [ Cloudflare Workers Proxy ] ☁️
+                                                                          │
+                                                                 (Sematkan API Key Asli)
+                                                                          ▼
+[ Google Gemini API Server ] 🤖 ◄─────────────────────────────────────────┘
 ```
 
-### 📄 Kode Cloudflare Workers yang Digunakan:
-```javascript
-export default {
-  async fetch(request, env) {
-    // API Key diambil secara aman dari cloud/env variable di dashboard Cloudflare
-    const GEMINI_API_KEY = env.GEMINI_API_KEY;
-
-    // Mendapatkan request dari aplikasi Android Anda
-    const url = new URL(request.url);
-    const targetUrl = new URL(`https://generativelanguage.googleapis.com${url.pathname}${url.search}`);
-    
-    // Menyisipkan API Key secara aman sebagai query parameter di balik layar
-    targetUrl.searchParams.set("key", GEMINI_API_KEY);
-
-    // Membuat request tujuan baru menuju server resmi Google Gemini
-    const newRequest = new Request(targetUrl.toString(), new Request(request));
-
-    // Kirim request ke Google dan kembalikan respon ke aplikasi Android
-    return fetch(newRequest);
-  }
-}
-```
-
-Hal ini membuat aplikasi kita **tetap aman 100%** meskipun di-decompiled, karena kunci akses didelegasikan sepenuhnya di sisi peladen Cloudflare! Fitur **Toggle Switch Model** (Gemma 2b-it/Gemini-3.1-flash-lite) di dalam menu Chat tetap berfungsi penuh karena URL model diteruskan secara dinamis melalui path request.
+Mekanisme pertahanan:
+1. Kunci asli `GEMINI_API_KEY` disimpan sebagai variabel rahasia (*Environment Secret*) di dashboard awan Cloudflare.
+2. Aplikasi client menghitung SHA-256 dan menyertakan header keamanan khusus `X-Worker-Secret` yang diekstrak menggunakan fungsionalitas kunci Android Keystore internal aman.
+3. Workers di Cloudflare memvalidasi kecocokan tanda tangan data sebelum meneruskan instruksi menuju server Google.
 
 ---
 
-## 🚀 Cara Menjalankan Project
+## 🚀 Instalasi & Konfigurasi
 
-### Prasyarat
+### Kebutuhan Sistem
 * Android Studio Jellyfish (atau versi yang lebih baru)
-* JDK 17 atau lebih tinggi
-* SDK Android Terinstal (Min SDK API 26+)
+* JDK 17 atau JDK 21
+* SDK Platform Android Terinstal (Min API Level 26 / Android 8.0 Oreo)
 
-### Langkah-langkah
-1. **Clone repositori ini**:
+### Langkah Langkah Pengoperasian
+1. **Clone Repositori**:
    ```bash
    git clone https://github.com/username/nano-money.git
    cd nano-money
    ```
-2. **Buka di Android Studio**:
-   Buka direktori proyek Anda, tunggu Gradle melakukan sinkronisasi modul.
-3. **Konfigurasi Lingkungan (Opsional jika ingin bypass proxy)**:
-   Aplikasi secara bawaan didesain untuk langsung menggunakan router proxy Cloudflare yang sudah di-deploy. Jika Anda ingin menggunakan API Key lokal Anda sendiri melalui SDK bawaan, Anda dapat menambahkannya ke panel Secrets Android Studio atau meletakkannya pada properti `local.properties` berkas proyek.
+2. **Sinkronisasi Modul**:
+   Buka direktori proyek Anda menggunakan editor Android Studio Anda, biarkan Gradle melakukan pengunduhan dependensi.
+3. **Konfigurasi Kredensial Environment**:
+   Pastikan Anda menyalin file `.env.example` menjadi file `.env` di root proyek Anda, dan atur variabel kredensial (seperti `WORKER_SECRET_KEY`) melalui menu Secrets panel yang disediakan.
 4. **Build & Run**:
-   Klik tombol hijau **Run** (`Shift + F10`) di Android Studio untuk menyiapkannya ke Emulator atau Perangkat Android fisik Anda!
+   Hubungkan ponsel cerdas Android Anda atau aktifkan Emulator bawaan Studio, tekan tombol **Run (Shift + F10)** untuk mendeploy aplikasi Nano Money Anda secara instan!
 
 ---
 
-## 🤝 Kontribusi
-Kontribusi selalu terbuka! Silakan lakukan fork pada repositori ini, ajukan issue jika Anda menemukan bug, atau kirimkan Pull Request (PR) terbaik Anda untuk menambahkan visualisasi diagram atau analisis pintar baru lainnya.
+## 🤝 Kontribusi & Dukungan
 
----
-*Dibuat dengan dedikasi penuh untuk menyederhanakan laporan finansial Anda secara aman, cepat, dan interaktif.* 💡🚀
+Laporan permasalahan (*bug reports*) dan saran perbaikan fitur dipersilakan melingkupi:
+* Pengayaan representasi grafik analisis visual lainnya pada tab Analisis.
+* Peningkatan performa render Canvas PDF untuk tabel bernominal baris ganda.
+* Pengoptimalan pola translasi asisten chat AI multibahasa.
+
+*Didesain dengan kepatuhan kode ketat dan visual bernilai seni tinggi demi ketenangan perencanaan finansial Anda sehari-hari.* 💸🚀

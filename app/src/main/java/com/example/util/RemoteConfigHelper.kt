@@ -25,6 +25,9 @@ object RemoteConfigHelper {
     private val _enableTelemetry = MutableStateFlow(true)
     val enableTelemetry: StateFlow<Boolean> = _enableTelemetry.asStateFlow()
 
+    private val _preventScreenshot = MutableStateFlow(true)
+    val preventScreenshot: StateFlow<Boolean> = _preventScreenshot.asStateFlow()
+
     fun initAndFetchConfig() {
         val remoteConfig = FirebaseRemoteConfig.getInstance()
         
@@ -38,7 +41,8 @@ object RemoteConfigHelper {
             "welcome_message" to "Selamat Datang!",
             "welcome_message_color" to "#4682B4",
             "show_new_feature" to false,
-            "enable_telemetry" to true
+            "enable_telemetry" to true,
+            "prevent_screenshot" to true
         )
         remoteConfig.setDefaultsAsync(defaultValues)
 
@@ -50,7 +54,8 @@ object RemoteConfigHelper {
                 if (configUpdate.updatedKeys.contains("welcome_message") || 
                     configUpdate.updatedKeys.contains("welcome_message_color") || 
                     configUpdate.updatedKeys.contains("show_new_feature") ||
-                    configUpdate.updatedKeys.contains("enable_telemetry")) {
+                    configUpdate.updatedKeys.contains("enable_telemetry") ||
+                    configUpdate.updatedKeys.contains("prevent_screenshot")) {
                     remoteConfig.activate().addOnCompleteListener { 
                         updateValues(remoteConfig)
                     }
@@ -89,5 +94,7 @@ object RemoteConfigHelper {
         val telemetryEnabled = remoteConfig.getBoolean("enable_telemetry")
         _enableTelemetry.value = telemetryEnabled
         TelemetryHelper.setTelemetryEnabled(telemetryEnabled)
+
+        _preventScreenshot.value = remoteConfig.getBoolean("prevent_screenshot")
     }
 }

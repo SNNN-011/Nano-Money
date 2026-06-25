@@ -525,8 +525,8 @@ fun MonthlyBudgetDialog(
                 OutlinedTextField(
                     value = budgetInput,
                     onValueChange = {
-                        val clean = it.replace(".", "")
-                        if (clean.length <= 11 && (clean.isEmpty() || clean.all { c -> c.isDigit() })) {
+                        val clean = it.filter { it.isDigit() }
+                        if (clean.length <= 11) {
                             budgetInput = FormatUtils.formatInputNumber(clean)
                         }
                         budgetError = null
@@ -534,6 +534,9 @@ fun MonthlyBudgetDialog(
                     label = { Text("Batas Anggaran (Rupiah)", style = MaterialTheme.typography.bodyMedium) },
                     placeholder = { Text("Misal: 5.000.000", style = MaterialTheme.typography.bodyMedium) },
                     singleLine = true,
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                        keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
+                    ),
                     isError = budgetError != null,
                     modifier = Modifier.fillMaxWidth().testTag("budget_limit_input"),
                     shape = RoundedCornerShape(12.dp),
@@ -821,7 +824,10 @@ fun MonthlyBudgetDialog(
                         verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         for (category in selectedEnabledCategories) {
-                            val localState = remember(category) { mutableStateOf(localCategoryBudgets[category] ?: "") }
+                            val localState = remember(category) {
+                                val raw = localCategoryBudgets[category] ?: ""
+                                mutableStateOf(if (raw.isNotEmpty()) FormatUtils.formatInputNumber(raw) else "")
+                            }
                             Card(
                                 modifier = Modifier.fillMaxWidth(),
                                 shape = RoundedCornerShape(8.dp),
@@ -861,9 +867,10 @@ fun MonthlyBudgetDialog(
                                     OutlinedTextField(
                                         value = localState.value,
                                         onValueChange = { newValue: String ->
-                                            if (newValue.length <= 11 && (newValue.all { char -> char.isDigit() } || newValue.isEmpty())) {
-                                                localState.value = newValue
-                                                localCategoryBudgets[category] = newValue
+                                            val clean = newValue.filter { it.isDigit() }
+                                            if (clean.length <= 11) {
+                                                localState.value = FormatUtils.formatInputNumber(clean)
+                                                localCategoryBudgets[category] = clean
                                             }
                                         },
                                         placeholder = {
@@ -874,6 +881,9 @@ fun MonthlyBudgetDialog(
                                             )
                                         },
                                         singleLine = true,
+                                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                                            keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
+                                        ),
                                         textStyle = MaterialTheme.typography.bodySmall.copy(color = GhostWhite, fontSize = 12.sp),
                                         modifier = Modifier
                                             .width(120.dp)
@@ -931,21 +941,22 @@ fun MonthlyBudgetDialog(
                     isActive = false,
                     testTag = "cancel_budget_button"
                 )
-                PremiumButton(
+                 PremiumButton(
                     text = "Simpan",
                     onClick = {
-                        val trimmed = budgetInput.trim().replace(".", "")
-                        if (trimmed.isEmpty()) {
+                        val cleanDigits = budgetInput.filter { it.isDigit() }
+                        if (cleanDigits.isEmpty()) {
                             budgetError = "Harap masukkan nilai anggaran"
                         } else {
-                            val parsed = trimmed.toDoubleOrNull()
+                            val parsed = cleanDigits.toDoubleOrNull()
                             if (parsed == null || parsed < 0.0) {
                                 budgetError = "Nilai harus berupa angka positif"
                             } else {
                                 val resultBudgets = mutableMapOf<String, Double>()
                                 selectedEnabledCategories.forEach { cat ->
                                     val valStr = localCategoryBudgets[cat] ?: ""
-                                    val parsedVal = valStr.toDoubleOrNull()
+                                    val cleanVal = valStr.filter { it.isDigit() }
+                                    val parsedVal = cleanVal.toDoubleOrNull()
                                     if (parsedVal != null && parsedVal > 0.0) {
                                         resultBudgets[cat] = parsedVal
                                     }
@@ -1185,8 +1196,8 @@ fun RecurringTransactionManagementDialog(
                     OutlinedTextField(
                         value = amountInput,
                         onValueChange = {
-                            val clean = it.replace(".", "")
-                            if (clean.length <= 11 && (clean.isEmpty() || clean.all { c -> c.isDigit() })) {
+                            val clean = it.filter { it.isDigit() }
+                            if (clean.length <= 11) {
                                 amountInput = FormatUtils.formatInputNumber(clean)
                             }
                             amountError = null

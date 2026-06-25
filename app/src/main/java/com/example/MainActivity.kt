@@ -1,9 +1,12 @@
 package com.example
 
 import android.os.Bundle
+import android.view.WindowManager
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.fragment.app.FragmentActivity
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -42,6 +45,17 @@ class MainActivity : FragmentActivity() {
     
     // Inisialisasi Firebase Telemetry (Crashlytics dan Analytics)
     com.example.util.TelemetryHelper.initialize(applicationContext)
+    
+    // Mengontrol status keamanan pencegahan screen capture secara dinamis via Firebase Remote Config
+    lifecycleScope.launch {
+      com.example.util.RemoteConfigHelper.preventScreenshot.collect { prevent ->
+        if (prevent) {
+          window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        } else {
+          window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        }
+      }
+    }
     
     enableEdgeToEdge()
     setContent {
