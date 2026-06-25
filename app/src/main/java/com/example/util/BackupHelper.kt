@@ -204,21 +204,8 @@ object BackupHelper {
             var isValid = false
 
             try {
-                val factory = net.sqlcipher.database.SupportFactory(passphraseBytes)
-                val configuration = androidx.sqlite.db.SupportSQLiteOpenHelper.Configuration.builder(context)
-                    .name(tempDbFile.absolutePath)
-                    .callback(object : androidx.sqlite.db.SupportSQLiteOpenHelper.Callback(1) {
-                        override fun onCreate(db: androidx.sqlite.db.SupportSQLiteDatabase) {}
-                        override fun onUpgrade(db: androidx.sqlite.db.SupportSQLiteDatabase, oldVersion: Int, newVersion: Int) {}
-                    })
-                    .build()
-                val helper = factory.create(configuration)
-                val db = helper.readableDatabase
-                db.close()
-                isValid = true
-            } catch (e: Exception) {
                 try {
-                    val factory = androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory()
+                    val factory = net.sqlcipher.database.SupportFactory(passphraseBytes)
                     val configuration = androidx.sqlite.db.SupportSQLiteOpenHelper.Configuration.builder(context)
                         .name(tempDbFile.absolutePath)
                         .callback(object : androidx.sqlite.db.SupportSQLiteOpenHelper.Callback(1) {
@@ -230,9 +217,26 @@ object BackupHelper {
                     val db = helper.readableDatabase
                     db.close()
                     isValid = true
-                } catch (e2: Exception) {
-                    Log.e("BackupHelper", "Database validasi gagal: ${e2.message}", e2)
+                } catch (e: Exception) {
+                    try {
+                        val factory = androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory()
+                        val configuration = androidx.sqlite.db.SupportSQLiteOpenHelper.Configuration.builder(context)
+                            .name(tempDbFile.absolutePath)
+                            .callback(object : androidx.sqlite.db.SupportSQLiteOpenHelper.Callback(1) {
+                                override fun onCreate(db: androidx.sqlite.db.SupportSQLiteDatabase) {}
+                                override fun onUpgrade(db: androidx.sqlite.db.SupportSQLiteDatabase, oldVersion: Int, newVersion: Int) {}
+                            })
+                            .build()
+                        val helper = factory.create(configuration)
+                        val db = helper.readableDatabase
+                        db.close()
+                        isValid = true
+                    } catch (e2: Exception) {
+                        Log.e("BackupHelper", "Database validasi gagal: ${e2.message}", e2)
+                    }
                 }
+            } finally {
+                java.util.Arrays.fill(passphraseBytes, 0.toByte())
             }
 
             if (!isValid) {

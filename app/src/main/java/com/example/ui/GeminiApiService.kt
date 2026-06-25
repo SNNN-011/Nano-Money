@@ -174,8 +174,11 @@ object GeminiClient {
                 val messageToSign = "$timestamp\n$method\n$pathAndQuery\n$bodyString"
                 val signingKey = WORKER_SECRET_KEY.ifEmpty { getDecryptedFallback() }
                 
+                val keyBytes = signingKey.toByteArray(Charsets.UTF_8)
                 val hmacSha256 = javax.crypto.Mac.getInstance("HmacSHA256")
-                val secretKey = javax.crypto.spec.SecretKeySpec(signingKey.toByteArray(Charsets.UTF_8), "HmacSHA256")
+                val secretKey = javax.crypto.spec.SecretKeySpec(keyBytes, "HmacSHA256")
+                java.util.Arrays.fill(keyBytes, 0.toByte())
+                
                 hmacSha256.init(secretKey)
                 val signatureBytes = hmacSha256.doFinal(messageToSign.toByteArray(Charsets.UTF_8))
                 val signature = android.util.Base64.encodeToString(signatureBytes, android.util.Base64.NO_WRAP)

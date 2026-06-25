@@ -116,7 +116,15 @@ abstract class AppDatabase : RoomDatabase() {
                     net.sqlcipher.database.SQLiteDatabase.OPEN_READWRITE
                 )
 
-                val passphraseHex = passphraseBytes.joinToString("") { "%02x".format(it) }
+                val hexChars = CharArray(passphraseBytes.size * 2)
+                val hexDigits = "0123456789abcdef".toCharArray()
+                for (i in passphraseBytes.indices) {
+                    val v = passphraseBytes[i].toInt() and 0xFF
+                    hexChars[i * 2] = hexDigits[v ushr 4]
+                    hexChars[i * 2 + 1] = hexDigits[v and 0x0F]
+                }
+                val passphraseHex = String(hexChars)
+                java.util.Arrays.fill(hexChars, '0')
 
                 database.rawExecSQL("ATTACH DATABASE '${tempFile.absolutePath}' AS encrypted KEY x'${passphraseHex}'")
                 database.rawExecSQL("SELECT sqlcipher_export('encrypted')")

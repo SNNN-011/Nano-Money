@@ -117,9 +117,13 @@ object DatabaseKeyManager {
             val messageDigest = java.security.MessageDigest.getInstance("SHA-256")
             messageDigest.update(androidId.toByteArray(Charsets.UTF_8))
             messageDigest.update(obfuscatedSalt)
-            messageDigest.digest()
+            val digest = messageDigest.digest()
+            java.util.Arrays.fill(obfuscatedSalt, 0.toByte())
+            digest
         } catch (e: Exception) {
-            androidId.toByteArray(Charsets.UTF_8).copyOf(32)
+            val fallbackBytes = androidId.toByteArray(Charsets.UTF_8).copyOf(32)
+            java.util.Arrays.fill(obfuscatedSalt, 0.toByte())
+            fallbackBytes
         }
     }
 }
