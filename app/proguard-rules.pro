@@ -11,8 +11,13 @@
 # Keep our BuildConfig so that our dynamic endpoint URLs and secret keys are available
 -keep class com.example.BuildConfig { *; }
 
-# Keep all classes in the UI package (includes GeminiClient, GeminiApiService, and Moshi models)
--keep class com.example.ui.** { *; }
+# Keep only Retrofit API service interfaces so that Retrofit dynamic proxying is not broken by name obfuscation, while allowing all other UI/ViewModel/Security classes to be fully obfuscated and optimized
+-keep interface com.example.ui.GeminiApiService { *; }
+
+# Keep SQLCipher database encryption classes intact for runtime JNI bindings
+-keep class net.sqlcipher.** { *; }
+-keep class net.sqlcipher.database.** { *; }
+-dontwarn net.sqlcipher.**
 
 # Keep our Moshi model classes and generated adapters from being stripped or broken
 -keep @com.squareup.moshi.JsonClass class * { *; }
