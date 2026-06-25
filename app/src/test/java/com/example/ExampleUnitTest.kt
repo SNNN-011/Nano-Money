@@ -7,7 +7,7 @@ import org.junit.Test
 class ExampleUnitTest {
   @Test
   fun testCertificatePinning() {
-    val host = "nano-money.yasinhacker135.workers.dev"
+    val host = "your-cloudflare-worker-url.workers.dev"
     val pinner = CertificatePinner.Builder()
         .add(host, "sha256/C5Ia9L779Af7sKT76T3GfXz3N68A3v4M8158gX768w==")
         .add(host, "sha256/iie7gV1YqiM2ODUYFBcRY1SBA1EPpkK0gTxF9IPKgpM=")

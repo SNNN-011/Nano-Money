@@ -175,6 +175,7 @@ fun EksporImporTabContent(
                 val firebaseResult = com.example.util.FirebaseSyncHelper.signInWithGoogleInFirebase(context, account)
                 if (firebaseResult.isSuccess) {
                     Toast.makeText(context, "Berhasil menghubungkan Google Drive & sinkronisasi cloud!", Toast.LENGTH_SHORT).show()
+                    com.example.util.FirebaseSyncHelper.syncFinancialRecordsWithFirestore(context)
                 } else {
                     Toast.makeText(context, "Google Drive terhubung, tetapi server sinkronisasi gagal: ${firebaseResult.exceptionOrNull()?.localizedMessage}", Toast.LENGTH_LONG).show()
                 }

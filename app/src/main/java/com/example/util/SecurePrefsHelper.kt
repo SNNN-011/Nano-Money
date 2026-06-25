@@ -4,14 +4,16 @@ import android.content.Context
 import android.content.SharedPreferences
 import android.util.Log
 import androidx.security.crypto.EncryptedSharedPreferences
-import androidx.security.crypto.MasterKeys
+import androidx.security.crypto.MasterKey
 
 object SecurePrefsHelper {
     private const val TAG = "SecurePrefsHelper"
 
     fun getEncryptedPrefs(context: Context, name: String): SharedPreferences {
-        val masterKeyAlias = try {
-            MasterKeys.getOrCreate(MasterKeys.AES256_GCM_SPEC)
+        val masterKey = try {
+            MasterKey.Builder(context.applicationContext)
+                .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+                .build()
         } catch (e: Exception) {
             Log.e(TAG, "Gagal mendapatkan MasterKey: ${e.message}", e)
             return context.getSharedPreferences(name, Context.MODE_PRIVATE)
@@ -19,9 +21,9 @@ object SecurePrefsHelper {
 
         val encryptedPrefs = try {
             EncryptedSharedPreferences.create(
-                name,
-                masterKeyAlias,
                 context.applicationContext,
+                name,
+                masterKey,
                 EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
                 EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
             )

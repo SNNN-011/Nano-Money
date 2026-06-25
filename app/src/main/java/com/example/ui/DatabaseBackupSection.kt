@@ -1573,75 +1573,7 @@ fun DatabaseBackupSection(
         */
         } // Closing Column database_backup_card
     } // Closing Card database_backup_card
-        
-        /* Card(
-            modifier = Modifier.fillMaxWidth().testTag("realtime_firestore_card"),
-            shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = TranslucentForm.copy(alpha = 0.65f)),
-            border = BorderStroke(
-                width = 1.dp,
-                brush = Brush.verticalGradient(
-                    colors = listOf(GhostWhite.copy(alpha = 0.15f), GhostWhite.copy(alpha = 0.02f))
-                )
-            )
-        ) {
-            Column(
-                modifier = Modifier.padding(20.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .width(3.dp)
-                            .height(20.dp)
-                            .background(
-                                brush = Brush.verticalGradient(
-                                    colors = listOf(NeonViolet, NeonViolet.copy(alpha = 0.4f))
-                                ),
-                                shape = RoundedCornerShape(2.dp)
-                            )
-                    )
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Text(
-                        text = "Sinkronisasi Realtime (Cloud Firestore)",
-                        style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold, fontSize = 14.sp),
-                        color = GhostWhite
-                    )
-                }
-
-                Text(
-                    text = "Sinkronkan seluruh catatan transaksi finansial Anda secara aman ke database awan Firestore. Saling sinkron otomatis ketika Anda berpindah dari atau ke perangkat lain.",
-                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp, lineHeight = 16.sp),
-                    color = GhostWhite.copy(alpha = 0.55f)
-                )
-
-                var isSyncingByFirebase by remember { mutableStateOf(false) }
-                
-                PremiumButton(
-                    text = if (isSyncingByFirebase) "MENYINKRONKAN..." else "SINKRONKAN TRANSAKSI SEKARANG",
-                    onClick = {
-                        coroutineScope.launch {
-                            isSyncingByFirebase = true
-                            val syncRes = com.example.util.FirebaseSyncHelper.syncFinancialRecordsWithFirestore(context)
-                            if (syncRes.isSuccess) {
-                                Toast.makeText(context, syncRes.getOrNull() ?: "Sinkronisasi Sukses!", Toast.LENGTH_LONG).show()
-                            } else {
-                                Toast.makeText(context, "Gagal sinkronisasi: ${syncRes.exceptionOrNull()?.localizedMessage ?: "kesalahan jaringan"}", Toast.LENGTH_LONG).show()
-                            }
-                            isSyncingByFirebase = false
-                        }
-                    },
-                    isActive = !isSyncingByFirebase,
-                    icon = Icons.Default.Sync,
-                    modifier = Modifier.fillMaxWidth().testTag("sync_firestore_button")
-                )
-            }
-        }
-        */
-    }
+    } // Closing main Column
 
     if (backupFileToDelete != null) {
         Dialog(onDismissRequest = { backupFileToDelete = null }) {

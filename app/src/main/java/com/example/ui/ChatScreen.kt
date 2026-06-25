@@ -82,6 +82,7 @@ fun ChatScreen(
                     if (firebaseResult.isSuccess) {
                         isLoggedIn = true
                         Toast.makeText(context, "Berhasil masuk untuk fitur AI!", Toast.LENGTH_SHORT).show()
+                        FirebaseSyncHelper.syncFinancialRecordsWithFirestore(context)
                     } else {
                         Toast.makeText(context, "Gagal terhubung ke Firebase: ${firebaseResult.exceptionOrNull()?.localizedMessage}", Toast.LENGTH_LONG).show()
                     }

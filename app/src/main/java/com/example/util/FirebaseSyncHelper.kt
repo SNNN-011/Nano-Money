@@ -121,14 +121,22 @@ object FirebaseSyncHelper {
             val firestoreDocs = firestoreSnapshot?.documents ?: emptyList()
             val firestoreRecordsMap = firestoreDocs.mapNotNull { doc ->
                 try {
-                    val id = doc.getLong("id")?.toInt() ?: return@mapNotNull null
+                    val idObj = doc.get("id")
+                    val id = (idObj as? Number)?.toInt() ?: doc.id.toIntOrNull() ?: return@mapNotNull null
+                    
+                    val amountObj = doc.get("amount")
+                    val amount = (amountObj as? Number)?.toDouble() ?: 0.0
+                    
+                    val dateObj = doc.get("date")
+                    val date = (dateObj as? Number)?.toLong() ?: 0L
+                    
                     id to FinancialRecord(
                         id = id,
                         description = doc.getString("description") ?: "",
-                        amount = doc.getDouble("amount") ?: 0.0,
+                        amount = amount,
                         type = doc.getString("type") ?: "",
                         category = doc.getString("category") ?: "",
-                        date = doc.getLong("date") ?: 0L,
+                        date = date,
                         notes = doc.getString("notes") ?: "",
                         isDeleted = doc.getBoolean("isDeleted") ?: false
                     )
@@ -219,16 +227,27 @@ object FirebaseSyncHelper {
             val recurringDocs = recurringSnapshot?.documents ?: emptyList()
             val firestoreRecurringMap = recurringDocs.mapNotNull { doc ->
                 try {
-                    val id = doc.getLong("id")?.toInt() ?: return@mapNotNull null
+                    val idObj = doc.get("id")
+                    val id = (idObj as? Number)?.toInt() ?: doc.id.toIntOrNull() ?: return@mapNotNull null
+                    
+                    val amountObj = doc.get("amount")
+                    val amount = (amountObj as? Number)?.toDouble() ?: 0.0
+                    
+                    val dayOfMonthObj = doc.get("dayOfMonth")
+                    val dayOfMonth = (dayOfMonthObj as? Number)?.toInt() ?: 1
+                    
+                    val lastRunDateObj = doc.get("lastRunDate")
+                    val lastRunDate = (lastRunDateObj as? Number)?.toLong()
+                    
                     id to com.example.data.RecurringTransaction(
                         id = id,
                         description = doc.getString("description") ?: "",
-                        amount = doc.getDouble("amount") ?: 0.0,
+                        amount = amount,
                         type = doc.getString("type") ?: "",
                         category = doc.getString("category") ?: "",
-                        dayOfMonth = doc.getLong("dayOfMonth")?.toInt() ?: 1,
+                        dayOfMonth = dayOfMonth,
                         notes = doc.getString("notes") ?: "",
-                        lastRunDate = doc.getLong("lastRunDate"),
+                        lastRunDate = lastRunDate,
                         isActive = doc.getBoolean("isActive") ?: true
                     )
                 } catch (e: Exception) {

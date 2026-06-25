@@ -92,6 +92,12 @@ class MainActivity : FragmentActivity() {
               com.example.util.NotificationScheduler.scheduleDailyReminder(
                   context, true, 20, 0
               )
+              
+              if (com.example.util.FirebaseSyncHelper.isUserSignedIn()) {
+                  launch {
+                      com.example.util.FirebaseSyncHelper.syncFinancialRecordsWithFirestore(context)
+                  }
+              }
           }
           
           val isPinEnabled = remember { securityPrefs.getBoolean("pin_enabled", false) }
