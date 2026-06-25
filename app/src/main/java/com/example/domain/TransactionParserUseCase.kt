@@ -164,6 +164,10 @@ class TransactionParserUseCase {
                     rawResponseText = response.candidates?.firstOrNull()?.content?.parts?.firstOrNull()?.text
                     if (!rawResponseText.isNullOrEmpty()) break
                 } catch (e: Throwable) {
+                    if (e is retrofit2.HttpException && e.code() == 401) {
+                        com.example.util.AuthHelper.getValidIdToken(true)
+                        return@withContext RequestResult.Error("Sesi login bermasalah, silakan coba lagi", e)
+                    }
                     lastException = e
                 }
             }

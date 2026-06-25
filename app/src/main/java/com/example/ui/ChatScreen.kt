@@ -48,6 +48,11 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.window.Dialog
 import com.example.ui.util.CategoryIconMapper
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.common.api.ApiException
+import android.widget.Toast
+import kotlinx.coroutines.launch
+import com.example.util.FirebaseSyncHelper
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -62,6 +67,81 @@ fun ChatScreen(
     val listState = rememberLazyListState()
 
     val context = LocalContext.current
+    var isLoggedIn by remember { mutableStateOf(FirebaseSyncHelper.isUserSignedIn()) }
+    val coroutineScope = rememberCoroutineScope()
+    
+    val googleSignInLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == android.app.Activity.RESULT_OK) {
+            val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
+            try {
+                val account = task.getResult(ApiException::class.java)
+                coroutineScope.launch {
+                    val firebaseResult = FirebaseSyncHelper.signInWithGoogleInFirebase(context, account)
+                    if (firebaseResult.isSuccess) {
+                        isLoggedIn = true
+                        Toast.makeText(context, "Berhasil masuk untuk fitur AI!", Toast.LENGTH_SHORT).show()
+                    } else {
+                        Toast.makeText(context, "Gagal terhubung ke Firebase: ${firebaseResult.exceptionOrNull()?.localizedMessage}", Toast.LENGTH_LONG).show()
+                    }
+                }
+            } catch (e: ApiException) {
+                val statusCode = e.statusCode
+                android.util.Log.e("ChatScreen", "Google Sign-In failed: StatusCode=$statusCode", e)
+                if (statusCode != 12501) { // 12501 is user canceled
+                    Toast.makeText(context, "Gagal masuk: ${e.localizedMessage ?: statusCode}", Toast.LENGTH_LONG).show()
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("ChatScreen", "Google Sign-In error", e)
+                Toast.makeText(context, "Kesalahan: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    if (!isLoggedIn) {
+        Column(
+            modifier = modifier
+                .fillMaxSize()
+                .padding(24.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Icon(
+                imageVector = Icons.Default.AccountCircle,
+                contentDescription = "Login Required",
+                tint = BlueGradientStart,
+                modifier = Modifier.size(80.dp)
+            )
+            Spacer(modifier = Modifier.height(24.dp))
+            Text(
+                text = "Autentikasi Diperlukan",
+                style = MaterialTheme.typography.titleLarge,
+                color = GhostWhite,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "Untuk menggunakan fitur Asisten AI Cerdas, Anda harus masuk dengan Akun Google terlebih dahulu. Hal ini untuk memastikan keamanan permintaan AI Anda.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = GhostWhite.copy(alpha = 0.7f),
+                textAlign = TextAlign.Center
+            )
+            Spacer(modifier = Modifier.height(32.dp))
+            PremiumButton(
+                text = "Masuk dengan Google",
+                onClick = {
+                    val client = com.example.util.GoogleDriveHelper.getGoogleSignInClient(context)
+                    googleSignInLauncher.launch(client.signInIntent)
+                },
+                isActive = true,
+                icon = Icons.Default.Login,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
+        return
+    }
+
     var showSourceSelector by remember { mutableStateOf(false) }
     var showPendingDatePicker by remember { mutableStateOf(false) }
     var showReceiptDatePicker by remember { mutableStateOf(false) }

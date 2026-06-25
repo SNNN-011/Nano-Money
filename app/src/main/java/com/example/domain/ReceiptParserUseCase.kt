@@ -210,6 +210,10 @@ class ReceiptParserUseCase {
                 )
             )
         } catch (e: Exception) {
+            if (e is retrofit2.HttpException && e.code() == 401) {
+                com.example.util.AuthHelper.getValidIdToken(true)
+                return@withContext RequestResult.Error("Sesi login bermasalah, silakan coba lagi", e)
+            }
             RequestResult.Error("Gagal menganalisis struk: ${e.localizedMessage ?: "kesalahan tidak dikenal"}", e)
         }
     }

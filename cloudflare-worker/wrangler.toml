@@ -1,0 +1,13 @@
+name = "gemini-firebase-proxy"
+main = "src/worker.js"
+compatibility_date = "2024-03-20"
+
+# Binding untuk Rate Limiting
+# Uncomment dan ganti id dengan ID KV Namespace Anda setelah dibuat di dashboard
+# kv_namespaces = [
+#   { binding = "RATE_LIMIT_KV", id = "YOUR_KV_NAMESPACE_ID" }
+# ]
+
+# Environment variables (Bisa di-set di sini untuk non-sensitive data)
+[vars]
+FIREBASE_PROJECT_ID = "nano-money-a44b0"

@@ -10,6 +10,8 @@ import retrofit2.http.POST
 import retrofit2.http.Path
 import retrofit2.http.Query
 import java.util.concurrent.TimeUnit
+import com.google.firebase.auth.FirebaseAuth
+import com.google.android.gms.tasks.Tasks
 
 @JsonClass(generateAdapter = true)
 data class InlineData(
@@ -111,39 +113,8 @@ object GeminiClient {
         "https://generativelanguage.googleapis.com/"
     }
 
-    private val WORKER_SECRET_KEY = try {
-        val rawSecret = com.example.BuildConfig.WORKER_SECRET_KEY
-        val decryptedSecret = com.example.util.SecurityUtil.decryptObfuscatedString(rawSecret)
-        
-        // If decrypted secret contains unprintable characters, assume fallback to raw
-        if (decryptedSecret.isNotEmpty() && !decryptedSecret.any { it.code < 32 }) {
-            decryptedSecret
-        } else {
-            rawSecret.trim().replace("\"", "")
-        }
-    } catch (e: Throwable) {
-        ""
-    }
-
-    private val BASE_HOST = try {
-        java.net.URL(BASE_URL).host
-    } catch (e: Throwable) {
-        ""
-    }
-
-    private fun getDecryptedFallback(): String {
-        val obfuscationKey = 42
-        val obfuscated = intArrayOf(73, 69, 67, 4, 79, 82, 75, 67, 74, 70, 79, 4, 109, 79, 67, 115, 68, 115, 75, 74, 74)
-        val sb = StringBuilder()
-        for (x in obfuscated) {
-            sb.append((x xor obfuscationKey).toChar())
-        }
-        return sb.toString()
-    }
-
-    private fun cleanString(input: String): String {
-        return input.replace(Regex("[^a-zA-Z0-9+/=:-]"), "").trim()
-    }
+    val isUsingProxy: Boolean
+        get() = !BASE_URL.contains("googleapis.com")
 
     private val okHttpClient = OkHttpClient.Builder().apply {
         connectTimeout(30, TimeUnit.SECONDS)
@@ -153,40 +124,13 @@ object GeminiClient {
             val originalRequest = chain.request()
             val requestBuilder = originalRequest.newBuilder()
             
-            if (WORKER_SECRET_KEY.isNotEmpty()) {
-                requestBuilder.header("X-Worker-Secret", WORKER_SECRET_KEY)
-            }
-            
-            try {
-                val timestamp = System.currentTimeMillis().toString()
-                val method = originalRequest.method
-                val pathAndQuery = originalRequest.url.encodedPath + 
-                        (originalRequest.url.encodedQuery?.let { "?$it" } ?: "")
-                
-                val bodyString = if (originalRequest.body != null) {
-                    val buffer = okio.Buffer()
-                    originalRequest.body?.writeTo(buffer)
-                    buffer.readUtf8()
-                } else {
-                    ""
+            if (isUsingProxy) {
+                val token = kotlinx.coroutines.runBlocking {
+                    com.example.util.AuthHelper.getValidIdToken()
                 }
-                
-                val messageToSign = "$timestamp\n$method\n$pathAndQuery\n$bodyString"
-                val signingKey = WORKER_SECRET_KEY.ifEmpty { getDecryptedFallback() }
-                
-                val keyBytes = signingKey.toByteArray(Charsets.UTF_8)
-                val hmacSha256 = javax.crypto.Mac.getInstance("HmacSHA256")
-                val secretKey = javax.crypto.spec.SecretKeySpec(keyBytes, "HmacSHA256")
-                java.util.Arrays.fill(keyBytes, 0.toByte())
-                
-                hmacSha256.init(secretKey)
-                val signatureBytes = hmacSha256.doFinal(messageToSign.toByteArray(Charsets.UTF_8))
-                val signature = android.util.Base64.encodeToString(signatureBytes, android.util.Base64.NO_WRAP)
-                
-                requestBuilder.header("X-Signature-Timestamp", timestamp)
-                requestBuilder.header("X-Signature", signature)
-            } catch (e: Throwable) {
-                android.util.Log.e("GeminiClient", "Failed to sign request", e)
+                if (token != null) {
+                    requestBuilder.header("Authorization", "Bearer $token")
+                }
             }
             
             chain.proceed(requestBuilder.build())

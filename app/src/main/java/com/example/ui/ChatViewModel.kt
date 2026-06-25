@@ -189,7 +189,12 @@ class ChatViewModel(
 
             when (resultStatus) {
                 is com.example.domain.RequestResult.Error -> {
-                    addAiMessage("Gagal memproses struk: ${resultStatus.message}")
+                    val msg = if (resultStatus.message == "Sesi login bermasalah, silakan coba lagi") {
+                        resultStatus.message
+                    } else {
+                        "Gagal memproses struk: ${resultStatus.message}"
+                    }
+                    addAiMessage(msg)
                 }
                 is com.example.domain.RequestResult.Success -> {
                     val parsed = resultStatus.data
@@ -351,7 +356,9 @@ class ChatViewModel(
                         val errorBodyText = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                             try { e.response()?.errorBody()?.string() } catch (ioe: java.io.IOException) { "gagal" }
                         }
-                        if (!errorBodyText.isNullOrEmpty() && errorBodyText.contains("not found", ignoreCase = true)) {
+                        if (e.code() == 401) {
+                            "${resultStatus.message} (Detail: $errorBodyText)"
+                        } else if (!errorBodyText.isNullOrEmpty() && errorBodyText.contains("not found", ignoreCase = true)) {
                             "HTTP ${e.code()}: AI sedang ada kendala, coba kembali atau gunakan opsi Gemini."
                         } else {
                             "HTTP ${e.code()}: ${errorBodyText ?: "tidak ada detail error"}"

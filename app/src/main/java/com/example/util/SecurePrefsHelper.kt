@@ -38,7 +38,7 @@ object SecurePrefsHelper {
                 if (allEntries.isNotEmpty()) {
                     val editor = encryptedPrefs.edit()
                     for ((key, value) in allEntries) {
-                        if (key != migrationKey) {
+                        if (key != migrationKey && !key.startsWith("__androidx_security_crypto_")) {
                             when (value) {
                                 is String -> editor.putString(key, value)
                                 is Boolean -> editor.putBoolean(key, value)
