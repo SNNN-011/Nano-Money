@@ -127,7 +127,6 @@ fun EksporImporTabContent(
     // Security preferences and states
     val securityPrefs = remember { com.example.util.SecurePrefsHelper.getEncryptedPrefs(context, "app_security_prefs") }
     var isPinEnabled by remember { mutableStateOf(securityPrefs.getBoolean("pin_enabled", false)) }
-    var savedPin by remember { mutableStateOf(securityPrefs.getString("saved_pin", "") ?: "") }
     var isBiometricEnabled by remember { mutableStateOf(securityPrefs.getBoolean("biometric_enabled", false)) }
 
 

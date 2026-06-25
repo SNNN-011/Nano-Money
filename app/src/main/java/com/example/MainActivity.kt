@@ -103,6 +103,29 @@ class MainActivity : FragmentActivity() {
           val isPinEnabled = remember { securityPrefs.getBoolean("pin_enabled", false) }
           val isBiometricEnabled = remember { securityPrefs.getBoolean("biometric_enabled", false) }
           
+          LaunchedEffect(Unit) {
+              val oldPin = securityPrefs.getString("saved_pin", null)
+              if (oldPin != null) {
+                  val pinSalt = com.example.util.PinHashHelper.generateSalt()
+                  val pinHash = com.example.util.PinHashHelper.hashValue(oldPin, pinSalt)
+                  securityPrefs.edit()
+                      .putString("pin_salt", pinSalt)
+                      .putString("pin_hash", pinHash)
+                      .remove("saved_pin")
+                      .apply()
+              }
+              val oldAnswer = securityPrefs.getString("security_answer", null)
+              if (oldAnswer != null) {
+                  val answerSalt = com.example.util.PinHashHelper.generateSalt()
+                  val answerHash = com.example.util.PinHashHelper.hashValue(oldAnswer, answerSalt)
+                  securityPrefs.edit()
+                      .putString("answer_salt", answerSalt)
+                      .putString("answer_hash", answerHash)
+                      .remove("security_answer")
+                      .apply()
+              }
+          }
+
           val needsLock = isPinEnabled || isBiometricEnabled
           var isAppUnlocked by remember { mutableStateOf(!needsLock) }
           var isLaunching by remember { mutableStateOf(true) }

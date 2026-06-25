@@ -319,10 +319,9 @@ object FirebaseSyncHelper {
                 val localSettingsMap = prefs.all
 
                 val mergedSettings = mutableMapOf<String, Any>()
-                mergedSettings.putAll(firestoreSettingsMap.filterKeys { it != "saved_pin" && it != "security_answer" })
+                mergedSettings.putAll(firestoreSettingsMap)
                 
                 for ((k, v) in localSettingsMap) {
-                    if (k == "saved_pin" || k == "security_answer") continue
                     if (v != null) {
                         if (v is Set<*>) {
                             mergedSettings[k] = v.toList()
@@ -330,6 +329,28 @@ object FirebaseSyncHelper {
                             mergedSettings[k] = v
                         }
                     }
+                }
+
+                // Migrate plaintext PINs and Answers to Hashes during sync
+                val oldPin = mergedSettings["saved_pin"] as? String
+                if (oldPin != null) {
+                    val pinSalt = com.example.util.PinHashHelper.generateSalt()
+                    val pinHash = com.example.util.PinHashHelper.hashValue(oldPin, pinSalt)
+                    mergedSettings["pin_salt"] = pinSalt
+                    mergedSettings["pin_hash"] = pinHash
+                    mergedSettings.remove("saved_pin")
+                    prefs.edit().remove("saved_pin").apply()
+                }
+
+                val oldAnswer = mergedSettings["security_answer"] as? String ?: mergedSettings["security_question_answer"] as? String
+                if (oldAnswer != null) {
+                    val answerSalt = com.example.util.PinHashHelper.generateSalt()
+                    val answerHash = com.example.util.PinHashHelper.hashValue(oldAnswer, answerSalt)
+                    mergedSettings["answer_salt"] = answerSalt
+                    mergedSettings["answer_hash"] = answerHash
+                    mergedSettings.remove("security_answer")
+                    mergedSettings.remove("security_question_answer")
+                    prefs.edit().remove("security_answer").remove("security_question_answer").apply()
                 }
                 
                 suspendCancellableCoroutine<Unit> { continuation ->
