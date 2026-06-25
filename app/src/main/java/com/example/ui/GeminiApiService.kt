@@ -101,8 +101,7 @@ interface GeminiApiService {
 object GeminiClient {
     private val BASE_URL = try {
         val rawUrl = com.example.BuildConfig.GEMINI_BASE_URL
-        val decryptedUrl = com.example.util.SecurityUtil.decryptObfuscatedString(rawUrl)
-        val finalUrl = if (decryptedUrl.startsWith("http")) decryptedUrl else rawUrl.trim().replace("\"", "")
+        val finalUrl = rawUrl.trim().replace("\"", "")
         
         if (finalUrl.isEmpty() || finalUrl.contains("your-cloudflare-worker-url")) {
             "https://generativelanguage.googleapis.com/"

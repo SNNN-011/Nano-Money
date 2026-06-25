@@ -11,18 +11,6 @@ import java.io.InputStreamReader
 
 object SecurityUtil {
     private const val TAG = "SecurityUtil"
-    private fun getDynamicXorKey(): String {
-        val hiddenKey = intArrayOf(
-            75, 104, 107, 104, 107, 104, 122, 78, 108, 116, 112, 117, 112, 52, 58, 53, 
-            60, 52, 109, 115, 104, 122, 111, 59, 60, 71, 101, 75, 104, 107, 104, 107, 
-            104, 122, 81, 104, 116, 75, 112, 117, 107, 112, 117, 110, 59, 60, 71, 101
-        )
-        val sb = StringBuilder()
-        for (i in hiddenKey) {
-            sb.append((i - 7).toChar())
-        }
-        return sb.toString()
-    }
 
     /**
      * Detects dynamic instrumentation (e.g., Frida, Xposed) and active debuggers.
@@ -61,29 +49,6 @@ object SecurityUtil {
             }
         } catch (e: Exception) {
             Log.e(TAG, "Failed to perform security checks", e)
-        }
-    }
-
-    /**
-     * Decrypts an obfuscated string. The string should be XORed with a static key
-     * and then Base64 encoded before being stored in BuildConfig/.env.
-     */
-    fun decryptObfuscatedString(encryptedBase64: String): String {
-        checkDebuggingAndHooks()
-        try {
-            val dynamicKey = getDynamicXorKey()
-            val cleanStr = encryptedBase64.trim().replace("\"", "")
-            if (cleanStr.isBlank()) return ""
-            // Try to decode Base64
-            val decodedBytes = Base64.decode(cleanStr, Base64.DEFAULT)
-            var decrypted = ""
-            for (i in decodedBytes.indices) {
-                decrypted += (decodedBytes[i].toInt() xor dynamicKey[i % dynamicKey.length].code).toChar()
-            }
-            return decrypted
-        } catch (e: Exception) {
-            // If it fails (e.g. not a valid Base64 or standard string), just return the fallback/original
-            return encryptedBase64.trim().replace("\"", "")
         }
     }
 
@@ -130,6 +95,7 @@ object SecurityUtil {
      * - If device is an emulator and this is a release build (not DEBUG), block access.
      */
     fun checkSecurityStatus(context: Context): SecurityStatus {
+        checkDebuggingAndHooks()
         if (isDeviceRooted()) {
             Log.w(TAG, "Security Violation: Device is rooted.")
             return SecurityStatus.ROOTED

@@ -105,7 +105,7 @@ Mekanisme pertahanan:
 2. **Sinkronisasi Modul**:
    Buka direktori proyek Anda menggunakan editor Android Studio Anda, biarkan Gradle melakukan pengunduhan dependensi.
 3. **Konfigurasi Kredensial Environment**:
-   Pastikan Anda menyalin file `.env.example` menjadi file `.env` di root proyek Anda, dan atur variabel kredensial (seperti `WORKER_SECRET_KEY`) melalui menu Secrets panel yang disediakan.
+   Pastikan Anda menyalin file `.env.example` menjadi file `.env` di root proyek Anda, dan atur variabel kredensial (seperti `GEMINI_API_KEY` dan `GEMINI_BASE_URL`) melalui menu Secrets panel yang disediakan.
 4. **Build & Run**:
    Hubungkan ponsel cerdas Android Anda atau aktifkan Emulator bawaan Studio, tekan tombol **Run (Shift + F10)** untuk mendeploy aplikasi Nano Money Anda secara instan!
 
