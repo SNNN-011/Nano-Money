@@ -102,6 +102,16 @@ class MainActivity : FragmentActivity() {
           
           val isPinEnabled = remember { securityPrefs.getBoolean("pin_enabled", false) }
           val isBiometricEnabled = remember { securityPrefs.getBoolean("biometric_enabled", false) }
+
+          LaunchedEffect(Unit) {
+              val rawValue = securityPrefs.getBoolean("pin_enabled", false)
+              val allKeys = securityPrefs.all.keys.size
+              android.widget.Toast.makeText(
+                  context,
+                  "DEBUG MAIN: isPinEnabled(remember)=$isPinEnabled | rawValue(baca ulang)=$rawValue | totalKeys=$allKeys",
+                  android.widget.Toast.LENGTH_LONG
+              ).show()
+          }
           
           LaunchedEffect(Unit) {
               val oldPin = securityPrefs.getString("saved_pin", null)

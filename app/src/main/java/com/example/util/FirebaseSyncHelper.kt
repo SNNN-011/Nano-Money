@@ -301,8 +301,8 @@ object FirebaseSyncHelper {
                 recurringDao.insertAll(recurringToInsertLocally)
             }
 
-            // 3. Sync Settings / Preferences (financial_tracker_prefs, security_prefs)
-            val prefNames = listOf("financial_tracker_prefs", "security_prefs")
+            // 3. Sync Settings / Preferences (financial_tracker_prefs, app_security_prefs, security_prefs)
+            val prefNames = listOf("financial_tracker_prefs", "app_security_prefs", "security_prefs")
             
             for (prefName in prefNames) {
                 val prefs = com.example.util.SecurePrefsHelper.getEncryptedPrefs(context, prefName)
@@ -331,6 +331,27 @@ object FirebaseSyncHelper {
                     }
                 }
 
+                // Migrate plaintext PINs and Answers to Hashes during sync
+                val oldPin = mergedSettings["saved_pin"] as? String
+                if (oldPin != null) {
+                    val pinSalt = com.example.util.PinHashHelper.generateSalt()
+                    val pinHash = com.example.util.PinHashHelper.hashValue(oldPin, pinSalt)
+                    mergedSettings["pin_salt"] = pinSalt
+                    mergedSettings["pin_hash"] = pinHash
+                    mergedSettings.remove("saved_pin")
+                    prefs.edit().remove("saved_pin").apply()
+                }
+
+                val oldAnswer = mergedSettings["security_answer"] as? String ?: mergedSettings["security_question_answer"] as? String
+                if (oldAnswer != null) {
+                    val answerSalt = com.example.util.PinHashHelper.generateSalt()
+                    val answerHash = com.example.util.PinHashHelper.hashValue(oldAnswer, answerSalt)
+                    mergedSettings["answer_salt"] = answerSalt
+                    mergedSettings["answer_hash"] = answerHash
+                    mergedSettings.remove("security_answer")
+                    mergedSettings.remove("security_question_answer")
+                    prefs.edit().remove("security_answer").remove("security_question_answer").apply()
+                }
                 
                 suspendCancellableCoroutine<Unit> { continuation ->
                     settingsDocRef.set(mergedSettings).addOnCompleteListener { continuation.resume(Unit) }

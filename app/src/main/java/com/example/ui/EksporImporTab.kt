@@ -275,6 +275,7 @@ fun EksporImporTabContent(
                             .putBoolean("pin_enabled", false)
                             .putBoolean("biometric_enabled", false)
                             .commit()
+                        coroutineScope.launch { com.example.util.FirebaseSyncHelper.syncFinancialRecordsWithFirestore(context) }
                         Toast.makeText(context, "Kunci PIN dinonaktifkan", Toast.LENGTH_SHORT).show()
                     } else {
                         val storedPin = securityPrefs.getString("pin_hash", "") ?: ""
@@ -286,6 +287,7 @@ fun EksporImporTabContent(
                             securityPrefs.edit()
                                 .putBoolean("pin_enabled", true)
                                 .commit()
+                            coroutineScope.launch { com.example.util.FirebaseSyncHelper.syncFinancialRecordsWithFirestore(context) }
                             Toast.makeText(context, "Kunci PIN diaktifkan", Toast.LENGTH_SHORT).show()
                         } else {
                             pinInputText = ""
@@ -300,6 +302,7 @@ fun EksporImporTabContent(
                 onBiometricToggle = { checked ->
                     isBiometricEnabled = checked
                     securityPrefs.edit().putBoolean("biometric_enabled", checked).commit()
+                    coroutineScope.launch { com.example.util.FirebaseSyncHelper.syncFinancialRecordsWithFirestore(context) }
                 },
                 onEditSecurity = {
                     val storedQuestion = securityPrefs.getString("security_question", "") ?: ""
@@ -913,6 +916,9 @@ fun EksporImporTabContent(
                                                     .remove("saved_pin")
                                                     .remove("security_answer")
                                                     .apply()
+                                                    
+                                                coroutineScope.launch { com.example.util.FirebaseSyncHelper.syncFinancialRecordsWithFirestore(context) }
+                                                
                                                 isSetPinDialogOpen = false
                                                 Toast.makeText(context, "Kunci PIN berhasil diatur!", Toast.LENGTH_SHORT).show()
                                             }
