@@ -331,26 +331,15 @@ object FirebaseSyncHelper {
                     }
                 }
 
-                // Migrate plaintext PINs and Answers to Hashes during sync
-                val oldPin = mergedSettings["saved_pin"] as? String
-                if (oldPin != null) {
-                    val pinSalt = com.example.util.PinHashHelper.generateSalt()
-                    val pinHash = com.example.util.PinHashHelper.hashValue(oldPin, pinSalt)
-                    mergedSettings["pin_salt"] = pinSalt
-                    mergedSettings["pin_hash"] = pinHash
-                    mergedSettings.remove("saved_pin")
-                    prefs.edit().remove("saved_pin").apply()
-                }
-
-                val oldAnswer = mergedSettings["security_answer"] as? String ?: mergedSettings["security_question_answer"] as? String
-                if (oldAnswer != null) {
-                    val answerSalt = com.example.util.PinHashHelper.generateSalt()
-                    val answerHash = com.example.util.PinHashHelper.hashValue(oldAnswer, answerSalt)
-                    mergedSettings["answer_salt"] = answerSalt
-                    mergedSettings["answer_hash"] = answerHash
-                    mergedSettings.remove("security_answer")
-                    mergedSettings.remove("security_question_answer")
-                    prefs.edit().remove("security_answer").remove("security_question_answer").apply()
+                // Remove all PIN & security lock related settings
+                val pinKeys = listOf(
+                    "saved_pin", "pin_enabled", "pin_salt", "pin_hash",
+                    "security_question", "security_answer", "security_question_answer",
+                    "answer_salt", "answer_hash", "biometric_enabled"
+                )
+                for (key in pinKeys) {
+                    mergedSettings.remove(key)
+                    prefs.edit().remove(key).apply()
                 }
                 
                 suspendCancellableCoroutine<Unit> { continuation ->

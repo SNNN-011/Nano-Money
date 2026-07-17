@@ -33,7 +33,6 @@ import androidx.compose.ui.unit.sp
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import com.example.ui.FinancialTrackerScreen
-import com.example.ui.LockScreenOverlay
 import com.example.ui.theme.*
 
 class MainActivity : FragmentActivity() {
@@ -100,44 +99,6 @@ class MainActivity : FragmentActivity() {
               }
           }
           
-          val isPinEnabled = remember { securityPrefs.getBoolean("pin_enabled", false) }
-          val isBiometricEnabled = remember { securityPrefs.getBoolean("biometric_enabled", false) }
-
-          LaunchedEffect(Unit) {
-              val rawValue = securityPrefs.getBoolean("pin_enabled", false)
-              val allKeys = securityPrefs.all.keys.size
-              android.widget.Toast.makeText(
-                  context,
-                  "DEBUG MAIN: isPinEnabled(remember)=$isPinEnabled | rawValue(baca ulang)=$rawValue | totalKeys=$allKeys",
-                  android.widget.Toast.LENGTH_LONG
-              ).show()
-          }
-          
-          LaunchedEffect(Unit) {
-              val oldPin = securityPrefs.getString("saved_pin", null)
-              if (oldPin != null) {
-                  val pinSalt = com.example.util.PinHashHelper.generateSalt()
-                  val pinHash = com.example.util.PinHashHelper.hashValue(oldPin, pinSalt)
-                  securityPrefs.edit()
-                      .putString("pin_salt", pinSalt)
-                      .putString("pin_hash", pinHash)
-                      .remove("saved_pin")
-                      .apply()
-              }
-              val oldAnswer = securityPrefs.getString("security_answer", null)
-              if (oldAnswer != null) {
-                  val answerSalt = com.example.util.PinHashHelper.generateSalt()
-                  val answerHash = com.example.util.PinHashHelper.hashValue(oldAnswer, answerSalt)
-                  securityPrefs.edit()
-                      .putString("answer_salt", answerSalt)
-                      .putString("answer_hash", answerHash)
-                      .remove("security_answer")
-                      .apply()
-              }
-          }
-
-          val needsLock = isPinEnabled || isBiometricEnabled
-          var isAppUnlocked by remember { mutableStateOf(!needsLock) }
           var isLaunching by remember { mutableStateOf(true) }
           
           val permissionLauncher = rememberLauncherForActivityResult(
@@ -146,8 +107,8 @@ class MainActivity : FragmentActivity() {
               securityPrefs.edit().putBoolean("permission_dialog_shown", true).apply()
           }
 
-          LaunchedEffect(isAppUnlocked, isLaunching) {
-              if (isAppUnlocked && !isLaunching) {
+          LaunchedEffect(isLaunching) {
+              if (!isLaunching) {
                   if (!securityPrefs.getBoolean("permission_dialog_shown", false)) {
                       val permissions = mutableListOf<String>()
                       if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
@@ -165,51 +126,12 @@ class MainActivity : FragmentActivity() {
                 visible = true,
                 onFinished = { isLaunching = false }
             )
-          } else if (!isAppUnlocked) {
-            LockScreenOverlay(
-              context = context,
-              savedPin = "", // Deprecated, unused but kept for signature
-              isPinEnabled = isPinEnabled,
-              isBiometricEnabled = isBiometricEnabled,
-              onUnlock = { isAppUnlocked = true },
-              onTriggerBiometrics = {
-                showBiometricVerification {
-                  isAppUnlocked = true
-                }
-              }
-            )
           } else {
             FinancialTrackerScreen(application = application, showStartupSplash = false)
           }
          }
         }
       }
-    }
-  }
-
-  private fun showBiometricVerification(onSuccess: () -> Unit) {
-    val executor = androidx.core.content.ContextCompat.getMainExecutor(this)
-    val biometricPrompt = androidx.biometric.BiometricPrompt(
-        this,
-        executor,
-        object : androidx.biometric.BiometricPrompt.AuthenticationCallback() {
-            override fun onAuthenticationSucceeded(result: androidx.biometric.BiometricPrompt.AuthenticationResult) {
-                super.onAuthenticationSucceeded(result)
-                onSuccess()
-            }
-        }
-    )
-
-    val promptInfo = androidx.biometric.BiometricPrompt.PromptInfo.Builder()
-        .setTitle("Kunci Aplikasi Financial")
-        .setSubtitle("Gunakan metode biometrik sensor Anda")
-        .setNegativeButtonText("Gunakan Kunci PIN")
-        .build()
-
-    try {
-        biometricPrompt.authenticate(promptInfo)
-    } catch (e: Exception) {
-        e.printStackTrace()
     }
   }
 }

@@ -28,6 +28,7 @@ Nano Money mengusung tema visual **Midnight Abyss** (Dark Theme) yang elegan, di
 
 ### 📈 2. Real-Time Dashboard & Batas Anggaran (Budgets)
 * **Glow Metric Cards**: Panel informasi dinamis yang memetakan akumulasi saldo, total pendapatan, dan total pengeluaran secara akurat dalam rupiah.
+* **Sistem Rollover Saldo Akumulatif (Balance Carryover)**: Saldo total dihitung secara kumulatif dari seluruh transaksi historis hingga akhir bulan terpilih, sehingga saldo dari bulan sebelumnya otomatis terbawa (rollover) ketika berpindah ke bulan baru.
 * **Batas Anggaran Bulanan (Monthly Limit)**: Menetapkan batas atas total pengeluaran Anda.
 * **Anggaran Khusus Kategori (Category Limits)**: Mengontrol pengeluaran di bawah sektor atau kategori spesifik (Makanan, Belanja, Hiburan, dll.) lengkap dengan indikator grafis berupa persentase pemakaian dan pemberitahuan batas kritis.
 
@@ -43,7 +44,6 @@ Nano Money mengusung tema visual **Midnight Abyss** (Dark Theme) yang elegan, di
 ### 🛡️ 5. Proteksi Keamanan Berlapis (Security Compliance)
 * **Root & Emulator Detection**: Mencegah jalannya aplikasi pada perangkat yang telah di-root atau lingkungan emulator tidak aman untuk menghindari eksploitasi data finansial.
 * **API Protection & Request Signing**: Setiap lalu-lintas request menuju peladen proxy Gemini disertakan dengan tanda tangan kriptografi tepercaya (*X-Worker-Secret*) yang terenkripsi dan diverifikasi di sisi serverless edge secara dinamis.
-* **Dynamic Lock Screen System**: Proteksi ganda berupa sandi PIN 4-digit khusus serta integrasi penuh dengan sensor Android Biometric (Sidik Jari / Pengenal Wajah) untuk membuka aplikasi secara instan dan tepercaya.
 * **Screen Capture Prevention (Remote Config Managed)**: Melarang sistem Android melakukan tangkapan layar (*screenshot*) atau perekaman layar guna menghindari kebocoran data finansial sensitif. Fitur pencegahan ini dapat dinyalakan atau dimatikan (*ON/OFF*) secara dinamis dari jauh melalui parameter `"prevent_screenshot"` di Firebase Remote Config.
 
 ---

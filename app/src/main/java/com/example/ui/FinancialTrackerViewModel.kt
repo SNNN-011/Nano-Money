@@ -204,8 +204,22 @@ class FinancialTrackerViewModel(
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
 
-    val currentBalance: StateFlow<Double> = combine(totalIncome, totalExpense) { income, expense ->
-        income - expense
+    val currentBalance: StateFlow<Double> = combine(allRecords, selectedBudgetOffset) { records, offset ->
+        val currentCal = java.util.Calendar.getInstance()
+        currentCal.add(java.util.Calendar.MONTH, offset)
+        currentCal.set(java.util.Calendar.DAY_OF_MONTH, currentCal.getActualMaximum(java.util.Calendar.DAY_OF_MONTH))
+        currentCal.set(java.util.Calendar.HOUR_OF_DAY, 23)
+        currentCal.set(java.util.Calendar.MINUTE, 59)
+        currentCal.set(java.util.Calendar.SECOND, 59)
+        currentCal.set(java.util.Calendar.MILLISECOND, 999)
+        val endOfSelectedMonth = currentCal.timeInMillis
+        records.sumOf { record ->
+            if (record.date <= endOfSelectedMonth) {
+                if (record.type == "income") record.amount else -record.amount
+            } else {
+                0.0
+            }
+        }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
 
     init {
