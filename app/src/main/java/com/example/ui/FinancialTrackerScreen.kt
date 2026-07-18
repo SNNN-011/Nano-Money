@@ -44,6 +44,8 @@ import com.example.ui.home.DashboardStatsSection
 import com.example.ui.transaction.TransaksiBaruTabContent
 import com.example.ui.calendar.CalendarTabContent
 import com.example.ui.calendar.CalendarViewModel
+import com.example.ui.analysis.AnalysisViewModel
+import com.example.ui.export.EksporImporTabContent
 import com.example.R
 import java.util.*
 import androidx.compose.animation.core.*
