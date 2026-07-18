@@ -30,6 +30,7 @@ import com.example.data.RecurringTransaction
 import com.example.ui.theme.*
 import com.example.ui.components.GlassCard
 import com.example.ui.common.RecurringTransactionManagementDialog
+import com.example.ui.transaction.TransactionListItem
 
 @Composable
 fun BerandaTabContent(

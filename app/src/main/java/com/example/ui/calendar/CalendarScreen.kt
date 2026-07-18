@@ -27,6 +27,10 @@ import com.example.ui.components.GlassCard
 import java.time.LocalDate
 import java.time.YearMonth
 import java.util.Locale
+import com.example.ui.common.FinancialTrackerViewModel
+import com.example.ui.analysis.AnalysisViewModel
+import com.example.ui.analysis.AnalysisTabContent
+import com.example.ui.transaction.TransactionListItem
 
 // Custom design system variables as specified
 val CalBgUtama = Color(0xFF0D0C15) // MidnightAbyss
