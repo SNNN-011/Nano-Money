@@ -97,7 +97,7 @@ fun PremiumButton(
 ) {
     Card(
         modifier = modifier.then(if (!enabled) Modifier.alpha(0.5f) else Modifier),
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(CornerRadius.xl),
         colors = CardDefaults.cardColors(containerColor = TranslucentGlass),
         border = BorderStroke(
             width = 1.dp,
@@ -111,15 +111,15 @@ fun PremiumButton(
     ) {
         Box(
             modifier = Modifier
-                .padding(4.dp)
-                .clip(RoundedCornerShape(16.dp))
+                .padding(Spacing.xs)
+                .clip(RoundedCornerShape(CornerRadius.lg))
                 .then(
                     if (isActive) {
                         Modifier.background(
                             brush = Brush.verticalGradient(
                                 colors = listOf(SteelBlue, SteelBlue.copy(alpha = 0.7f))
                             ),
-                            shape = RoundedCornerShape(16.dp)
+                            shape = RoundedCornerShape(CornerRadius.lg)
                         )
                     } else {
                         Modifier.background(Color.Transparent)
@@ -219,7 +219,7 @@ fun PremiumSwitch(
                     .offset(x = thumbOffset)
                     .width(38.dp)
                     .fillMaxHeight()
-                    .clip(RoundedCornerShape(14.dp))
+                    .clip(RoundedCornerShape(CornerRadius.md))
                     .background(if (checked) SteelBlue else Comet.copy(alpha = 0.6f)),
                 contentAlignment = Alignment.Center
             ) {

@@ -32,6 +32,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.clickable
 import com.example.data.CategoryAggregation
 import com.example.ui.theme.*
+import com.example.ui.components.GlassCard
 import androidx.compose.ui.platform.testTag
 
 @Composable
@@ -51,8 +52,8 @@ fun AnalysisTabContent(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .padding(vertical = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+            .padding(vertical = Spacing.lg),
+        verticalArrangement = Arrangement.spacedBy(Spacing.lg)
     ) {
         PeriodFilterRow(
             selectedPeriod = selectedPeriod,

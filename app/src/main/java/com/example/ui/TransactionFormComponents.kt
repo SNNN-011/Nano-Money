@@ -29,6 +29,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.theme.*
+import com.example.ui.components.GlassCard
 import com.example.ui.util.CategoryIconMapper
 
 @Composable
@@ -43,7 +44,7 @@ fun CategorySelectionChip(
 
     Card(
         modifier = modifier,
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(CornerRadius.xl),
         colors = CardDefaults.cardColors(containerColor = TranslucentGlass),
         border = BorderStroke(
             width = 1.dp,
@@ -58,7 +59,7 @@ fun CategorySelectionChip(
         Box(
             modifier = Modifier
                 .padding(4.dp)
-                .clip(RoundedCornerShape(16.dp))
+                .clip(RoundedCornerShape(CornerRadius.lg))
                 .then(
                     if (selected) {
                         Modifier.background(
@@ -169,7 +170,7 @@ fun TransactionFormCard(
                 val expenseSelected = type == "expense"
                 
                 Card(
-                    shape = RoundedCornerShape(20.dp),
+                    shape = RoundedCornerShape(CornerRadius.xl),
                     colors = CardDefaults.cardColors(containerColor = TranslucentGlass),
                     border = BorderStroke(
                         width = 1.dp,
@@ -191,7 +192,7 @@ fun TransactionFormCard(
                             modifier = Modifier
                                 .weight(1f)
                                 .height(40.dp)
-                                .clip(RoundedCornerShape(16.dp))
+                                .clip(RoundedCornerShape(CornerRadius.lg))
                                 .then(
                                     if (incomeSelected) {
                                         Modifier.background(
@@ -221,7 +222,7 @@ fun TransactionFormCard(
                             modifier = Modifier
                                 .weight(1f)
                                 .height(40.dp)
-                                .clip(RoundedCornerShape(16.dp))
+                                .clip(RoundedCornerShape(CornerRadius.lg))
                                 .then(
                                     if (expenseSelected) {
                                         Modifier.background(
@@ -407,7 +408,7 @@ fun TransactionFormCard(
                     Spacer(modifier = Modifier.height(4.dp))
                     
                     Card(
-                        shape = RoundedCornerShape(20.dp),
+                        shape = RoundedCornerShape(CornerRadius.xl),
                         colors = CardDefaults.cardColors(containerColor = TranslucentGlass),
                         border = BorderStroke(
                             width = 1.dp,

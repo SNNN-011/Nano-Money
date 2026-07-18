@@ -31,11 +31,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.FinancialRecord
 import com.example.ui.theme.*
+import com.example.ui.components.GlassCard
 import com.example.ui.util.CategoryIconMapper
 
 @Composable
 fun UserMessageBubble(text: String) {
-    val bubbleShape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp, bottomStart = 16.dp)
+    val bubbleShape = RoundedCornerShape(topStart = CornerRadius.lg, topEnd = CornerRadius.lg, bottomStart = CornerRadius.lg)
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -60,13 +61,12 @@ fun UserMessageBubble(text: String) {
                         ),
                         shape = bubbleShape
                     )
-                    .padding(horizontal = 14.dp, vertical = 10.dp)
+                    .padding(horizontal = Spacing.md, vertical = Spacing.sm)
             ) {
                 Text(
                     text = text,
                     color = GhostWhite,
-                    fontSize = 14.sp,
-                    lineHeight = 20.sp
+                    style = MaterialTheme.typography.bodyMedium
                 )
             }
         }
@@ -75,7 +75,7 @@ fun UserMessageBubble(text: String) {
 
 @Composable
 fun UserImageMessageBubble(bitmap: Bitmap) {
-    val bubbleShape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp, bottomStart = 16.dp)
+    val bubbleShape = RoundedCornerShape(topStart = CornerRadius.lg, topEnd = CornerRadius.lg, bottomStart = CornerRadius.lg)
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -142,13 +142,12 @@ fun AiMessageBubble(text: String, record: FinancialRecord?) {
                         ),
                         shape = bubbleShape
                     )
-                    .padding(horizontal = 14.dp, vertical = 10.dp)
+                    .padding(horizontal = Spacing.md, vertical = Spacing.sm)
             ) {
                 Text(
                     text = text,
                     color = GhostWhite,
-                    fontSize = 14.sp,
-                    lineHeight = 20.sp
+                    style = MaterialTheme.typography.bodyMedium
                 )
             }
 

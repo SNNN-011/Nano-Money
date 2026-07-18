@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.FinancialRecord
 import com.example.ui.theme.*
+import com.example.ui.components.GlassCard
 import com.example.ui.util.CategoryIconMapper
 import java.util.*
 
@@ -36,7 +37,7 @@ fun FilterAndSortHeader(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 12.dp)
+            .padding(vertical = Spacing.md)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -53,7 +54,7 @@ fun FilterAndSortHeader(
                             shape = RoundedCornerShape(2.dp)
                         )
                 )
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(Spacing.sm))
                 Text(
                     text = "RIWAYAT TRANSAKSI",
                     style = MaterialTheme.typography.titleMedium.copy(
@@ -66,7 +67,7 @@ fun FilterAndSortHeader(
             }
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(Spacing.md))
 
         // Categories toggles row
         Row(

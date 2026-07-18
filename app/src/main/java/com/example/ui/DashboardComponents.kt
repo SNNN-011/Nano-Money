@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.example.ui.theme.*
+import com.example.ui.components.GlassCard
 
 @Composable
 fun DashboardStatsSection(
@@ -177,9 +178,9 @@ fun DashboardStatsSection(
                     // Minimalist premium-styled Rutin button next to SALDO TOTAL
                     Box(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(20.dp))
+                            .clip(RoundedCornerShape(CornerRadius.xl))
                             .background(SteelBlue.copy(alpha = 0.12f))
-                            .border(1.dp, SteelBlue.copy(alpha = 0.3f), RoundedCornerShape(20.dp))
+                            .border(1.dp, SteelBlue.copy(alpha = 0.3f), RoundedCornerShape(CornerRadius.xl))
                             .clickable { onRecurringClick() }
                             .padding(horizontal = 10.dp, vertical = 6.dp)
                             .testTag("recurring_transactions_inline_button"),
@@ -187,7 +188,7 @@ fun DashboardStatsSection(
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            horizontalArrangement = Arrangement.spacedBy(Spacing.xs)
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Autorenew,
@@ -207,18 +208,17 @@ fun DashboardStatsSection(
                     }
                 }
             }
-            Spacer(modifier = Modifier.height(2.dp))
+            Spacer(modifier = Modifier.height(Spacing.xs))
             Text(
                 text = displayBalance,
                 style = MaterialTheme.typography.displayMedium.copy(
                     fontWeight = FontWeight.W600,
                     letterSpacing = (-1).sp,
-                    fontSize = 26.sp
                 ),
                 color = GhostWhite,
             )
 
-            Spacer(modifier = Modifier.height(14.dp))
+            Spacer(modifier = Modifier.height(Spacing.md))
 
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -312,7 +312,7 @@ fun DashboardStatsSection(
                 }
             }
 
-            Spacer(modifier = Modifier.height(14.dp))
+            Spacer(modifier = Modifier.height(Spacing.md))
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -530,7 +530,7 @@ fun DashboardStatsSection(
 
                 val activeCategoryBudgets = categoryBudgets.filter { it.value > 0.0 }
                 if (activeCategoryBudgets.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(14.dp))
+                    Spacer(modifier = Modifier.height(Spacing.md))
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -581,7 +581,7 @@ fun DashboardStatsSection(
                         Spacer(modifier = Modifier.height(8.dp))
                         Column(
                             modifier = Modifier.fillMaxWidth(),
-                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                            verticalArrangement = Arrangement.spacedBy(Spacing.md)
                         ) {
                             activeCategoryBudgets.forEach { (cat, limit) ->
                                 val spent = if (balanceVisible) (categorySpending[cat] ?: 0.0) else 0.0

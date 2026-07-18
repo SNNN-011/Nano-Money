@@ -50,6 +50,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import android.widget.Toast
 import com.example.ui.theme.*
+import com.example.ui.components.GlassCard
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -66,10 +67,10 @@ fun MonthSelectChip(
 
     Card(
         modifier = modifier
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(CornerRadius.md))
             .clickable { onClick() }
             .testTag("month_chip_${month.year}_${month.monthValue}"),
-        shape = RoundedCornerShape(12.dp),
+        shape = RoundedCornerShape(CornerRadius.md),
         colors = CardDefaults.cardColors(
             containerColor = if (isSelected) SteelBlue.copy(alpha = 0.25f) else TranslucentGlass
         ),

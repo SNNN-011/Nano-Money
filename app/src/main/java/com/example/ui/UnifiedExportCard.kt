@@ -23,6 +23,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.theme.*
+import com.example.ui.components.GlassCard
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -43,7 +44,7 @@ fun UnifiedExportCard(
 
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(28.dp),
+        shape = RoundedCornerShape(CornerRadius.xl),
         colors = CardDefaults.cardColors(containerColor = TranslucentForm.copy(alpha = 0.65f)),
         border = BorderStroke(
             width = 1.dp,

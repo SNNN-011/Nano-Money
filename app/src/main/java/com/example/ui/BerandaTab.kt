@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.sp
 import com.example.data.FinancialRecord
 import com.example.data.RecurringTransaction
 import com.example.ui.theme.*
+import com.example.ui.components.GlassCard
 
 @Composable
 fun BerandaTabContent(
@@ -69,13 +70,13 @@ fun BerandaTabContent(
         Row(
             modifier = modifier
                 .fillMaxSize()
-                .padding(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
+                .padding(Spacing.lg),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.lg)
         ) {
             // Left column: stats & brief overview
             Column(
                 modifier = Modifier.weight(4f),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                verticalArrangement = Arrangement.spacedBy(Spacing.lg)
             ) {
                 DashboardStatsSection(
                     totalIncome = totalIncome,
@@ -96,7 +97,7 @@ fun BerandaTabContent(
 
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(6.dp),
+                    shape = RoundedCornerShape(CornerRadius.sm),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
                     border = BorderStroke(1.dp, GhostWhite.copy(alpha = 0.2f))
                 ) {

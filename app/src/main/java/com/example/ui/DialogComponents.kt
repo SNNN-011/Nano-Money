@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.example.data.FinancialRecord
 import com.example.ui.theme.*
+import com.example.ui.components.GlassCard
 import java.util.*
 
 @Composable
@@ -37,8 +38,8 @@ fun MessageAlertDialog(
 ) {
     Dialog(onDismissRequest = onDismissRequest) {
         Card(
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
-            shape = RoundedCornerShape(24.dp),
+            modifier = Modifier.fillMaxWidth().padding(Spacing.lg),
+            shape = RoundedCornerShape(CornerRadius.xl),
             colors = CardDefaults.cardColors(containerColor = MidnightAbyss),
             border = BorderStroke(
                 width = 1.dp,
@@ -55,27 +56,27 @@ fun MessageAlertDialog(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(24.dp),
+                        .padding(Spacing.xl),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Icon(
                         imageVector = Icons.Default.Info,
                         contentDescription = null,
                         tint = SteelBlue,
-                        modifier = Modifier.size(40.dp).padding(bottom = 8.dp)
+                        modifier = Modifier.size(40.dp).padding(bottom = Spacing.sm)
                     )
                     Text(
                         text = title,
                         style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                         color = GhostWhite,
-                        modifier = Modifier.padding(bottom = 12.dp)
+                        modifier = Modifier.padding(bottom = Spacing.md)
                     )
                     Text(
                         text = message,
                         style = MaterialTheme.typography.bodyMedium,
                         color = GhostWhite.copy(alpha = 0.8f),
                         textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                        modifier = Modifier.padding(bottom = 24.dp)
+                        modifier = Modifier.padding(bottom = Spacing.xl)
                     )
                     PremiumButton(
                         text = "OK",
@@ -178,8 +179,8 @@ fun CategoryManagementDialog(
 
     Dialog(onDismissRequest = onDismissRequest) {
         Card(
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
-            shape = RoundedCornerShape(24.dp),
+            modifier = Modifier.fillMaxWidth().padding(Spacing.lg),
+            shape = RoundedCornerShape(CornerRadius.xl),
             colors = CardDefaults.cardColors(containerColor = MidnightAbyss),
             border = BorderStroke(
                 width = 1.dp,
@@ -196,7 +197,7 @@ fun CategoryManagementDialog(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(24.dp),
+                        .padding(Spacing.xl),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     Text(
@@ -435,8 +436,8 @@ fun MonthlyBudgetDialog(
 
     Dialog(onDismissRequest = onDismiss) {
         Card(
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
-            shape = RoundedCornerShape(24.dp),
+            modifier = Modifier.fillMaxWidth().padding(Spacing.lg),
+            shape = RoundedCornerShape(CornerRadius.xl),
             colors = CardDefaults.cardColors(containerColor = MidnightAbyss),
             border = BorderStroke(
                 width = 1.dp,
@@ -453,7 +454,7 @@ fun MonthlyBudgetDialog(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(24.dp),
+                        .padding(Spacing.xl),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
             Row(
@@ -716,7 +717,7 @@ fun MonthlyBudgetDialog(
                     Dialog(onDismissRequest = { showCategoryPickerPopup = false }) {
                         Card(
                             colors = CardDefaults.cardColors(containerColor = MidnightAbyss),
-                            shape = RoundedCornerShape(24.dp),
+                            shape = RoundedCornerShape(CornerRadius.xl),
                             border = BorderStroke(
                                 width = 1.dp,
                                 brush = Brush.verticalGradient(
@@ -735,7 +736,7 @@ fun MonthlyBudgetDialog(
                                 Column(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(24.dp),
+                                        .padding(Spacing.xl),
                                     verticalArrangement = Arrangement.spacedBy(16.dp)
                                 ) {
                                     Text(
@@ -978,8 +979,8 @@ fun MonthlyBudgetDialog(
     if (showDeleteConfirmation) {
         Dialog(onDismissRequest = { showDeleteConfirmation = false }) {
             Card(
-                modifier = Modifier.fillMaxWidth().padding(16.dp),
-                shape = RoundedCornerShape(24.dp),
+                modifier = Modifier.fillMaxWidth().padding(Spacing.lg),
+                shape = RoundedCornerShape(CornerRadius.xl),
                 colors = CardDefaults.cardColors(containerColor = MidnightAbyss),
                 border = BorderStroke(
                     width = 1.dp,
@@ -996,14 +997,14 @@ fun MonthlyBudgetDialog(
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(24.dp),
+                            .padding(Spacing.xl),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Icon(
                             imageVector = Icons.Default.DeleteOutline,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.size(40.dp).padding(bottom = 8.dp)
+                            modifier = Modifier.size(40.dp).padding(bottom = Spacing.sm)
                         )
                         Text(
                             text = "Hapus Batas Anggaran?",
@@ -1016,7 +1017,7 @@ fun MonthlyBudgetDialog(
                             style = MaterialTheme.typography.bodyMedium,
                             color = GhostWhite.copy(alpha = 0.8f),
                             textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                            modifier = Modifier.padding(bottom = 24.dp)
+                            modifier = Modifier.padding(bottom = Spacing.xl)
                         )
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -1079,8 +1080,8 @@ fun RecurringTransactionManagementDialog(
 
     Dialog(onDismissRequest = onDismissRequest) {
         Card(
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
-            shape = RoundedCornerShape(24.dp),
+            modifier = Modifier.fillMaxWidth().padding(Spacing.lg),
+            shape = RoundedCornerShape(CornerRadius.xl),
             colors = CardDefaults.cardColors(containerColor = MidnightAbyss),
             border = BorderStroke(
                 width = 1.dp,
@@ -1097,7 +1098,7 @@ fun RecurringTransactionManagementDialog(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(24.dp),
+                        .padding(Spacing.xl),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
             Row(

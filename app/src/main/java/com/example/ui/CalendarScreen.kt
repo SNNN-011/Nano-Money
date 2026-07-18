@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.FinancialRecord
 import com.example.ui.theme.*
+import com.example.ui.components.GlassCard
 import java.time.LocalDate
 import java.time.YearMonth
 import java.util.Locale
