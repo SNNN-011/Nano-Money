@@ -3,7 +3,7 @@ package com.example.util
 import android.content.Context
 import android.os.Build
 import android.util.Base64
-import android.util.Log
+import com.example.util.SecureLog
 import com.example.BuildConfig
 import java.io.BufferedReader
 import java.io.File
@@ -25,7 +25,7 @@ object SecurityUtil {
                     if (line.startsWith("TracerPid:")) {
                         val pid = line.substringAfter("TracerPid:").trim().toIntOrNull()
                         if (pid != null && pid > 0) {
-                            Log.e(TAG, "Debugger detected! TracerPid: $pid")
+                            SecureLog.e(TAG, "Debugger detected! TracerPid: $pid")
                             kotlin.system.exitProcess(0)
                         }
                     }
@@ -42,13 +42,13 @@ object SecurityUtil {
                         lowerLine.contains("edxposed") ||
                         lowerLine.contains("lsposed") ||
                         lowerLine.contains("substrate")) {
-                        Log.e(TAG, "Hooking framework detected via memory map: $line")
+                        SecureLog.e(TAG, "Hooking framework detected via memory map: $line")
                         kotlin.system.exitProcess(0) // Forcefully exit
                     }
                 }
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to perform security checks", e)
+            SecureLog.e(TAG, "Failed to perform security checks", e)
         }
     }
 
@@ -97,7 +97,7 @@ object SecurityUtil {
     fun checkSecurityStatus(context: Context): SecurityStatus {
         checkDebuggingAndHooks()
         if (isDeviceRooted()) {
-            Log.w(TAG, "Security Violation: Device is rooted.")
+            SecureLog.w(TAG, "Security Violation: Device is rooted.")
             return SecurityStatus.ROOTED
         }
 
@@ -105,7 +105,7 @@ object SecurityUtil {
             // Under normal developer conditions (DEBUG build), emulator is allowed.
             // On Release builds, emulator execution is strictly forbidden.
             if (!BuildConfig.DEBUG) {
-                Log.w(TAG, "Security Violation: Running on emulator in release build.")
+                SecureLog.w(TAG, "Security Violation: Running on emulator in release build.")
                 return SecurityStatus.EMULATOR_RELEASE
             }
         }

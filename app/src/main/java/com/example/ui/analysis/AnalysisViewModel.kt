@@ -202,8 +202,9 @@ class AnalysisViewModel(
                     val db = AppDatabase.getDatabase(application)
                     val repo = AnalysisRepository(db.analysisDao())
                     return AnalysisViewModel(application, repo) as T
+                } else {
+                    throw IllegalArgumentException("Unknown ViewModel class: ${modelClass.name}")
                 }
-                throw IllegalArgumentException("Unknown ViewModel class")
             }
         }
     }

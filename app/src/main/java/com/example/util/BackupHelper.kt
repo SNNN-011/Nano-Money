@@ -3,7 +3,7 @@ package com.example.util
 import android.content.Context
 import android.content.Intent
 import android.os.Process
-import android.util.Log
+import com.example.util.SecureLog
 import com.example.data.AppDatabase
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -61,7 +61,7 @@ object BackupHelper {
             // 2. Check if database file exists
             val dbFile = context.getDatabasePath("financial_tracker_database")
             if (!dbFile.exists()) {
-                Log.e("BackupHelper", "Database file does not exist!")
+                SecureLog.e("BackupHelper", "Database file does not exist!")
                 TelemetryHelper.trackBackupAction("backup", false, "Database file does not exist")
                 return@withContext BackupResult.Error("Database file belum terbentuk! Harap isi minimal satu catatan keuangan terlebih dahulu.")
             }
@@ -90,7 +90,7 @@ object BackupHelper {
             try {
                 db.openHelper.writableDatabase.execSQL("PRAGMA wal_checkpoint(FULL)")
             } catch (e: Exception) {
-                Log.w("BackupHelper", "Failed on PRAGMA wal_checkpoint, continuing backup: ${e.message}")
+                SecureLog.w("BackupHelper", "Failed on PRAGMA wal_checkpoint, continuing backup: ${e.message}")
             }
 
             val prefix = if (isAuto) "auto_DataNanoMoney_" else "manual_DataNanoMoney_"
@@ -109,10 +109,10 @@ object BackupHelper {
                 // B. Add all available shared preferences XML entries
                 val dataDir = context.applicationContext.dataDir ?: context.filesDir.parentFile ?: context.dataDir
                 val sharedPrefsDir = File(dataDir, "shared_prefs")
-                Log.d("BackupHelper", "Memulai penyalinan Shared Preferences dari: ${sharedPrefsDir.absolutePath}")
+                SecureLog.d("BackupHelper", "Memulai penyalinan Shared Preferences dari: ${sharedPrefsDir.absolutePath}")
                 if (sharedPrefsDir.exists() && sharedPrefsDir.isDirectory) {
                     sharedPrefsDir.listFiles { _, name -> name.endsWith(".xml") }?.forEach { xmlFile ->
-                        Log.d("BackupHelper", "Mencadangkan file preferensi: ${xmlFile.name}")
+                        SecureLog.d("BackupHelper", "Mencadangkan file preferensi: ${xmlFile.name}")
                         zos.putNextEntry(ZipEntry("shared_prefs/${xmlFile.name}"))
                         xmlFile.inputStream().use { input ->
                             input.copyTo(zos)
@@ -120,17 +120,17 @@ object BackupHelper {
                         zos.closeEntry()
                     }
                 } else {
-                    Log.w("BackupHelper", "Folder shared_prefs tidak ditemukan atau bukan direktori: ${sharedPrefsDir.absolutePath}")
+                    SecureLog.w("BackupHelper", "Folder shared_prefs tidak ditemukan atau bukan direktori: ${sharedPrefsDir.absolutePath}")
                 }
             }
 
             cleanOldBackups(context)
 
-            Log.d("BackupHelper", "Settings and database successfully backed up to ${backupFile.absolutePath}")
+            SecureLog.d("BackupHelper", "Settings and database successfully backed up to ${backupFile.absolutePath}")
             TelemetryHelper.trackBackupAction("backup", true)
             BackupResult.Success(backupFile.name)
         } catch (e: Exception) {
-            Log.e("BackupHelper", "Error during backup: ${e.message}", e)
+            SecureLog.e("BackupHelper", "Error during backup: ${e.message}", e)
             val errMsg = e.localizedMessage ?: e.toString()
             TelemetryHelper.trackBackupAction("backup", false, errMsg)
             TelemetryHelper.logNonFatal(e, "Backup failed")
@@ -156,11 +156,11 @@ object BackupHelper {
             if (allBackups.size > 5) {
                 for (i in 5 until allBackups.size) {
                     allBackups[i].delete()
-                    Log.d("BackupHelper", "Menghapus cadangan lokal lama untuk membatasi maksimal 5: ${allBackups[i].name}")
+                    SecureLog.d("BackupHelper", "Menghapus cadangan lokal lama untuk membatasi maksimal 5: ${allBackups[i].name}")
                 }
             }
         } catch (e: Exception) {
-            Log.e("BackupHelper", "Gagal membersihkan cadangan lama: ${e.message}")
+            SecureLog.e("BackupHelper", "Gagal membersihkan cadangan lama: ${e.message}")
         }
     }
 
@@ -232,7 +232,7 @@ object BackupHelper {
                         db.close()
                         isValid = true
                     } catch (e2: Exception) {
-                        Log.e("BackupHelper", "Database validasi gagal: ${e2.message}", e2)
+                        SecureLog.e("BackupHelper", "Database validasi gagal: ${e2.message}", e2)
                     }
                 }
             } finally {
@@ -294,7 +294,7 @@ object BackupHelper {
             restartApplication(context)
             true
         } catch (e: Exception) {
-            Log.e("BackupHelper", "Gagal mengembalikan cadangan: ${e.message}", e)
+            SecureLog.e("BackupHelper", "Gagal mengembalikan cadangan: ${e.message}", e)
             TelemetryHelper.trackBackupAction("restore", false, e.message)
             TelemetryHelper.logNonFatal(e, "Restore failed")
             false

@@ -162,14 +162,14 @@ fun EksporImporTabContent(
             }
         } catch (e: ApiException) {
             val statusCode = e.statusCode
-            android.util.Log.e("GoogleDrive", "Google Sign-In failed: StatusCode=$statusCode", e)
+            com.example.util.SecureLog.e("GoogleDrive", "Google Sign-In failed: StatusCode=$statusCode", e)
             if (statusCode == 12501) {
                 Toast.makeText(context, "Batal menghubungkan Google Drive.", Toast.LENGTH_SHORT).show()
             } else {
                 Toast.makeText(context, "Gagal masuk: ${e.localizedMessage ?: statusCode}", Toast.LENGTH_LONG).show()
             }
         } catch (e: Exception) {
-            android.util.Log.e("GoogleDrive", "Google Sign-In error", e)
+            com.example.util.SecureLog.e("GoogleDrive", "Google Sign-In error", e)
             Toast.makeText(context, "Kesalahan: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
         }
     }
@@ -183,13 +183,13 @@ fun EksporImporTabContent(
                     driveBackupList = result.data
                 }
                 is GoogleDriveHelper.DriveResult.Error -> {
-                    android.util.Log.e("GoogleDrive", "Gagal memuat daftar Drive: ${result.message}")
+                    com.example.util.SecureLog.e("GoogleDrive", "Gagal memuat daftar Drive: ${result.message}")
                     driveErrorDetailMessage = result.message
                     if (result.recoverableIntent != null) {
                         try {
                             context.startActivity(result.recoverableIntent)
                         } catch (e: Exception) {
-                            android.util.Log.e("GoogleDrive", "Failed to launch auth recovery", e)
+                            com.example.util.SecureLog.e("GoogleDrive", "Failed to launch auth recovery", e)
                         }
                     }
                 }

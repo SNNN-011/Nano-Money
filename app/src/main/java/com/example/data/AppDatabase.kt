@@ -139,7 +139,7 @@ abstract class AppDatabase : RoomDatabase() {
                     }
                 }
             } catch (e: Exception) {
-                android.util.Log.e("AppDatabase", "Gagal memigrasi database menjadi terenkripsi: ${e.message}", e)
+                com.example.util.SecureLog.e("AppDatabase", "Gagal memigrasi database menjadi terenkripsi: ${e.message}", e)
             } finally {
                 if (tempFile.exists()) {
                     tempFile.delete()

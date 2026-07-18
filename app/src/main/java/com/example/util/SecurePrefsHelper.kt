@@ -2,7 +2,7 @@ package com.example.util
 
 import android.content.Context
 import android.content.SharedPreferences
-import android.util.Log
+import com.example.util.SecureLog
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 
@@ -24,26 +24,26 @@ object SecurePrefsHelper {
             prefs.all // paksa baca sekarang, supaya error Keystore ketahuan di sini, bukan nanti
             return prefs
         } catch (e: Exception) {
-            Log.e(TAG, "EncryptedSharedPreferences '$name' corrupt (${e.javaClass.simpleName}), melakukan reset paksa.", e)
+            SecureLog.e(TAG, "EncryptedSharedPreferences '$name' corrupt (${e.javaClass.simpleName}), melakukan reset paksa.", e)
             try {
                 context.applicationContext.getSharedPreferences(name, Context.MODE_PRIVATE)
                     .edit().clear().commit()
                 val prefsFile = java.io.File(context.applicationContext.filesDir.parentFile, "shared_prefs/$name.xml")
                 if (prefsFile.exists()) prefsFile.delete()
             } catch (cleanupError: Exception) {
-                Log.e(TAG, "Gagal cleanup file corrupt: ${cleanupError.message}", cleanupError)
+                SecureLog.e(TAG, "Gagal cleanup file corrupt: ${cleanupError.message}", cleanupError)
             }
             try {
                 val keyStore = java.security.KeyStore.getInstance("AndroidKeyStore")
                 keyStore.load(null)
                 keyStore.deleteEntry(MasterKey.DEFAULT_MASTER_KEY_ALIAS)
             } catch (ksError: Exception) {
-                Log.e(TAG, "Gagal hapus Keystore alias: ${ksError.message}", ksError)
+                SecureLog.e(TAG, "Gagal hapus Keystore alias: ${ksError.message}", ksError)
             }
             return try {
                 buildEncryptedPrefs(context, name)
             } catch (e2: Exception) {
-                Log.e(TAG, "Gagal total membuat ulang, fallback plain SEMENTARA (bukan permanen).", e2)
+                SecureLog.e(TAG, "Gagal total membuat ulang, fallback plain SEMENTARA (bukan permanen).", e2)
                 context.applicationContext.getSharedPreferences(name, Context.MODE_PRIVATE)
             }
         }

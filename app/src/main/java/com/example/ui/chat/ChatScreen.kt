@@ -56,6 +56,7 @@ import com.google.android.gms.common.api.ApiException
 import android.widget.Toast
 import kotlinx.coroutines.launch
 import com.example.util.FirebaseSyncHelper
+import com.example.data.remote.ExtractionResult
 import com.example.ui.common.CustomDatePickerDialog
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -93,12 +94,12 @@ fun ChatScreen(
                 }
             } catch (e: ApiException) {
                 val statusCode = e.statusCode
-                android.util.Log.e("ChatScreen", "Google Sign-In failed: StatusCode=$statusCode", e)
+                com.example.util.SecureLog.e("ChatScreen", "Google Sign-In failed: StatusCode=$statusCode", e)
                 if (statusCode != 12501) { // 12501 is user canceled
                     Toast.makeText(context, "Gagal masuk: ${e.localizedMessage ?: statusCode}", Toast.LENGTH_LONG).show()
                 }
             } catch (e: Exception) {
-                android.util.Log.e("ChatScreen", "Google Sign-In error", e)
+                com.example.util.SecureLog.e("ChatScreen", "Google Sign-In error", e)
                 Toast.makeText(context, "Kesalahan: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
             }
         }
@@ -330,29 +331,31 @@ fun ChatScreen(
     }
 
     val pendingConfirmationForDialog by viewModel.pendingConfirmation.collectAsState()
-    if (showPendingDatePicker && pendingConfirmationForDialog != null) {
-        val pending = pendingConfirmationForDialog!!
-        CustomDatePickerDialog(
-            initialTimeMs = pending.date ?: System.currentTimeMillis(),
-            onDateSelected = { timestamp ->
-                viewModel.updatePendingTransaction(pending.copy(date = timestamp))
-                showPendingDatePicker = false
-            },
-            onDismissRequest = { showPendingDatePicker = false }
-        )
+    if (showPendingDatePicker) {
+        pendingConfirmationForDialog?.let { pending ->
+            CustomDatePickerDialog(
+                initialTimeMs = pending.date ?: System.currentTimeMillis(),
+                onDateSelected = { timestamp ->
+                    viewModel.updatePendingTransaction(pending.copy(date = timestamp))
+                    showPendingDatePicker = false
+                },
+                onDismissRequest = { showPendingDatePicker = false }
+            )
+        }
     }
 
     val pendingReceiptConfirmationForDialog by viewModel.pendingReceiptConfirmation.collectAsState()
-    if (showReceiptDatePicker && pendingReceiptConfirmationForDialog != null) {
-        val r = pendingReceiptConfirmationForDialog!!
-        CustomDatePickerDialog(
-            initialTimeMs = r.dateMillis,
-            onDateSelected = { timestamp ->
-                viewModel.updatePendingReceipt(r.copy(dateMillis = timestamp))
-                showReceiptDatePicker = false
-            },
-            onDismissRequest = { showReceiptDatePicker = false }
-        )
+    if (showReceiptDatePicker) {
+        pendingReceiptConfirmationForDialog?.let { r ->
+            CustomDatePickerDialog(
+                initialTimeMs = r.dateMillis,
+                onDateSelected = { timestamp ->
+                    viewModel.updatePendingReceipt(r.copy(dateMillis = timestamp))
+                    showReceiptDatePicker = false
+                },
+                onDismissRequest = { showReceiptDatePicker = false }
+            )
+        }
     }
 
     Scaffold(

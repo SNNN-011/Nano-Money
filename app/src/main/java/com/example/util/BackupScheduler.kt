@@ -1,7 +1,7 @@
 package com.example.util
 
 import android.content.Context
-import android.util.Log
+import com.example.util.SecureLog
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
@@ -25,7 +25,7 @@ object BackupScheduler {
 
         if (!enabled) {
             workManager.cancelUniqueWork(UNIQUE_WORK_NAME)
-            Log.d("BackupScheduler", "Pencadangan otomatis dinonaktifkan")
+            SecureLog.d("BackupScheduler", "Pencadangan otomatis dinonaktifkan")
             return
         }
 
@@ -78,12 +78,12 @@ object BackupScheduler {
                 policy,
                 periodicWorkRequest
             )
-            Log.d(
+            SecureLog.d(
                 "BackupScheduler", 
                 "Pencadangan otomatis diatur menggunakan WorkManager (${policy.name}): $interval mulai pukul ${String.format("%02d:%02d", hour, minute)} (Initial delay: ${TimeUnit.MILLISECONDS.toMinutes(initialDelay)} menit)"
             )
         } catch (e: Exception) {
-            Log.e("BackupScheduler", "Gagal mengatur WorkManager untuk pencadangan otomatis: ${e.message}", e)
+            SecureLog.e("BackupScheduler", "Gagal mengatur WorkManager untuk pencadangan otomatis: ${e.message}", e)
         }
     }
 }

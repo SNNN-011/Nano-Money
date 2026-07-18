@@ -33,6 +33,7 @@ class CalendarViewModel(
                                 .atZone(zoneId)
                                 .toLocalDate()
                         } catch (e: Exception) {
+                            com.example.util.SecureLog.w("CalendarVM", "Invalid date for record ${record.id}: ${record.date}", e)
                             java.time.LocalDate.now()
                         }
                     }

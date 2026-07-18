@@ -1,6 +1,6 @@
 package com.example.util
 
-import android.util.Log
+import com.example.util.SecureLog
 import com.google.firebase.remoteconfig.FirebaseRemoteConfig
 import com.google.firebase.remoteconfig.FirebaseRemoteConfigSettings
 import com.google.firebase.remoteconfig.ConfigUpdate
@@ -50,7 +50,7 @@ object RemoteConfigHelper {
 
         remoteConfig.addOnConfigUpdateListener(object : ConfigUpdateListener {
             override fun onUpdate(configUpdate : ConfigUpdate) {
-                Log.d(TAG, "Konfigurasi diperbarui: ${configUpdate.updatedKeys}")
+                SecureLog.d(TAG, "Konfigurasi diperbarui: ${configUpdate.updatedKeys}")
                 if (configUpdate.updatedKeys.contains("welcome_message") || 
                     configUpdate.updatedKeys.contains("welcome_message_color") || 
                     configUpdate.updatedKeys.contains("show_new_feature") ||
@@ -63,7 +63,7 @@ object RemoteConfigHelper {
             }
 
             override fun onError(error: FirebaseRemoteConfigException) {
-                Log.w(TAG, "Gagal mendengarkan update konfigurasi.", error)
+                SecureLog.w(TAG, "Gagal mendengarkan update konfigurasi.", error)
             }
         })
     }
@@ -73,10 +73,10 @@ object RemoteConfigHelper {
             .addOnCompleteListener { task ->
                 if (task.isSuccessful) {
                     val updated = task.result
-                    Log.d(TAG, "Konfigurasi berhasil diambil. Updated: $updated")
+                    SecureLog.d(TAG, "Konfigurasi berhasil diambil. Updated: $updated")
                     updateValues(remoteConfig)
                 } else {
-                    Log.d(TAG, "Gagal mengambil konfigurasi")
+                    SecureLog.d(TAG, "Gagal mengambil konfigurasi")
                 }
             }
     }
