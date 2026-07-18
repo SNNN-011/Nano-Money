@@ -93,7 +93,8 @@ fun PremiumButton(
     testTag: String = "",
     fillMaxWidth: Boolean = true,
     horizontalPadding: Dp = 16.dp,
-    verticalPadding: Dp = 10.dp
+    verticalPadding: Dp = 10.dp,
+    gradientColors: List<Color> = listOf(SteelBlue, SteelBlue.copy(alpha = 0.7f))
 ) {
     Card(
         modifier = modifier.then(if (!enabled) Modifier.alpha(0.5f) else Modifier),
@@ -117,7 +118,7 @@ fun PremiumButton(
                     if (isActive) {
                         Modifier.background(
                             brush = Brush.verticalGradient(
-                                colors = listOf(SteelBlue, SteelBlue.copy(alpha = 0.7f))
+                                colors = gradientColors
                             ),
                             shape = RoundedCornerShape(CornerRadius.lg)
                         )
