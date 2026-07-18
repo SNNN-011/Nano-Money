@@ -1,5 +1,7 @@
 package com.example.ui.config
 
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.TextFieldValue
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.*
@@ -10,6 +12,33 @@ object FormatUtils {
         if (cleanString.isEmpty()) return ""
         val parsed = cleanString.toLongOrNull() ?: return input
         return NumberFormat.getNumberInstance(Locale.forLanguageTag("id-ID")).format(parsed)
+    }
+
+    /**
+     * Format number input while preserving cursor position.
+     * Returns a TextFieldValue with the cursor placed after the same digit the user was editing.
+     */
+    fun formatInputNumberPreserveCursor(fieldValue: TextFieldValue): TextFieldValue {
+        val oldText = fieldValue.text
+        val cursorPos = fieldValue.selection.start.coerceIn(0, oldText.length)
+        val digitsBeforeCursor = oldText.substring(0, cursorPos).count { it.isDigit() }
+        val cleanInput = oldText.replace(".", "").replace(",", "")
+        if (cleanInput.isEmpty()) return TextFieldValue("", TextRange(0))
+        if (!cleanInput.all { it.isDigit() }) return fieldValue
+        val formatted = formatInputNumber(cleanInput)
+        var digitCount = 0
+        var newCursorPos = formatted.length
+        for (i in formatted.indices) {
+            if (formatted[i].isDigit()) {
+                digitCount++
+                if (digitCount > digitsBeforeCursor) {
+                    newCursorPos = i
+                    break
+                }
+            }
+            if (i == formatted.length - 1) newCursorPos = formatted.length
+        }
+        return TextFieldValue(formatted, TextRange(newCursorPos))
     }
 
     fun formatRupiah(amount: Double): String {

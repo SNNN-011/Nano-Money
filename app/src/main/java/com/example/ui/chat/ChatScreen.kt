@@ -708,6 +708,7 @@ fun ChatScreen(
 
                                 // Amount block (compact basic input field)
                                 val amtStr = if (pending.amount == null || pending.amount == 0.0) "" else FormatUtils.formatInputNumber(pending.amount.toLong().toString())
+                                val amtFieldValue = remember(amtStr) { androidx.compose.ui.text.input.TextFieldValue(amtStr, androidx.compose.ui.text.TextRange(amtStr.length)) }
                                 Row(
                                     modifier = Modifier
                                         .weight(1f)
@@ -720,9 +721,9 @@ fun ChatScreen(
                                     Text("Rp", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold), color = GhostWhite.copy(alpha = 0.5f))
                                     Spacer(modifier = Modifier.width(4.dp))
                                     androidx.compose.foundation.text.BasicTextField(
-                                        value = amtStr,
-                                        onValueChange = { newValue ->
-                                            val clean = newValue.replace(".", "")
+                                        value = amtFieldValue,
+                                        onValueChange = { field ->
+                                            val clean = field.text.replace(".", "")
                                             if (clean.length <= 11) {
                                                 val parsedAmt = clean.toDoubleOrNull() ?: 0.0
                                                 viewModel.updatePendingTransaction(pending.copy(amount = parsedAmt))
@@ -1117,6 +1118,7 @@ fun ChatScreen(
 
                                             // Item Amount basic numeric field
                                             val grpAmtStr = if (grp.amount == 0.0) "" else FormatUtils.formatInputNumber(grp.amount.toLong().toString())
+                                            val grpAmtFieldValue = remember(grpAmtStr) { androidx.compose.ui.text.input.TextFieldValue(grpAmtStr, androidx.compose.ui.text.TextRange(grpAmtStr.length)) }
                                             Row(
                                                 modifier = Modifier
                                                     .weight(1f)
@@ -1129,9 +1131,9 @@ fun ChatScreen(
                                                 Text("Rp", style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp, fontWeight = FontWeight.Bold), color = GhostWhite.copy(alpha = 0.5f))
                                                 Spacer(modifier = Modifier.width(3.dp))
                                                 androidx.compose.foundation.text.BasicTextField(
-                                                    value = grpAmtStr,
-                                                    onValueChange = { newValue ->
-                                                        val clean = newValue.replace(".", "")
+                                                    value = grpAmtFieldValue,
+                                                    onValueChange = { field ->
+                                                        val clean = field.text.replace(".", "")
                                                         if (clean.length <= 11) {
                                                             val parsedAmt = clean.toDoubleOrNull() ?: 0.0
                                                             val updatedGrouped = receipt.grouped.toMutableList()

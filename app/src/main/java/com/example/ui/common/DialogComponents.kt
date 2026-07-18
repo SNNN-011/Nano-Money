@@ -29,6 +29,8 @@ import com.example.data.FinancialRecord
 import com.example.ui.theme.*
 import com.example.ui.components.GlassCard
 import com.example.ui.config.FormatUtils
+import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.TextRange
 import java.util.*
 
 @Composable
@@ -394,16 +396,15 @@ fun MonthlyBudgetDialog(
     onDismiss: () -> Unit
 ) {
     var budgetInput by remember {
-        mutableStateOf(
-            if (currentBudgetLimit > 0.0) {
-                val rawAmt = if (currentBudgetLimit % 1.0 == 0.0) {
-                    currentBudgetLimit.toLong().toString()
-                } else {
-                    currentBudgetLimit.toString().substringBefore(".")
-                }
-                FormatUtils.formatInputNumber(rawAmt)
-            } else ""
-        )
+        val initial = if (currentBudgetLimit > 0.0) {
+            val rawAmt = if (currentBudgetLimit % 1.0 == 0.0) {
+                currentBudgetLimit.toLong().toString()
+            } else {
+                currentBudgetLimit.toString().substringBefore(".")
+            }
+            FormatUtils.formatInputNumber(rawAmt)
+        } else ""
+        mutableStateOf(TextFieldValue(initial, TextRange(initial.length)))
     }
     var budgetError by remember { mutableStateOf<String?>(null) }
 
@@ -526,10 +527,10 @@ fun MonthlyBudgetDialog(
 
                 OutlinedTextField(
                     value = budgetInput,
-                    onValueChange = {
-                        val clean = it.filter { it.isDigit() }
+                    onValueChange = { field ->
+                        val clean = field.text.replace(".", "").filter { it.isDigit() }
                         if (clean.length <= 11) {
-                            budgetInput = FormatUtils.formatInputNumber(clean)
+                            budgetInput = FormatUtils.formatInputNumberPreserveCursor(field)
                         }
                         budgetError = null
                     },
@@ -587,7 +588,7 @@ fun MonthlyBudgetDialog(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     presets.forEach { (value, label) ->
-                        val isSelected = budgetInput.replace(".", "") == value.toLong().toString()
+                        val isSelected = budgetInput.text.replace(".", "") == value.toLong().toString()
                         val containerCol = if (isSelected) SteelBlue.copy(alpha = 0.2f) else TranslucentInput
                         val borderCol = if (isSelected) SteelBlue else GhostWhite.copy(alpha = 0.1f)
                         val textCol = if (isSelected) SteelBlue else GhostWhite.copy(alpha = 0.8f)
@@ -596,7 +597,8 @@ fun MonthlyBudgetDialog(
                             modifier = Modifier
                                 .weight(1f)
                                 .clickable {
-                                    budgetInput = FormatUtils.formatInputNumber(value.toLong().toString())
+                                    val formatted = FormatUtils.formatInputNumber(value.toLong().toString())
+                                    budgetInput = TextFieldValue(formatted, TextRange(formatted.length))
                                     budgetError = null
                                 }
                                 .testTag("budget_preset_${value.toLong()}"),
@@ -828,7 +830,8 @@ fun MonthlyBudgetDialog(
                         for (category in selectedEnabledCategories) {
                             val localState = remember(category) {
                                 val raw = localCategoryBudgets[category] ?: ""
-                                mutableStateOf(if (raw.isNotEmpty()) FormatUtils.formatInputNumber(raw) else "")
+                                val initial = if (raw.isNotEmpty()) FormatUtils.formatInputNumber(raw) else ""
+                                mutableStateOf(TextFieldValue(initial, TextRange(initial.length)))
                             }
                             Card(
                                 modifier = Modifier.fillMaxWidth(),
@@ -868,10 +871,10 @@ fun MonthlyBudgetDialog(
 
                                     OutlinedTextField(
                                         value = localState.value,
-                                        onValueChange = { newValue: String ->
-                                            val clean = newValue.filter { it.isDigit() }
+                                        onValueChange = { field ->
+                                            val clean = field.text.replace(".", "").filter { it.isDigit() }
                                             if (clean.length <= 11) {
-                                                localState.value = FormatUtils.formatInputNumber(clean)
+                                                localState.value = FormatUtils.formatInputNumberPreserveCursor(field)
                                                 localCategoryBudgets[category] = clean
                                             }
                                         },
@@ -946,7 +949,7 @@ fun MonthlyBudgetDialog(
                  PremiumButton(
                     text = "Simpan",
                     onClick = {
-                        val cleanDigits = budgetInput.filter { it.isDigit() }
+                        val cleanDigits = budgetInput.text.filter { it.isDigit() }
                         if (cleanDigits.isEmpty()) {
                             budgetError = "Harap masukkan nilai anggaran"
                         } else {
@@ -1064,7 +1067,7 @@ fun RecurringTransactionManagementDialog(
 
     // Form states
     var descInput by remember { mutableStateOf("") }
-    var amountInput by remember { mutableStateOf("") }
+    var amountInput by remember { mutableStateOf(TextFieldValue("", TextRange(0))) }
     var typeInput by remember { mutableStateOf("expense") } // "income" or "expense"
     
     // Choose list based on selected type
@@ -1197,10 +1200,10 @@ fun RecurringTransactionManagementDialog(
                     // Amount Input
                     OutlinedTextField(
                         value = amountInput,
-                        onValueChange = {
-                            val clean = it.filter { it.isDigit() }
+                        onValueChange = { field ->
+                            val clean = field.text.replace(".", "").filter { it.isDigit() }
                             if (clean.length <= 11) {
-                                amountInput = FormatUtils.formatInputNumber(clean)
+                                amountInput = FormatUtils.formatInputNumberPreserveCursor(field)
                             }
                             amountError = null
                         },
@@ -1447,7 +1450,7 @@ fun RecurringTransactionManagementDialog(
                                 descError = "Harap masukkan deskripsi"
                                 valid = false
                             }
-                            val amt = amountInput.replace(".", "").trim().toDoubleOrNull()
+                            val amt = amountInput.text.replace(".", "").trim().toDoubleOrNull()
                             if (amt == null || amt <= 0.0) {
                                 amountError = "Nilai harus berupa angka positif"
                                 valid = false
