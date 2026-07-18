@@ -1,4 +1,4 @@
-package com.example.ui
+package com.example.ui.transaction
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween

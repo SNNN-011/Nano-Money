@@ -41,6 +41,7 @@ import com.example.ui.chat.ChatScreen
 import com.example.ui.chat.ChatViewModel
 import com.example.ui.home.BerandaTabContent
 import com.example.ui.home.DashboardStatsSection
+import com.example.ui.transaction.TransaksiBaruTabContent
 import com.example.R
 import java.util.*
 import androidx.compose.animation.core.*

@@ -1,4 +1,4 @@
-package com.example.ui
+package com.example.ui.transaction
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
