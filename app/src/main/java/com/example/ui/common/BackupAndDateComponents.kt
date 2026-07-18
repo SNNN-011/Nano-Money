@@ -1,4 +1,4 @@
-package com.example.ui
+package com.example.ui.common
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.BorderStroke

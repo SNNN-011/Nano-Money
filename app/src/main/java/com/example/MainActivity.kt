@@ -32,7 +32,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import com.example.ui.FinancialTrackerScreen
+import com.example.ui.common.FinancialTrackerScreen
 import com.example.ui.theme.*
 
 class MainActivity : FragmentActivity() {

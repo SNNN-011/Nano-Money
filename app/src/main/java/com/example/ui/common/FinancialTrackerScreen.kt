@@ -1,4 +1,4 @@
-package com.example.ui
+package com.example.ui.common
 
 import android.app.Application
 import android.widget.Toast
