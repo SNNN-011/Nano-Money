@@ -21,7 +21,10 @@ object DatabaseKeyManager {
 
     @Synchronized
     fun getOrCreatePassphrase(context: Context): ByteArray {
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        // Migrate from plain SharedPreferences to EncryptedSharedPreferences if needed
+        val prefs = SecurePrefsHelper.getEncryptedPrefs(context, PREFS_NAME)
+        migrateFromPlainPrefsIfNeeded(context, prefs)
+
         val encryptedBase64 = prefs.getString(KEY_ENCRYPTED_PASSPHRASE, null)
         val ivBase64 = prefs.getString(KEY_IV, null)
 
@@ -36,7 +39,7 @@ object DatabaseKeyManager {
                 cipher.init(Cipher.DECRYPT_MODE, secretKey, spec)
                 return cipher.doFinal(encryptedBytes)
             } catch (e: Exception) {
-                // Jika terjadi gagal dekripsi (e.g. KeyStore rusak / reset), kita bisa fallback/generate ulang
+                SecureLog.e("DatabaseKeyManager", "Failed to decrypt passphrase, regenerating", e)
             }
         }
 
@@ -48,7 +51,7 @@ object DatabaseKeyManager {
             val secretKey = getOrCreateKeystoreKey()
             val cipher = Cipher.getInstance(AES_GCM_NOPADDING)
             cipher.init(Cipher.ENCRYPT_MODE, secretKey)
-            
+
             val iv = cipher.iv
             val encryptedBytes = cipher.doFinal(passphraseBytes)
 
@@ -60,10 +63,44 @@ object DatabaseKeyManager {
                 .putString(KEY_IV, newIvBase64)
                 .apply()
         } catch (e: Exception) {
+            SecureLog.e("DatabaseKeyManager", "Failed to encrypt and store passphrase", e)
             return getFallbackPassphrase(context)
         }
 
         return passphraseBytes
+    }
+
+    /**
+     * One-time migration: move encrypted passphrase from plain SharedPreferences
+     * to EncryptedSharedPreferences. Deletes plain prefs after migration.
+     */
+    private fun migrateFromPlainPrefsIfNeeded(context: Context, encryptedPrefs: android.content.SharedPreferences) {
+        val migrationDoneKey = "db_key_migration_to_encrypted_v1"
+        if (encryptedPrefs.getBoolean(migrationDoneKey, false)) return
+
+        val plainPrefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val plainEncrypted = plainPrefs.getString(KEY_ENCRYPTED_PASSPHRASE, null)
+        val plainIv = plainPrefs.getString(KEY_IV, null)
+
+        if (plainEncrypted != null && plainIv != null) {
+            // Copy to encrypted prefs
+            encryptedPrefs.edit()
+                .putString(KEY_ENCRYPTED_PASSPHRASE, plainEncrypted)
+                .putString(KEY_IV, plainIv)
+                .putBoolean(migrationDoneKey, true)
+                .apply()
+
+            // Delete plain prefs file entirely
+            plainPrefs.edit().clear().commit()
+            try {
+                val prefsFile = java.io.File(context.filesDir.parentFile, "shared_prefs/$PREFS_NAME.xml")
+                if (prefsFile.exists()) prefsFile.delete()
+            } catch (_: Exception) {}
+
+            SecureLog.i("DatabaseKeyManager", "Migrated DB passphrase from plain to encrypted prefs")
+        } else {
+            encryptedPrefs.edit().putBoolean(migrationDoneKey, true).apply()
+        }
     }
 
     private fun getKeystoreKey(): SecretKey? {

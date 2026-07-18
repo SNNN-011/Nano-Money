@@ -43,8 +43,8 @@ object SecurePrefsHelper {
             return try {
                 buildEncryptedPrefs(context, name)
             } catch (e2: Exception) {
-                SecureLog.e(TAG, "Gagal total membuat ulang, fallback plain SEMENTARA (bukan permanen).", e2)
-                context.applicationContext.getSharedPreferences(name, Context.MODE_PRIVATE)
+                SecureLog.e(TAG, "Gagal total membuat ulang encrypted prefs '$name'.", e2)
+                throw IllegalStateException("Cannot create encrypted prefs '$name' after recovery", e2)
             }
         }
     }

@@ -102,7 +102,7 @@ object GeminiClient {
     private val BASE_URL = try {
         val rawUrl = com.example.BuildConfig.GEMINI_BASE_URL
         val finalUrl = rawUrl.trim().replace("\"", "")
-        
+
         if (finalUrl.isEmpty() || finalUrl.contains("your-cloudflare-worker-url")) {
             "https://generativelanguage.googleapis.com/"
         } else {
@@ -115,6 +115,37 @@ object GeminiClient {
     val isUsingProxy: Boolean
         get() = !BASE_URL.contains("googleapis.com")
 
+    // Cached token to avoid runBlocking in interceptor
+    @Volatile
+    private var cachedToken: String? = null
+    @Volatile
+    private var tokenExpiryMs: Long = 0L
+    private const val TOKEN_CACHE_TTL_MS = 50_000L // 50 seconds — Firebase tokens last 60min, this prevents stale on refresh
+
+    /**
+     * Get cached token or fetch synchronously. Called from OkHttp interceptor thread.
+     * Uses Tasks.await() (Google Play Services pattern) instead of runBlocking.
+     */
+    private fun getCachedOrFetchToken(): String? {
+        val now = System.currentTimeMillis()
+        cachedToken?.let { token ->
+            if (now < tokenExpiryMs) return token
+        }
+        return try {
+            val user = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser ?: return null
+            val result = com.google.android.gms.tasks.Tasks.await(user.getIdToken(false))
+            val token = result.token
+            if (token != null) {
+                cachedToken = token
+                tokenExpiryMs = now + TOKEN_CACHE_TTL_MS
+            }
+            token
+        } catch (e: Exception) {
+            com.example.util.SecureLog.w("GeminiClient", "Failed to fetch Firebase token", e)
+            null
+        }
+    }
+
     private val okHttpClient = OkHttpClient.Builder().apply {
         connectTimeout(30, TimeUnit.SECONDS)
         readTimeout(30, TimeUnit.SECONDS)
@@ -122,16 +153,14 @@ object GeminiClient {
         addInterceptor { chain ->
             val originalRequest = chain.request()
             val requestBuilder = originalRequest.newBuilder()
-            
+
             if (isUsingProxy) {
-                val token = kotlinx.coroutines.runBlocking {
-                    com.example.util.AuthHelper.getValidIdToken()
-                }
+                val token = getCachedOrFetchToken()
                 if (token != null) {
                     requestBuilder.header("Authorization", "Bearer $token")
                 }
             }
-            
+
             chain.proceed(requestBuilder.build())
         }
     }.build()
