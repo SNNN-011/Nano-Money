@@ -29,6 +29,7 @@ import com.example.data.FinancialRecord
 import com.example.data.RecurringTransaction
 import com.example.ui.theme.*
 import com.example.ui.components.GlassCard
+import com.example.ui.common.RecurringTransactionManagementDialog
 
 @Composable
 fun BerandaTabContent(
