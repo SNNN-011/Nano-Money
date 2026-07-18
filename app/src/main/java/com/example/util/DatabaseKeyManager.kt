@@ -89,17 +89,15 @@ object DatabaseKeyManager {
 
         try {
             val plainValues = mutableMapOf<String, String>()
-            context.contentResolver.openContentUri(android.net.Uri.fromFile(plainFile)).use { /* noop */ }
-            // Use XmlPullParser to read plain SharedPreferences XML
             val factory = android.util.Xml.newPullParser()
             val inputStream = plainFile.inputStream()
             factory.setInput(inputStream, null)
             var eventType = factory.eventType
             var currentKey: String? = null
-            while (eventType != android.content.res.XmlResourceParser.END_DOCUMENT) {
-                if (eventType == android.content.res.XmlResourceParser.START_TAG) {
+            while (eventType != org.xmlpull.v1.XmlPullParser.END_DOCUMENT) {
+                if (eventType == org.xmlpull.v1.XmlPullParser.START_TAG) {
                     currentKey = factory.getAttributeValue(null, "name")
-                } else if (eventType == android.content.res.XmlResourceParser.TEXT) {
+                } else if (eventType == org.xmlpull.v1.XmlPullParser.TEXT) {
                     if (currentKey != null) {
                         plainValues[currentKey] = factory.text.trim()
                     }
