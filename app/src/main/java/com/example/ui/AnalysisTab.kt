@@ -33,6 +33,7 @@ import androidx.compose.foundation.clickable
 import com.example.data.CategoryAggregation
 import com.example.ui.theme.*
 import com.example.ui.components.GlassCard
+import com.example.ui.config.FormatUtils
 import androidx.compose.ui.platform.testTag
 
 @Composable

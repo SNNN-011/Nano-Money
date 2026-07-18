@@ -1,4 +1,4 @@
-package com.example.ui
+package com.example.ui.config
 
 import java.text.NumberFormat
 import java.text.SimpleDateFormat

@@ -28,6 +28,7 @@ import androidx.compose.ui.window.Dialog
 import com.example.data.FinancialRecord
 import com.example.ui.theme.*
 import com.example.ui.components.GlassCard
+import com.example.ui.config.FormatUtils
 import java.util.*
 
 @Composable

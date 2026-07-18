@@ -16,6 +16,8 @@ import java.io.IOException
 
 import android.graphics.Bitmap
 import com.example.domain.ParsedReceipt
+import com.example.ui.config.AiModelConfig
+import com.example.ui.config.FormatUtils
 
 sealed class ChatMessage {
     data class UserMessage(val text: String) : ChatMessage()

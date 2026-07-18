@@ -35,6 +35,8 @@ import androidx.compose.ui.unit.sp
 import com.example.data.FinancialRecord
 import com.example.ui.theme.*
 import com.example.ui.components.GlassCard
+import com.example.ui.config.AiModelConfig
+import com.example.ui.config.FormatUtils
 
 import android.graphics.Bitmap
 import android.graphics.ImageDecoder

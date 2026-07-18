@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.theme.*
 import com.example.ui.components.GlassCard
+import com.example.ui.config.FormatUtils
 import com.example.ui.util.CategoryIconMapper
 
 @Composable

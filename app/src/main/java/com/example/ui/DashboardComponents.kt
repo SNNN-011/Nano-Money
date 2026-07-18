@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.example.ui.theme.*
 import com.example.ui.components.GlassCard
+import com.example.ui.config.FormatUtils
 
 @Composable
 fun DashboardStatsSection(

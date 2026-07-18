@@ -1,4 +1,4 @@
-package com.example.ui
+package com.example.ui.config
 
 object AiModelConfig {
     const val GEMINI_MODEL = "gemini-3.1-flash-lite"
