@@ -2,12 +2,12 @@ package com.example.domain
 
 import android.graphics.Bitmap
 import android.util.Base64
-import com.example.ui.GeminiClient
-import com.example.ui.GeminiContent
-import com.example.ui.GeminiGenerationConfig
-import com.example.ui.GeminiPart
-import com.example.ui.GeminiRequest
-import com.example.ui.InlineData
+import com.example.data.remote.GeminiClient
+import com.example.data.remote.GeminiContent
+import com.example.data.remote.GeminiGenerationConfig
+import com.example.data.remote.GeminiPart
+import com.example.data.remote.GeminiRequest
+import com.example.data.remote.InlineData
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray

@@ -1,13 +1,13 @@
 package com.example.domain
 
-import com.example.ui.ExtractionResult
-import com.example.ui.GeminiClient
-import com.example.ui.GeminiContent
-import com.example.ui.GeminiGenerationConfig
-import com.example.ui.GeminiPart
-import com.example.ui.GeminiRequest
-import com.example.ui.GeminiSchemaOptions
-import com.example.ui.GeminiSchemaItem
+import com.example.data.remote.ExtractionResult
+import com.example.data.remote.GeminiClient
+import com.example.data.remote.GeminiContent
+import com.example.data.remote.GeminiGenerationConfig
+import com.example.data.remote.GeminiPart
+import com.example.data.remote.GeminiRequest
+import com.example.data.remote.GeminiSchemaOptions
+import com.example.data.remote.GeminiSchemaItem
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject

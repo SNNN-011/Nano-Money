@@ -1,4 +1,4 @@
-package com.example.ui
+package com.example.data.remote
 
 import com.squareup.moshi.JsonClass
 import okhttp3.MediaType.Companion.toMediaType
