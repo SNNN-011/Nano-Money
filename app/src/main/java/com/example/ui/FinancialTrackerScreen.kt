@@ -42,6 +42,8 @@ import com.example.ui.chat.ChatViewModel
 import com.example.ui.home.BerandaTabContent
 import com.example.ui.home.DashboardStatsSection
 import com.example.ui.transaction.TransaksiBaruTabContent
+import com.example.ui.calendar.CalendarTabContent
+import com.example.ui.calendar.CalendarViewModel
 import com.example.R
 import java.util.*
 import androidx.compose.animation.core.*
