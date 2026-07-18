@@ -74,7 +74,7 @@ class MainActivity : FragmentActivity() {
           }
           
           if (securityStatus != com.example.util.SecurityUtil.SecurityStatus.SAFE) {
-            com.example.ui.SecurityViolationScreen(securityStatus = securityStatus)
+            com.example.ui.common.SecurityViolationScreen(securityStatus = securityStatus)
           } else {
             val securityPrefs = remember { com.example.util.SecurePrefsHelper.getEncryptedPrefs(context, "app_security_prefs") }
             
@@ -122,7 +122,7 @@ class MainActivity : FragmentActivity() {
           }
           
           if (isLaunching) {
-            com.example.ui.StartupScreen(
+            com.example.ui.common.StartupScreen(
                 visible = true,
                 onFinished = { isLaunching = false }
             )
