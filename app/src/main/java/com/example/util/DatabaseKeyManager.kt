@@ -93,13 +93,13 @@ object DatabaseKeyManager {
             val inputStream = plainFile.inputStream()
             factory.setInput(inputStream, null)
             var eventType = factory.eventType
-            var currentKey: String? = null
             while (eventType != org.xmlpull.v1.XmlPullParser.END_DOCUMENT) {
                 if (eventType == org.xmlpull.v1.XmlPullParser.START_TAG) {
-                    currentKey = factory.getAttributeValue(null, "name")
-                } else if (eventType == org.xmlpull.v1.XmlPullParser.TEXT) {
-                    if (currentKey != null) {
-                        plainValues[currentKey] = factory.text.trim()
+                    val key = factory.getAttributeValue(null, "name")
+                    // SharedPreferences XML stores values in "value" attribute, not text content
+                    val value = factory.getAttributeValue(null, "value")
+                    if (key != null && value != null) {
+                        plainValues[key] = value
                     }
                 }
                 eventType = factory.next()
