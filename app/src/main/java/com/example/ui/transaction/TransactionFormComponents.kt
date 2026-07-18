@@ -25,6 +25,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -253,12 +255,30 @@ fun TransactionFormCard(
                 // Amount field - Jumbo & Centered
                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
                     Text("Jumlah (Rp)", color = MutedExpense, style = MaterialTheme.typography.labelMedium)
+                    val amountFieldValue = remember(amount) {
+                        TextFieldValue(text = amount, selection = TextRange(amount.length))
+                    }
                     TextField(
-                        value = amount,
-                        onValueChange = { input ->
-                            val cleanInput = input.replace(".", "")
+                        value = amountFieldValue,
+                        onValueChange = { field ->
+                            val cleanInput = field.text.replace(".", "")
                             if (cleanInput.length <= 11 && (cleanInput.isEmpty() || cleanInput.all { it.isDigit() })) {
-                                onAmountChanged(FormatUtils.formatInputNumber(cleanInput))
+                                val formatted = FormatUtils.formatInputNumber(cleanInput)
+                                // Preserve cursor position: count digits before cursor, then find same position in formatted string
+                                val digitsBeforeCursor = field.text.substring(0, field.selection.start.coerceAtMost(field.text.length)).count { it.isDigit() }
+                                var digitCount = 0
+                                var newCursorPos = formatted.length
+                                for (i in formatted.indices) {
+                                    if (formatted[i].isDigit()) {
+                                        digitCount++
+                                        if (digitCount > digitsBeforeCursor) {
+                                            newCursorPos = i
+                                            break
+                                        }
+                                    }
+                                    if (i == formatted.length - 1) newCursorPos = formatted.length
+                                }
+                                onAmountChanged(formatted)
                             }
                         },
                         textStyle = MaterialTheme.typography.displayMedium.copy(
