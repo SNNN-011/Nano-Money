@@ -282,8 +282,7 @@ fun UnifiedExportCard(
                 enabled = selectedMonths.isNotEmpty(),
                 icon = Icons.Default.PictureAsPdf,
                 testTag = "export_pdf_button",
-                modifier = Modifier.fillMaxWidth(),
-                gradientColors = listOf(NeonViolet, NeonViolet.copy(alpha = 0.7f))
+                modifier = Modifier.fillMaxWidth()
             )
 
             Spacer(modifier = Modifier.height(2.dp))
