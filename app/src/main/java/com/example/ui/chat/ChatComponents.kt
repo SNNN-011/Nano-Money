@@ -1,4 +1,4 @@
-package com.example.ui
+package com.example.ui.chat
 
 import android.graphics.Bitmap
 import androidx.compose.animation.core.*

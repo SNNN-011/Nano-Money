@@ -37,6 +37,8 @@ import androidx.navigation.compose.rememberNavController
 import com.example.data.FinancialRecord
 import com.example.ui.theme.*
 import com.example.ui.components.GlassCard
+import com.example.ui.chat.ChatScreen
+import com.example.ui.chat.ChatViewModel
 import com.example.R
 import java.util.*
 import androidx.compose.animation.core.*

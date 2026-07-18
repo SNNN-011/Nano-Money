@@ -1,4 +1,4 @@
-package com.example.ui
+package com.example.ui.chat
 
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
