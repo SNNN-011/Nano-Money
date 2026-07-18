@@ -71,34 +71,61 @@ object DatabaseKeyManager {
     }
 
     /**
-     * One-time migration: move encrypted passphrase from plain SharedPreferences
-     * to EncryptedSharedPreferences. Deletes plain prefs after migration.
+     * One-time migration: read DB passphrase from plain SharedPreferences XML file on disk
+     * (NOT via context.getSharedPreferences which returns cached EncryptedPrefs),
+     * copy to EncryptedSharedPreferences, then delete the plain file.
      */
     private fun migrateFromPlainPrefsIfNeeded(context: Context, encryptedPrefs: android.content.SharedPreferences) {
         val migrationDoneKey = "db_key_migration_to_encrypted_v1"
         if (encryptedPrefs.getBoolean(migrationDoneKey, false)) return
 
-        val plainPrefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        val plainEncrypted = plainPrefs.getString(KEY_ENCRYPTED_PASSPHRASE, null)
-        val plainIv = plainPrefs.getString(KEY_IV, null)
+        // Read plain XML file directly from disk — context.getSharedPreferences()
+        // would return the cached encrypted instance, not the actual plain file.
+        val plainFile = java.io.File(context.filesDir.parentFile, "shared_prefs/$PREFS_NAME.xml")
+        if (!plainFile.exists()) {
+            encryptedPrefs.edit().putBoolean(migrationDoneKey, true).apply()
+            return
+        }
 
-        if (plainEncrypted != null && plainIv != null) {
-            // Copy to encrypted prefs
-            encryptedPrefs.edit()
-                .putString(KEY_ENCRYPTED_PASSPHRASE, plainEncrypted)
-                .putString(KEY_IV, plainIv)
-                .putBoolean(migrationDoneKey, true)
-                .apply()
+        try {
+            val plainValues = mutableMapOf<String, String>()
+            context.contentResolver.openContentUri(android.net.Uri.fromFile(plainFile)).use { /* noop */ }
+            // Use XmlPullParser to read plain SharedPreferences XML
+            val factory = android.util.Xml.newPullParser()
+            val inputStream = plainFile.inputStream()
+            factory.setInput(inputStream, null)
+            var eventType = factory.eventType
+            var currentKey: String? = null
+            while (eventType != android.content.res.XmlResourceParser.END_DOCUMENT) {
+                if (eventType == android.content.res.XmlResourceParser.START_TAG) {
+                    currentKey = factory.getAttributeValue(null, "name")
+                } else if (eventType == android.content.res.XmlResourceParser.TEXT) {
+                    if (currentKey != null) {
+                        plainValues[currentKey] = factory.text.trim()
+                    }
+                }
+                eventType = factory.next()
+            }
+            inputStream.close()
 
-            // Delete plain prefs file entirely
-            plainPrefs.edit().clear().commit()
-            try {
-                val prefsFile = java.io.File(context.filesDir.parentFile, "shared_prefs/$PREFS_NAME.xml")
-                if (prefsFile.exists()) prefsFile.delete()
-            } catch (_: Exception) {}
+            val plainEncrypted = plainValues[KEY_ENCRYPTED_PASSPHRASE]
+            val plainIv = plainValues[KEY_IV]
 
-            SecureLog.i("DatabaseKeyManager", "Migrated DB passphrase from plain to encrypted prefs")
-        } else {
+            if (!plainEncrypted.isNullOrEmpty() && !plainIv.isNullOrEmpty()) {
+                encryptedPrefs.edit()
+                    .putString(KEY_ENCRYPTED_PASSPHRASE, plainEncrypted)
+                    .putString(KEY_IV, plainIv)
+                    .putBoolean(migrationDoneKey, true)
+                    .apply()
+
+                // Delete plain prefs file
+                plainFile.delete()
+                SecureLog.i("DatabaseKeyManager", "Migrated DB passphrase from plain to encrypted prefs")
+            } else {
+                encryptedPrefs.edit().putBoolean(migrationDoneKey, true).apply()
+            }
+        } catch (e: Exception) {
+            SecureLog.e("DatabaseKeyManager", "Migration from plain prefs failed", e)
             encryptedPrefs.edit().putBoolean(migrationDoneKey, true).apply()
         }
     }
