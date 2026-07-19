@@ -26,19 +26,24 @@ object SecurePrefsHelper {
         } catch (e: Exception) {
             SecureLog.e(TAG, "EncryptedSharedPreferences '$name' corrupt (${e.javaClass.simpleName}), melakukan reset paksa.", e)
             // Backup PIN data sebelum wipe — PIN adalah data keamanan kritis
+            // TIDAK bisa via EncryptedPrefs API karena corrupt, baca XML langsung
             val pinBackup = mutableMapOf<String, Any?>()
             try {
-                val oldPrefs = buildEncryptedPrefs(context, name)
-                val pinKeys = listOf("pin_hash", "pin_salt", "pin_enabled")
-                for (key in pinKeys) {
-                    val value = oldPrefs.all[key] ?: oldPrefs.getString(key, null)
-                    if (value != null) {
-                        pinBackup[key] = value
-                    } else if (oldPrefs.contains(key)) {
-                        pinBackup[key] = oldPrefs.getBoolean(key, false)
+                val prefsFile = java.io.File(context.applicationContext.filesDir.parentFile, "shared_prefs/$name.xml")
+                if (prefsFile.exists()) {
+                    val xmlText = prefsFile.readText()
+                    // Parse XML sederhana — cari <string name="pin_hash">...</string>, dll
+                    val pinKeys = listOf("pin_hash", "pin_salt", "pin_enabled")
+                    for (key in pinKeys) {
+                        // String: <string name="pin_hash">base64data</string>
+                        val stringPattern = """<string\s+name="$key"[^>]*>([^<]*)</string>""".toRegex()
+                        stringPattern.find(xmlText)?.groups?.get(1)?.value?.let { pinBackup[key] = it }
+                        // Boolean: <boolean name="pin_enabled" value="true" />
+                        val boolPattern = """<boolean\s+name="$key"\s+value="(true|false)"\s*/>""".toRegex()
+                        boolPattern.find(xmlText)?.groups?.get(1)?.value?.let { pinBackup[key] = it.toBoolean() }
                     }
+                    SecureLog.w(TAG, "Backup PIN data dari XML: ${pinBackup.keys}")
                 }
-                SecureLog.w(TAG, "Backup PIN data sebelum wipe: ${pinBackup.keys}")
             } catch (backupError: Exception) {
                 SecureLog.w(TAG, "Tidak bisa backup PIN data: ${backupError.message}")
             }
