@@ -25,6 +25,23 @@ object SecurePrefsHelper {
             return prefs
         } catch (e: Exception) {
             SecureLog.e(TAG, "EncryptedSharedPreferences '$name' corrupt (${e.javaClass.simpleName}), melakukan reset paksa.", e)
+            // Backup PIN data sebelum wipe — PIN adalah data keamanan kritis
+            val pinBackup = mutableMapOf<String, Any?>()
+            try {
+                val oldPrefs = buildEncryptedPrefs(context, name)
+                val pinKeys = listOf("pin_hash", "pin_salt", "pin_enabled")
+                for (key in pinKeys) {
+                    val value = oldPrefs.all[key] ?: oldPrefs.getString(key, null)
+                    if (value != null) {
+                        pinBackup[key] = value
+                    } else if (oldPrefs.contains(key)) {
+                        pinBackup[key] = oldPrefs.getBoolean(key, false)
+                    }
+                }
+                SecureLog.w(TAG, "Backup PIN data sebelum wipe: ${pinBackup.keys}")
+            } catch (backupError: Exception) {
+                SecureLog.w(TAG, "Tidak bisa backup PIN data: ${backupError.message}")
+            }
             try {
                 context.applicationContext.getSharedPreferences(name, Context.MODE_PRIVATE)
                     .edit().clear().commit()
@@ -41,7 +58,20 @@ object SecurePrefsHelper {
                 SecureLog.e(TAG, "Gagal hapus Keystore alias: ${ksError.message}", ksError)
             }
             return try {
-                buildEncryptedPrefs(context, name)
+                val newPrefs = buildEncryptedPrefs(context, name)
+                // Restore PIN data setelah rebuild
+                if (pinBackup.isNotEmpty()) {
+                    val editor = newPrefs.edit()
+                    for ((key, value) in pinBackup) {
+                        when (value) {
+                            is String -> editor.putString(key, value)
+                            is Boolean -> editor.putBoolean(key, value)
+                        }
+                    }
+                    editor.apply()
+                    SecureLog.w(TAG, "PIN data restored setelah recovery: ${pinBackup.keys}")
+                }
+                newPrefs
             } catch (e2: Exception) {
                 SecureLog.e(TAG, "Gagal total membuat ulang encrypted prefs '$name'.", e2)
                 throw IllegalStateException("Cannot create encrypted prefs '$name' after recovery", e2)
