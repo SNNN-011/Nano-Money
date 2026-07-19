@@ -46,8 +46,10 @@ object PinUtils {
         return storedHash == hashPin(pin, salt)
     }
 
-    fun isPinEnabled(context: Context): Boolean =
-        prefs(context).getBoolean(KEY_ENABLED, false)
+    fun isPinEnabled(context: Context): Boolean {
+        val p = prefs(context)
+        return p.getBoolean(KEY_ENABLED, false) && p.getString(KEY_HASH, null) != null
+    }
 
     fun hasPin(context: Context): Boolean =
         prefs(context).getString(KEY_HASH, null) != null

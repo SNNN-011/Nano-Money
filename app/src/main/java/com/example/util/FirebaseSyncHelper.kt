@@ -362,13 +362,13 @@ object FirebaseSyncHelper {
                     }
                 }
 
-                // Remove all PIN & security lock related settings
-                val pinKeys = listOf(
-                    "saved_pin", "pin_enabled", "pin_salt", "pin_hash",
+                // Remove legacy security fields (not PIN feature keys)
+                val legacySecurityKeys = listOf(
+                    "saved_pin",
                     "security_question", "security_answer", "security_question_answer",
                     "answer_salt", "answer_hash", "biometric_enabled"
                 )
-                for (key in pinKeys) {
+                for (key in legacySecurityKeys) {
                     mergedSettings.remove(key)
                     prefs.edit().remove(key).apply()
                 }
