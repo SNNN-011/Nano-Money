@@ -100,15 +100,21 @@ class MainActivity : FragmentActivity() {
           }
           
           var isLaunching by remember { mutableStateOf(true) }
-          
+          // null = belum dicek, true = sudah unlock/PIN tidak aktif, false = perlu PIN
+          var pinUnlocked by remember { mutableStateOf<Boolean?>(null) }
+
           val permissionLauncher = rememberLauncherForActivityResult(
               contract = ActivityResultContracts.RequestMultiplePermissions()
           ) { _ ->
               securityPrefs.edit().putBoolean("permission_dialog_shown", true).apply()
           }
 
+          // Cek PIN SETELAH splash selesai — bukan saat composable build
+          // Ini penting: EncryptedSharedPreferences butuh waktu untuk init
           LaunchedEffect(isLaunching) {
               if (!isLaunching) {
+                  // Baca PIN status di coroutine, setelah prefs siap
+                  pinUnlocked = !com.example.util.PinUtils.isPinEnabled(context)
                   if (!securityPrefs.getBoolean("permission_dialog_shown", false)) {
                       val permissions = mutableListOf<String>()
                       if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
@@ -120,22 +126,23 @@ class MainActivity : FragmentActivity() {
                   }
               }
           }
-          
-          if (isLaunching) {
-            com.example.ui.common.StartupScreen(
-                visible = true,
-                onFinished = { isLaunching = false }
-            )
-          } else {
-            var pinUnlocked by remember { mutableStateOf(!com.example.util.PinUtils.isPinEnabled(context)) }
-            if (!pinUnlocked) {
-              com.example.ui.common.PinUnlockScreen(
-                onUnlocked = { pinUnlocked = true },
-                onExit = { finish() }
-              )
-            } else {
-              FinancialTrackerScreen(application = application, showStartupSplash = false)
-            }
+
+          when {
+            isLaunching || pinUnlocked == null -> {
+                  com.example.ui.common.StartupScreen(
+                      visible = true,
+                      onFinished = { isLaunching = false }
+                  )
+              }
+              pinUnlocked == false -> {
+                  com.example.ui.common.PinUnlockScreen(
+                      onUnlocked = { pinUnlocked = true },
+                      onExit = { finish() }
+                  )
+              }
+              else -> {
+                  FinancialTrackerScreen(application = application, showStartupSplash = false)
+              }
           }
          }
         }
