@@ -348,9 +348,14 @@ object FirebaseSyncHelper {
                     }
                 }
 
-                // For all other keys: local wins (original behavior), skip category keys already merged
+                // PIN keys: selalu local wins — PIN adalah data keamanan lokal device
+                val pinKeys = listOf("pin_hash", "pin_salt", "pin_enabled")
+
+                // For all other keys: Firestore first, local overwrite (local wins)
+                // Skip category keys (handled above) and PIN keys (handled below)
+                val skipKeys = categoryKeys + pinKeys
                 for ((k, v) in firestoreSettingsMap) {
-                    if (k !in categoryKeys) mergedSettings[k] = v
+                    if (k !in skipKeys) mergedSettings[k] = v
                 }
                 for ((k, v) in localSettingsMap) {
                     if (v != null && k !in categoryKeys) {
@@ -360,6 +365,11 @@ object FirebaseSyncHelper {
                             mergedSettings[k] = v
                         }
                     }
+                }
+
+                // PIN keys: only write local value — never sync PIN to/from Firestore
+                for (pinKey in pinKeys) {
+                    mergedSettings.remove(pinKey)
                 }
 
                 // Remove legacy security fields (not PIN feature keys)
