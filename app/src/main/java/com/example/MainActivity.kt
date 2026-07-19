@@ -111,11 +111,9 @@ class MainActivity : FragmentActivity() {
 
           // Cek PIN segera di background, parallel dengan splash
           LaunchedEffect(Unit) {
-              android.util.Log.d("MainActivity", "Cek PIN dimulai...")
               val needsPin = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                   com.example.util.PinUtils.isPinEnabled(context)
               }
-              android.util.Log.d("MainActivity", "isPinEnabled=$needsPin, pinUnlocked=${!needsPin}")
               pinUnlocked = !needsPin
               // Permission check — setelah PIN dicek
               if (!securityPrefs.getBoolean("permission_dialog_shown", false)) {
