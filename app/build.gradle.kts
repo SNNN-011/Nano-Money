@@ -20,6 +20,14 @@ android {
     versionName = "1.0"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+    // Read from local.properties, fallback to .env.example defaults
+    val localProps = java.util.Properties()
+    val localPropsFile = rootProject.file("local.properties")
+    if (localPropsFile.exists()) localProps.load(localPropsFile.inputStream())
+
+    buildConfigField("String", "GEMINI_API_KEY", "\"${localProps.getProperty("GEMINI_API_KEY", "MY_GEMINI_API_KEY")}\"")
+    buildConfigField("String", "GEMINI_BASE_URL", "\"${localProps.getProperty("GEMINI_BASE_URL", "https://your-cloudflare-worker-url.workers.dev/")}\"")
   }
 
   signingConfigs {
@@ -70,10 +78,9 @@ android {
   }
 }
 
-// Configure the Secrets Gradle Plugin to use .env and .env.example files
-// to match the convention used in Web projects.
+// Secrets Gradle Plugin reads API keys from local.properties
 secrets {
-  propertiesFileName = ".env"
+  propertiesFileName = "local.properties"
   defaultPropertiesFileName = ".env.example"
 }
 
