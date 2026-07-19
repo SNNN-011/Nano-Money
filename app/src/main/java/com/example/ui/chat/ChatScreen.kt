@@ -158,7 +158,18 @@ fun ChatScreen(
     ) { bitmap: Bitmap? ->
         bitmap?.let {
             try {
-                val softwareBitmap = it.copy(Bitmap.Config.ARGB_8888, false)
+                val maxDimension = 2048
+                val scale = minOf(
+                    maxDimension / it.width.toFloat(),
+                    maxDimension / it.height.toFloat(),
+                    1f
+                )
+                val scaledBitmap = if (scale < 1f) {
+                    Bitmap.createScaledBitmap(it, (it.width * scale).toInt(), (it.height * scale).toInt(), true)
+                } else {
+                    it
+                }
+                val softwareBitmap = scaledBitmap.copy(Bitmap.Config.ARGB_8888, false)
                 viewModel.scanReceipt(softwareBitmap)
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -176,9 +187,31 @@ fun ChatScreen(
                     MediaStore.Images.Media.getBitmap(context.contentResolver, it)
                 } else {
                     val source = ImageDecoder.createSource(context.contentResolver, it)
-                    ImageDecoder.decodeBitmap(source)
+                    ImageDecoder.decodeBitmap(source) { decoder, info, _ ->
+                        val maxDimension = 2048
+                        val scale = minOf(
+                            maxDimension / info.size.width.toFloat(),
+                            maxDimension / info.size.height.toFloat(),
+                            1f
+                        )
+                        decoder.setTargetSize(
+                            (info.size.width * scale).toInt(),
+                            (info.size.height * scale).toInt()
+                        )
+                    }
                 }
-                val softwareBitmap = bitmap.copy(Bitmap.Config.ARGB_8888, false)
+                val maxDimension = 2048
+                val scale = minOf(
+                    maxDimension / bitmap.width.toFloat(),
+                    maxDimension / bitmap.height.toFloat(),
+                    1f
+                )
+                val scaledBitmap = if (scale < 1f) {
+                    Bitmap.createScaledBitmap(bitmap, (bitmap.width * scale).toInt(), (bitmap.height * scale).toInt(), true)
+                } else {
+                    bitmap
+                }
+                val softwareBitmap = scaledBitmap.copy(Bitmap.Config.ARGB_8888, false)
                 viewModel.scanReceipt(softwareBitmap)
             } catch (e: Exception) {
                 e.printStackTrace()

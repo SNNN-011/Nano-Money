@@ -127,15 +127,8 @@ class FinancialTrackerViewModel(
 
     // Map of category name to current month's expenses for that category
     val categorySpending: StateFlow<Map<String, Double>> = combine(allRecords, selectedBudgetOffset) { records, offset ->
-        val currentCal = java.util.Calendar.getInstance()
-        currentCal.add(java.util.Calendar.MONTH, offset)
-        val recordCal = java.util.Calendar.getInstance()
-        records.filter { it.type == "expense" }
-            .filter { record ->
-                recordCal.timeInMillis = record.date
-                recordCal.get(java.util.Calendar.YEAR) == currentCal.get(java.util.Calendar.YEAR) &&
-                recordCal.get(java.util.Calendar.MONTH) == currentCal.get(java.util.Calendar.MONTH)
-            }
+        val (rangeStart, rangeEnd) = getMonthRange(offset)
+        records.filter { it.type == "expense" && it.date in rangeStart..rangeEnd }
             .groupBy { it.category }
             .mapValues { entry -> entry.value.sumOf { it.amount } }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
@@ -161,67 +154,50 @@ class FinancialTrackerViewModel(
     }
 
     val monthlySpendingTotal: StateFlow<Double> = combine(allRecords, selectedBudgetOffset) { records, offset ->
-        val currentCal = java.util.Calendar.getInstance()
-        currentCal.add(java.util.Calendar.MONTH, offset)
-        val recordCal = java.util.Calendar.getInstance()
-        records.filter { it.type == "expense" }.sumOf { record ->
-            recordCal.timeInMillis = record.date
-            if (recordCal.get(java.util.Calendar.YEAR) == currentCal.get(java.util.Calendar.YEAR) &&
-                recordCal.get(java.util.Calendar.MONTH) == currentCal.get(java.util.Calendar.MONTH)) {
-                record.amount
-            } else {
-                0.0
-            }
-        }
+        val (rangeStart, rangeEnd) = getMonthRange(offset)
+        records.filter { it.type == "expense" && it.date in rangeStart..rangeEnd }
+            .sumOf { it.amount }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
 
     val totalIncome: StateFlow<Double> = combine(allRecords, selectedBudgetOffset) { records, offset ->
-        val currentCal = java.util.Calendar.getInstance()
-        currentCal.add(java.util.Calendar.MONTH, offset)
-        val recordCal = java.util.Calendar.getInstance()
-        records.filter { it.type == "income" }.sumOf { record ->
-            recordCal.timeInMillis = record.date
-            if (recordCal.get(java.util.Calendar.YEAR) == currentCal.get(java.util.Calendar.YEAR) &&
-                recordCal.get(java.util.Calendar.MONTH) == currentCal.get(java.util.Calendar.MONTH)) {
-                record.amount
-            } else {
-                0.0
-            }
-        }
+        val (rangeStart, rangeEnd) = getMonthRange(offset)
+        records.filter { it.type == "income" && it.date in rangeStart..rangeEnd }
+            .sumOf { it.amount }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
 
     val totalExpense: StateFlow<Double> = combine(allRecords, selectedBudgetOffset) { records, offset ->
-        val currentCal = java.util.Calendar.getInstance()
-        currentCal.add(java.util.Calendar.MONTH, offset)
-        val recordCal = java.util.Calendar.getInstance()
-        records.filter { it.type == "expense" }.sumOf { record ->
-            recordCal.timeInMillis = record.date
-            if (recordCal.get(java.util.Calendar.YEAR) == currentCal.get(java.util.Calendar.YEAR) &&
-                recordCal.get(java.util.Calendar.MONTH) == currentCal.get(java.util.Calendar.MONTH)) {
-                record.amount
-            } else {
-                0.0
-            }
-        }
+        val (rangeStart, rangeEnd) = getMonthRange(offset)
+        records.filter { it.type == "expense" && it.date in rangeStart..rangeEnd }
+            .sumOf { it.amount }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
 
     val currentBalance: StateFlow<Double> = combine(allRecords, selectedBudgetOffset) { records, offset ->
-        val currentCal = java.util.Calendar.getInstance()
-        currentCal.add(java.util.Calendar.MONTH, offset)
-        currentCal.set(java.util.Calendar.DAY_OF_MONTH, currentCal.getActualMaximum(java.util.Calendar.DAY_OF_MONTH))
-        currentCal.set(java.util.Calendar.HOUR_OF_DAY, 23)
-        currentCal.set(java.util.Calendar.MINUTE, 59)
-        currentCal.set(java.util.Calendar.SECOND, 59)
-        currentCal.set(java.util.Calendar.MILLISECOND, 999)
-        val endOfSelectedMonth = currentCal.timeInMillis
+        val (rangeStart, rangeEnd) = getMonthRange(offset)
         records.sumOf { record ->
-            if (record.date <= endOfSelectedMonth) {
+            if (record.date <= rangeEnd) {
                 if (record.type == "income") record.amount else -record.amount
             } else {
                 0.0
             }
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
+
+    private fun getMonthRange(offset: Int): Pair<Long, Long> {
+        val now = java.time.Instant.now()
+            .atZone(java.time.ZoneId.systemDefault())
+            .toLocalDate()
+        val target = now.plusMonths(offset.toLong())
+        val start = target.withDayOfMonth(1)
+            .atStartOfDay(java.time.ZoneId.systemDefault())
+            .toInstant()
+            .toEpochMilli()
+        val end = target.withDayOfMonth(target.lengthOfMonth())
+            .plusDays(1)
+            .atStartOfDay(java.time.ZoneId.systemDefault())
+            .toInstant()
+            .toEpochMilli() - 1
+        return start to end
+    }
 
     init {
         // Automatically keep category logic sensible when type changes
