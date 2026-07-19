@@ -6,13 +6,15 @@ import java.security.SecureRandom
 import java.util.Base64
 
 object PinUtils {
-    private const val PREFS_NAME = "app_security_prefs"
+    private const val PREFS_NAME = "pin_prefs"
     private const val KEY_HASH = "pin_hash"
     private const val KEY_SALT = "pin_salt"
     private const val KEY_ENABLED = "pin_enabled"
 
+    // Plain SharedPreferences — PIN sudah one-way hash (SHA-256 + salt),
+    // EncryptedSharedPreferences redundant dan data loss di cold start (MIUI/dll)
     private fun prefs(context: Context) =
-        SecurePrefsHelper.getEncryptedPrefs(context, PREFS_NAME)
+        context.applicationContext.getSharedPreferences(PREFS_NAME, android.content.Context.MODE_PRIVATE)
 
     private fun sha256(input: String): ByteArray =
         MessageDigest.getInstance("SHA-256").digest(input.toByteArray(Charsets.UTF_8))
