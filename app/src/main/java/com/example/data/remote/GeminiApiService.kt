@@ -103,12 +103,15 @@ object GeminiClient {
         val rawUrl = com.example.BuildConfig.GEMINI_BASE_URL
         val finalUrl = rawUrl.trim().replace("\"", "")
 
-        if (finalUrl.isEmpty() || finalUrl.contains("your-cloudflare-worker-url")) {
+        val result = if (finalUrl.isEmpty() || finalUrl.contains("your-cloudflare-worker-url")) {
             "https://generativelanguage.googleapis.com/"
         } else {
             finalUrl
         }
+        android.util.Log.d("GeminiClient", "BASE_URL raw='$rawUrl' final='$result'")
+        result
     } catch (e: Throwable) {
+        android.util.Log.d("GeminiClient", "BASE_URL exception, using googleapis.com")
         "https://generativelanguage.googleapis.com/"
     }
 

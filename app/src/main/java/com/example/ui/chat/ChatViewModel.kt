@@ -331,6 +331,7 @@ class ChatViewModel(
             val modelName = _selectedModel.value
 
             val apiKeyRaw = try { BuildConfig.GEMINI_API_KEY } catch (e: Throwable) { "" } ?: ""
+            android.util.Log.d("ChatVM", "GEMINI_API_KEY='$apiKeyRaw' BASE_URL='${try { BuildConfig.GEMINI_BASE_URL } catch (e: Throwable) { "ERR" }}'")
             val apiKey = if (apiKeyRaw.isEmpty() || apiKeyRaw == "MY_GEMINI_API_KEY" || apiKeyRaw == "GEMINI_API_KEY") {
                 "CF_PROXY_KEY"
             } else {
