@@ -328,14 +328,15 @@ object FirebaseSyncHelper {
 
                 val mergedSettings = mutableMapOf<String, Any>()
 
-                // For category keys: Firestore wins if present (preserves user's latest categories)
+                // For category keys: MERGE (union) both lists — never lose categories from either side
                 for (key in categoryKeys) {
-                    val firestoreValue = firestoreSettingsMap[key] as? String
-                    val localValue = localSettingsMap[key] as? String
-                    if (!firestoreValue.isNullOrBlank()) {
-                        mergedSettings[key] = firestoreValue
-                    } else if (!localValue.isNullOrBlank()) {
-                        mergedSettings[key] = localValue
+                    val firestoreCategories = (firestoreSettingsMap[key] as? String)
+                        ?.split(",")?.map { it.trim() }?.filter { it.isNotBlank() } ?: emptyList()
+                    val localCategories = (localSettingsMap[key] as? String)
+                        ?.split(",")?.map { it.trim() }?.filter { it.isNotBlank() } ?: emptyList()
+                    val merged = (firestoreCategories + localCategories).distinct()
+                    if (merged.isNotEmpty()) {
+                        mergedSettings[key] = merged.joinToString(",")
                     }
                 }
 
