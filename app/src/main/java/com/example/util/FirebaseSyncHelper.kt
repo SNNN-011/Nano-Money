@@ -316,13 +316,33 @@ object FirebaseSyncHelper {
                 }
 
                 val firestoreSettingsMap = settingsSnapshot?.data ?: emptyMap<String, Any>()
-                val localSettingsMap = prefs.all
+                val localSettingsMap = prefs.all.toMutableMap()
+
+                // Explicitly read category keys — prefs.all sometimes misses them in EncryptedSharedPreferences
+                val categoryKeys = listOf("income_categories_list", "expense_categories_list")
+                for (key in categoryKeys) {
+                    if (!localSettingsMap.containsKey(key)) {
+                        prefs.getString(key, null)?.let { localSettingsMap[key] = it }
+                    }
+                }
 
                 val mergedSettings = mutableMapOf<String, Any>()
+
+                // For category keys: Firestore wins if present (preserves user's latest categories)
+                for (key in categoryKeys) {
+                    val firestoreValue = firestoreSettingsMap[key] as? String
+                    val localValue = localSettingsMap[key] as? String
+                    if (!firestoreValue.isNullOrBlank()) {
+                        mergedSettings[key] = firestoreValue
+                    } else if (!localValue.isNullOrBlank()) {
+                        mergedSettings[key] = localValue
+                    }
+                }
+
+                // For all other keys: local wins (original behavior)
                 mergedSettings.putAll(firestoreSettingsMap)
-                
                 for ((k, v) in localSettingsMap) {
-                    if (v != null) {
+                    if (v != null && k !in categoryKeys) {
                         if (v is Set<*>) {
                             mergedSettings[k] = v.toList()
                         } else {
