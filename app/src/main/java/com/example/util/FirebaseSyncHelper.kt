@@ -328,15 +328,23 @@ object FirebaseSyncHelper {
 
                 val mergedSettings = mutableMapOf<String, Any>()
 
-                // For category keys: MERGE (union) both lists — never lose categories from either side
+                // Category keys: local wins if user customized, Firestore wins if local still default
+                val defaultCategories = mapOf(
+                    "income_categories_list" to "Gaji,Investasi,Freelance,Lainnya",
+                    "expense_categories_list" to "Makanan,Transportasi,Tagihan,Hiburan,Belanja,Lainnya"
+                )
                 for (key in categoryKeys) {
-                    val firestoreCategories = (firestoreSettingsMap[key] as? String)
-                        ?.split(",")?.map { it.trim() }?.filter { it.isNotBlank() } ?: emptyList()
-                    val localCategories = (localSettingsMap[key] as? String)
-                        ?.split(",")?.map { it.trim() }?.filter { it.isNotBlank() } ?: emptyList()
-                    val merged = (firestoreCategories + localCategories).distinct()
-                    if (merged.isNotEmpty()) {
-                        mergedSettings[key] = merged.joinToString(",")
+                    val localValue = localSettingsMap[key] as? String
+                    val firestoreValue = firestoreSettingsMap[key] as? String
+                    val isDefault = localValue.isNullOrBlank() || localValue == defaultCategories[key]
+                    if (!isDefault) {
+                        // User customized locally — local is source of truth (supports delete)
+                        mergedSettings[key] = localValue!!
+                    } else if (!firestoreValue.isNullOrBlank()) {
+                        // Local still default — use Firestore (restore scenario)
+                        mergedSettings[key] = firestoreValue
+                    } else if (!localValue.isNullOrBlank()) {
+                        mergedSettings[key] = localValue
                     }
                 }
 
