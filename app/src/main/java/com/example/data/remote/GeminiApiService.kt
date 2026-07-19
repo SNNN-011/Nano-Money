@@ -177,17 +177,7 @@ object GeminiClient {
 
     fun getFullUrl(path: String): String {
         var cleanPath = if (path.startsWith("/")) path.substring(1) else path
-        
-        // If calling the direct standard Google Gemini API, map unsupported mockup models to standard ones
-        if (BASE_URL.contains("googleapis.com")) {
-            if (cleanPath.contains("models/gemma-4-31b-it") || cleanPath.contains("models/gemini-3.1-flash-lite") || cleanPath.contains("models/gemini-2.0-flash-lite")) {
-                cleanPath = cleanPath
-                    .replace("models/gemma-4-31b-it", "models/gemini-1.5-flash")
-                    .replace("models/gemini-3.1-flash-lite", "models/gemini-1.5-flash")
-                    .replace("models/gemini-2.0-flash-lite", "models/gemini-1.5-flash")
-            }
-        }
-        
+
         val base = BASE_URL.trim()
         val cleanBase = if (base.endsWith("/")) base else "$base/"
         return cleanBase + cleanPath
