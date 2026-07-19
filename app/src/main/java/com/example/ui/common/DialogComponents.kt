@@ -18,6 +18,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
@@ -241,15 +242,15 @@ fun CategoryManagementDialog(
                                 unfocusedTextColor = GhostWhite,
                                 focusedLabelColor = GhostWhite,
                                 unfocusedLabelColor = GhostWhite.copy(alpha = 0.5f),
-                                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                focusedBorderColor = SteelBlue,
                                 unfocusedBorderColor = GhostWhite.copy(alpha = 0.2f),
-                                focusedContainerColor = GhostWhite.copy(alpha = 0.05f),
-                                unfocusedContainerColor = GhostWhite.copy(alpha = 0.02f),
-                                errorBorderColor = MaterialTheme.colorScheme.error,
+                                focusedContainerColor = TranslucentInput,
+                                unfocusedContainerColor = TranslucentInput,
+                                errorBorderColor = ErrorRed,
                                 errorTextColor = GhostWhite
                             )
                         )
-                        Button(
+                        Card(
                             onClick = {
                                 val trimmed = newCategoryName.trim()
                                 if (trimmed.isEmpty()) {
@@ -262,15 +263,39 @@ fun CategoryManagementDialog(
                                     categoryNameError = null
                                 }
                             },
-                            shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = MaterialTheme.colorScheme.primary,
-                                contentColor = MaterialTheme.colorScheme.onPrimary
+                            shape = RoundedCornerShape(CornerRadius.xl),
+                            colors = CardDefaults.cardColors(containerColor = TranslucentGlass),
+                            border = BorderStroke(
+                                width = 1.dp,
+                                brush = Brush.verticalGradient(
+                                    colors = listOf(
+                                        GhostWhite.copy(alpha = 0.2f),
+                                        GhostWhite.copy(alpha = 0.02f)
+                                    )
+                                )
                             ),
-                            contentPadding = PaddingValues(0.dp),
                             modifier = Modifier.size(52.dp).testTag("add_category_confirm_button")
                         ) {
-                            Icon(Icons.Default.Add, contentDescription = "Tambah", modifier = Modifier.size(24.dp))
+                            Box(
+                                modifier = Modifier
+                                    .padding(4.dp)
+                                    .fillMaxSize()
+                                    .clip(RoundedCornerShape(CornerRadius.xl))
+                                    .background(
+                                        brush = Brush.verticalGradient(
+                                            colors = listOf(SteelBlue, SteelBlue.copy(alpha = 0.7f))
+                                        ),
+                                        shape = RoundedCornerShape(CornerRadius.xl)
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    Icons.Default.Add,
+                                    contentDescription = "Tambah",
+                                    tint = MidnightAbyss,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
                         }
                     }
                     if (categoryNameError != null) {
@@ -1472,7 +1497,7 @@ fun RecurringTransactionManagementDialog(
                                 )
                                 // Clear fields & go back to list
                                 descInput = ""
-                                amountInput = ""
+                                amountInput = TextFieldValue("")
                                 dayInput = java.time.LocalDate.now().dayOfMonth.toString()
                                 notesInput = ""
                                 isAddingNew = false
