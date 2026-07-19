@@ -33,6 +33,8 @@ import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
+import androidx.compose.material.icons.filled.LockReset
+import androidx.compose.animation.AnimatedVisibility
 import java.io.File
 import kotlinx.coroutines.launch
 import androidx.compose.material3.*
@@ -310,6 +312,7 @@ fun EksporImporTabContent(
                     modifier = Modifier.fillMaxWidth().padding(20.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
+                    // Section header
                     Row(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -317,26 +320,40 @@ fun EksporImporTabContent(
                             imageVector = Icons.Default.Lock,
                             contentDescription = null,
                             tint = SteelBlue,
-                            modifier = Modifier.size(24.dp)
+                            modifier = Modifier.size(20.dp)
                         )
-                        Spacer(modifier = Modifier.width(12.dp))
+                        Spacer(modifier = Modifier.width(10.dp))
                         Text(
-                            text = "Keamanan Aplikasi",
+                            text = "Keamanan",
                             style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                             color = GhostWhite
                         )
                     }
 
+                    HorizontalDivider(
+                        color = GhostWhite.copy(alpha = 0.08f),
+                        thickness = 1.dp
+                    )
+
+                    // PIN toggle row
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Text(
-                            text = "Kunci PIN",
-                            color = GhostWhite.copy(alpha = 0.8f),
-                            style = MaterialTheme.typography.bodyMedium
-                        )
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Kunci PIN",
+                                color = GhostWhite,
+                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium)
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = if (pinEnabled) "Aktif — aplikasi terkunci saat dibuka" else "Nonaktif",
+                                color = GhostWhite.copy(alpha = 0.45f),
+                                style = MaterialTheme.typography.labelSmall
+                            )
+                        }
                         Switch(
                             checked = pinEnabled,
                             onCheckedChange = { enable ->
@@ -350,27 +367,55 @@ fun EksporImporTabContent(
                             colors = SwitchDefaults.colors(
                                 checkedThumbColor = GhostWhite,
                                 checkedTrackColor = SteelBlue,
-                                uncheckedThumbColor = GhostWhite.copy(alpha = 0.5f),
-                                uncheckedTrackColor = GhostWhite.copy(alpha = 0.15f)
+                                uncheckedThumbColor = GhostWhite.copy(alpha = 0.4f),
+                                uncheckedTrackColor = GhostWhite.copy(alpha = 0.1f)
                             )
                         )
                     }
 
-                    if (pinEnabled) {
-                        OutlinedButton(
-                            onClick = { showPinDialog = true },
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp),
-                            border = BorderStroke(1.dp, SteelBlue.copy(alpha = 0.5f)),
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = SteelBlue)
+                    // Change PIN button (when enabled)
+                    AnimatedVisibility(visible = pinEnabled) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(CornerRadius.md))
+                                .background(
+                                    brush = Brush.verticalGradient(
+                                        colors = listOf(
+                                            GhostWhite.copy(alpha = 0.06f),
+                                            GhostWhite.copy(alpha = 0.02f)
+                                        )
+                                    )
+                                )
+                                .border(
+                                    width = 1.dp,
+                                    brush = Brush.verticalGradient(
+                                        colors = listOf(
+                                            GhostWhite.copy(alpha = 0.12f),
+                                            GhostWhite.copy(alpha = 0.03f)
+                                        )
+                                    ),
+                                    shape = RoundedCornerShape(CornerRadius.md)
+                                )
+                                .clickable { showPinDialog = true }
+                                .padding(horizontal = 16.dp, vertical = 14.dp)
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.LockOpen,
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Ubah PIN")
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.LockReset,
+                                    contentDescription = null,
+                                    tint = SteelBlue,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Text(
+                                    text = "Ubah PIN",
+                                    color = GhostWhite.copy(alpha = 0.8f),
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
+                            }
                         }
                     }
                 }
