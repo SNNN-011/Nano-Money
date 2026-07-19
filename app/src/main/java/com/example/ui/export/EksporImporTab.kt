@@ -31,6 +31,8 @@ import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.LockOpen
 import java.io.File
 import kotlinx.coroutines.launch
 import androidx.compose.material3.*
@@ -295,6 +297,94 @@ fun EksporImporTabContent(
             )
 
             // DIALOGS & OVERLAYS
+
+            // PIN Settings
+            var showPinDialog by remember { mutableStateOf(false) }
+            var pinEnabled by remember { mutableStateOf(com.example.util.PinUtils.isPinEnabled(context)) }
+
+            // PIN Settings Card
+            com.example.ui.components.GlassCard(
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Lock,
+                            contentDescription = null,
+                            tint = SteelBlue,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            text = "Keamanan Aplikasi",
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                            color = GhostWhite
+                        )
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = "Kunci PIN",
+                            color = GhostWhite.copy(alpha = 0.8f),
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        Switch(
+                            checked = pinEnabled,
+                            onCheckedChange = { enable ->
+                                if (enable) {
+                                    showPinDialog = true
+                                } else {
+                                    com.example.util.PinUtils.disablePin(context)
+                                    pinEnabled = false
+                                }
+                            },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = GhostWhite,
+                                checkedTrackColor = SteelBlue,
+                                uncheckedThumbColor = GhostWhite.copy(alpha = 0.5f),
+                                uncheckedTrackColor = GhostWhite.copy(alpha = 0.15f)
+                            )
+                        )
+                    }
+
+                    if (pinEnabled) {
+                        OutlinedButton(
+                            onClick = { showPinDialog = true },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            border = BorderStroke(1.dp, SteelBlue.copy(alpha = 0.5f)),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = SteelBlue)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.LockOpen,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Ubah PIN")
+                        }
+                    }
+                }
+            }
+
+            if (showPinDialog) {
+                com.example.ui.common.PinSetupDialog(
+                    onDismiss = { showPinDialog = false },
+                    onPinSet = {
+                        showPinDialog = false
+                        pinEnabled = com.example.util.PinUtils.isPinEnabled(context)
+                    }
+                )
+            }
 
             // 1. Confirm Restore Local Backup Dialog
             if (selectedBackupToRestore != null) {

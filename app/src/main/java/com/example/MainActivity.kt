@@ -127,7 +127,15 @@ class MainActivity : FragmentActivity() {
                 onFinished = { isLaunching = false }
             )
           } else {
-            FinancialTrackerScreen(application = application, showStartupSplash = false)
+            var pinUnlocked by remember { mutableStateOf(!com.example.util.PinUtils.isPinEnabled(context)) }
+            if (!pinUnlocked) {
+              com.example.ui.common.PinUnlockScreen(
+                onUnlocked = { pinUnlocked = true },
+                onExit = { finish() }
+              )
+            } else {
+              FinancialTrackerScreen(application = application, showStartupSplash = false)
+            }
           }
          }
         }
