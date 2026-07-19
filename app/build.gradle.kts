@@ -9,9 +9,16 @@ plugins {
 }
 
 // Read API keys from local.properties at build time
-val localProps = java.util.Properties().apply {
+fun readLocalProp(key: String, default: String): String {
     val f = rootProject.file("local.properties")
-    if (f.exists()) load(f.inputStream())
+    if (!f.exists()) return default
+    return f.readLines()
+        .map { it.trim() }
+        .firstOrNull { it.startsWith("$key=") && !it.startsWith("#") }
+        ?.substringAfter("=")
+        ?.trim()
+        ?.ifBlank { default }
+        ?: default
 }
 
 android {
@@ -27,8 +34,8 @@ android {
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-    buildConfigField("String", "GEMINI_API_KEY", "\"${localProps.getProperty("GEMINI_API_KEY", "MY_GEMINI_API_KEY")}\"")
-    buildConfigField("String", "GEMINI_BASE_URL", "\"${localProps.getProperty("GEMINI_BASE_URL", "https://your-cloudflare-worker-url.workers.dev/")}\"")
+    buildConfigField("String", "GEMINI_API_KEY", "\"${readLocalProp("GEMINI_API_KEY", "MY_GEMINI_API_KEY")}\"")
+    buildConfigField("String", "GEMINI_BASE_URL", "\"${readLocalProp("GEMINI_BASE_URL", "https://your-cloudflare-worker-url.workers.dev/")}\"")
   }
 
   signingConfigs {
