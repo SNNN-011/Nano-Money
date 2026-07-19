@@ -31,12 +31,16 @@ object PinUtils {
     fun savePin(context: Context, pin: String) {
         val salt = generateSalt()
         val hash = hashPin(pin, salt)
+        android.util.Log.d("PinUtils", "savePin: saving hash=${hash.take(10)}... salt=${salt.take(10)}...")
         prefs(context).edit().apply {
             putString(KEY_HASH, hash)
             putString(KEY_SALT, salt)
             putBoolean(KEY_ENABLED, true)
             apply()
         }
+        // Verify immediately
+        val p = prefs(context)
+        android.util.Log.d("PinUtils", "savePin verify: enabled=${p.getBoolean(KEY_ENABLED, false)}, hasHash=${p.getString(KEY_HASH, null) != null}")
     }
 
     fun verifyPin(context: Context, pin: String): Boolean {
@@ -48,7 +52,10 @@ object PinUtils {
 
     fun isPinEnabled(context: Context): Boolean {
         val p = prefs(context)
-        return p.getBoolean(KEY_ENABLED, false) && p.getString(KEY_HASH, null) != null
+        val enabled = p.getBoolean(KEY_ENABLED, false)
+        val hasHash = p.getString(KEY_HASH, null) != null
+        android.util.Log.d("PinUtils", "isPinEnabled: enabled=$enabled, hasHash=$hasHash")
+        return enabled && hasHash
     }
 
     fun hasPin(context: Context): Boolean =

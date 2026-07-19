@@ -109,21 +109,23 @@ class MainActivity : FragmentActivity() {
               securityPrefs.edit().putBoolean("permission_dialog_shown", true).apply()
           }
 
-          // Cek PIN SETELAH splash selesai — bukan saat composable build
-          // Ini penting: EncryptedSharedPreferences butuh waktu untuk init
-          LaunchedEffect(isLaunching) {
-              if (!isLaunching) {
-                  // Baca PIN status di coroutine, setelah prefs siap
-                  pinUnlocked = !com.example.util.PinUtils.isPinEnabled(context)
-                  if (!securityPrefs.getBoolean("permission_dialog_shown", false)) {
-                      val permissions = mutableListOf<String>()
-                      if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
-                          permissions.add(android.Manifest.permission.POST_NOTIFICATIONS)
-                      }
-                      permissions.add(android.Manifest.permission.CAMERA)
-                      permissionLauncher.launch(permissions.toTypedArray())
-                      securityPrefs.edit().putBoolean("permission_dialog_shown", true).apply()
+          // Cek PIN segera di background, parallel dengan splash
+          LaunchedEffect(Unit) {
+              android.util.Log.d("MainActivity", "Cek PIN dimulai...")
+              val needsPin = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                  com.example.util.PinUtils.isPinEnabled(context)
+              }
+              android.util.Log.d("MainActivity", "isPinEnabled=$needsPin, pinUnlocked=${!needsPin}")
+              pinUnlocked = !needsPin
+              // Permission check — setelah PIN dicek
+              if (!securityPrefs.getBoolean("permission_dialog_shown", false)) {
+                  val permissions = mutableListOf<String>()
+                  if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                      permissions.add(android.Manifest.permission.POST_NOTIFICATIONS)
                   }
+                  permissions.add(android.Manifest.permission.CAMERA)
+                  permissionLauncher.launch(permissions.toTypedArray())
+                  securityPrefs.edit().putBoolean("permission_dialog_shown", true).apply()
               }
           }
 
