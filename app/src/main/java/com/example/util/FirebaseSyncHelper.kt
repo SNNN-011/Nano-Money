@@ -340,8 +340,10 @@ object FirebaseSyncHelper {
                     }
                 }
 
-                // For all other keys: local wins (original behavior)
-                mergedSettings.putAll(firestoreSettingsMap)
+                // For all other keys: local wins (original behavior), skip category keys already merged
+                for ((k, v) in firestoreSettingsMap) {
+                    if (k !in categoryKeys) mergedSettings[k] = v
+                }
                 for ((k, v) in localSettingsMap) {
                     if (v != null && k !in categoryKeys) {
                         if (v is Set<*>) {
