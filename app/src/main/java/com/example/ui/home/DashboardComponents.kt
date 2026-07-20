@@ -381,7 +381,7 @@ fun DashboardStatsSection(
                 }
             }
 
-            if (monthlyBudgetLimit <= 0.0) {
+            if (monthlyBudgetLimit <= 0L) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
@@ -529,7 +529,7 @@ fun DashboardStatsSection(
                     }
                 }
 
-                val activeCategoryBudgets = categoryBudgets.filter { it.value > 0.0 }
+                val activeCategoryBudgets = categoryBudgets.filter { it.value > 0L }
                 if (activeCategoryBudgets.isNotEmpty()) {
                     Spacer(modifier = Modifier.height(Spacing.md))
                     Box(

@@ -421,13 +421,8 @@ fun MonthlyBudgetDialog(
     onDismiss: () -> Unit
 ) {
     var budgetInput by remember {
-        val initial = if (currentBudgetLimit > 0.0) {
-            val rawAmt = if (currentBudgetLimit % 1.0 == 0.0) {
-                currentBudgetLimit.toLong().toString()
-            } else {
-                currentBudgetLimit.toString().substringBefore(".")
-            }
-            FormatUtils.formatInputNumber(rawAmt)
+        val initial = if (currentBudgetLimit > 0L) {
+            FormatUtils.formatInputNumber(currentBudgetLimit.toString())
         } else ""
         mutableStateOf(TextFieldValue(initial, TextRange(initial.length)))
     }
@@ -438,8 +433,8 @@ fun MonthlyBudgetDialog(
         mutableStateMapOf<String, String>().apply {
             expenseCategories.forEach { cat ->
                 val value = categoryBudgets[cat]
-                put(cat, if (value != null && value > 0.0) {
-                    if (value % 1.0 == 0.0) value.toLong().toString() else value.toString()
+                put(cat, if (value != null && value > 0L) {
+                    value.toString()
                 } else "")
             }
         }
@@ -449,7 +444,7 @@ fun MonthlyBudgetDialog(
         mutableStateListOf<String>().apply {
             expenseCategories.forEach { cat ->
                 val value = categoryBudgets[cat]
-                if (value != null && value > 0.0) {
+                if (value != null && value > 0L) {
                     add(cat)
                 }
             }
@@ -602,10 +597,10 @@ fun MonthlyBudgetDialog(
                 )
 
                 val presets = listOf(
-                    1_000_000.0 to "1 Juta",
-                    2_000_000.0 to "2 Juta",
-                    5_000_000.0 to "5 Juta",
-                    10_000_000.0 to "10 Juta"
+                    1_000_000L to "1 Juta",
+                    2_000_000L to "2 Juta",
+                    5_000_000L to "5 Juta",
+                    10_000_000L to "10 Juta"
                 )
 
                 Row(
@@ -613,7 +608,7 @@ fun MonthlyBudgetDialog(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     presets.forEach { (value, label) ->
-                        val isSelected = budgetInput.text.replace(".", "") == value.toLong().toString()
+                        val isSelected = budgetInput.text.replace(".", "") == value.toString()
                         val containerCol = if (isSelected) SteelBlue.copy(alpha = 0.2f) else TranslucentInput
                         val borderCol = if (isSelected) SteelBlue else GhostWhite.copy(alpha = 0.1f)
                         val textCol = if (isSelected) SteelBlue else GhostWhite.copy(alpha = 0.8f)
@@ -1063,7 +1058,7 @@ fun MonthlyBudgetDialog(
                                 text = "Ya, Hapus",
                                 onClick = {
                                     showDeleteConfirmation = false
-                                    onConfirm(0.0, emptyMap())
+                                    onConfirm(0L, emptyMap())
                                 },
                                 modifier = Modifier.weight(1f),
                                 isActive = true,
