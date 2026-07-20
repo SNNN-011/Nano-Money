@@ -16,8 +16,8 @@ object TelemetryHelper {
             firebaseCrashlytics = FirebaseCrashlytics.getInstance()
             
             val isDebug = (context.applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0
-            firebaseCrashlytics?.setCrashlyticsCollectionEnabled(true)
-            firebaseAnalytics?.setAnalyticsCollectionEnabled(true)
+            firebaseCrashlytics?.setCrashlyticsCollectionEnabled(false)
+            firebaseAnalytics?.setAnalyticsCollectionEnabled(false)
             
             logCrashlytics("TelemetryHelper initialized successfully. IsDebug: $isDebug")
         } catch (e: Exception) {
