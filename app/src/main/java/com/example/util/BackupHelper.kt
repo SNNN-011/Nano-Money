@@ -307,7 +307,8 @@ object BackupHelper {
             file.inputStream().use { input ->
                 val bytes = ByteArray(4)
                 val read = input.read(bytes)
-                read == 4 && bytes[0] == 0x50.toByte() && bytes[1] == 0x4B.toByte() && bytes[2] == 0x03.toByte() && bytes[3] == 0x04.toByte()
+                val isZip = read == 4 && bytes[0] == 0x50.toByte() && bytes[1] == 0x4B.toByte() && bytes[2] == 0x03.toByte() && bytes[3] == 0x04.toByte()
+                isZip
             }
         } catch (e: Exception) {
             false

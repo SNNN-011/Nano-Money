@@ -59,6 +59,14 @@ export default {
 
     const uid = decodedToken.sub; // Ini adalah UID user dari Firebase
 
+    // 2b. Validasi email_verified — tolak akun dengan email belum diverifikasi
+    if (decodedToken.email_verified === false) {
+      return new Response(JSON.stringify({ error: "Unauthorized: Email belum diverifikasi" }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
     // 3. Rate Limiting dengan Cloudflare KV
     // env.RATE_LIMIT_KV adalah binding name yang Anda set di Cloudflare (bisa via wrangler.toml)
     if (env.RATE_LIMIT_KV) {

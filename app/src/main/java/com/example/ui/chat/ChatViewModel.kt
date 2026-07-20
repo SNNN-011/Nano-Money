@@ -354,29 +354,19 @@ class ChatViewModel(
                 is com.example.domain.RequestResult.Error -> {
                     val e = resultStatus.e
                     val errorMessage = if (e is IOException) {
-                        "Gagal terhubung. Periksa koneksimu ya 🙏 (Detail: ${e.javaClass.simpleName} - ${e.message})"
+                        "Gagal terhubung. Periksa koneksi internet Anda."
                     } else if (e is retrofit2.HttpException) {
-                        val errorBodyText = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                            try { e.response()?.errorBody()?.string() } catch (ioe: java.io.IOException) { "gagal" }
-                        }
-                        if (e.code() == 401) {
-                            "${resultStatus.message} (Detail: $errorBodyText)"
-                        } else if (!errorBodyText.isNullOrEmpty() && errorBodyText.contains("not found", ignoreCase = true)) {
-                            "HTTP ${e.code()}: AI sedang ada kendala, coba kembali atau gunakan opsi Gemini."
-                        } else {
-                            "HTTP ${e.code()}: ${errorBodyText ?: "tidak ada detail error"}"
+                        when (e.code()) {
+                            401 -> "Sesi login bermasalah, silakan coba lagi."
+                            429 -> "Terlalu banyak permintaan. Coba beberapa saat lagi."
+                            in 500..599 -> "Server AI sedang bermasalah. Coba kembali nanti."
+                            else -> "Terjadi kesalahan (HTTP ${e.code()}). Silakan coba lagi."
                         }
                     } else {
-                        if (e != null) {
-                            val sw = java.io.StringWriter()
-                            e.printStackTrace(java.io.PrintWriter(sw))
-                            val fullTrace = sw.toString()
-                            "Exception: ${e.javaClass.simpleName} - ${e.localizedMessage ?: e.message}\nCause: ${e.cause?.javaClass?.simpleName} - ${e.cause?.localizedMessage ?: e.cause?.message}\nDetails: ${fullTrace.take(450)}"
-                        } else {
-                            resultStatus.message
-                        }
+                        "Terjadi kesalahan. Silakan coba lagi atau gunakan tab 'Transaksi Baru'."
                     }
-                    addAiMessage("Detail Error: $errorMessage\n\n(Catatan: Anda tetap dapat mencatat langsung melalui tab 'Transaksi Baru'.)")
+                    com.example.util.SecureLog.e("ChatVM", "AI request failed", e)
+                    addAiMessage("$errorMessage\n\n(Catatan: Anda tetap dapat mencatat langsung melalui tab 'Transaksi Baru'.)")
                 }
                 is com.example.domain.RequestResult.Success -> {
                     val result = resultStatus.data
