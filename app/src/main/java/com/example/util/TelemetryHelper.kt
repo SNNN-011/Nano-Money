@@ -96,8 +96,8 @@ object TelemetryHelper {
         logEvent(FirebaseAnalytics.Event.SCREEN_VIEW, bundle)
     }
 
-    fun trackTransactionAction(action: String, type: String, category: String, amount: Double) {
-        val amountTier = if (amount < 100000.0) "KECIL" else "BESAR"
+    fun trackTransactionAction(action: String, type: String, category: String, amount: Long) {
+        val amountTier = if (amount < 100000L) "KECIL" else "BESAR"
         val bundle = Bundle().apply {
             putString("transaction_action", action)
             putString("transaction_type", type)

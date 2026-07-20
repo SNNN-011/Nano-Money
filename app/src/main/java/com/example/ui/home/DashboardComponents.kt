@@ -35,13 +35,13 @@ import com.example.ui.config.FormatUtils
 
 @Composable
 fun DashboardStatsSection(
-    totalIncome: Double,
-    totalExpense: Double,
-    currentBalance: Double,
-    monthlySpendingTotal: Double,
-    monthlyBudgetLimit: Double,
-    categoryBudgets: Map<String, Double> = emptyMap(),
-    categorySpending: Map<String, Double> = emptyMap(),
+    totalIncome: Long,
+    totalExpense: Long,
+    currentBalance: Long,
+    monthlySpendingTotal: Long,
+    monthlyBudgetLimit: Long,
+    categoryBudgets: Map<String, Long> = emptyMap(),
+    categorySpending: Map<String, Long> = emptyMap(),
     selectedBudgetOffset: Int = 0,
     onBudgetOffsetChange: (Int) -> Unit = {},
     onSetBudgetClick: () -> Unit,

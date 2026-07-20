@@ -118,25 +118,25 @@ class FinancialTrackerViewModel(
             ?.split(",")?.filter { it.isNotEmpty() } ?: listOf("Makanan", "Transportasi", "Tagihan", "Hiburan", "Belanja", "Lainnya")
     )
 
-    val monthlyBudgetLimit = MutableStateFlow(prefs.getFloat("monthly_budget_limit", 0f).toDouble())
+    val monthlyBudgetLimit = MutableStateFlow(prefs.getLong("monthly_budget_limit", 0L))
     val selectedBudgetOffset = MutableStateFlow(0)
 
     // Map of expense category name to its customized budget limit
-    private val _categoryBudgets = MutableStateFlow<Map<String, Double>>(emptyMap())
-    val categoryBudgets: StateFlow<Map<String, Double>> = _categoryBudgets.asStateFlow()
+    private val _categoryBudgets = MutableStateFlow<Map<String, Long>>(emptyMap())
+    val categoryBudgets: StateFlow<Map<String, Long>> = _categoryBudgets.asStateFlow()
 
     // Map of category name to current month's expenses for that category
-    val categorySpending: StateFlow<Map<String, Double>> = combine(allRecords, selectedBudgetOffset) { records, offset ->
+    val categorySpending: StateFlow<Map<String, Long>> = combine(allRecords, selectedBudgetOffset) { records, offset ->
         val (rangeStart, rangeEnd) = getMonthRange(offset)
         records.filter { it.type == "expense" && it.date in rangeStart..rangeEnd }
             .groupBy { it.category }
             .mapValues { entry -> entry.value.sumOf { it.amount } }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
 
-    fun updateCategoryBudget(category: String, limit: Double) {
-        prefs.edit().putFloat("category_budget_$category", limit.toFloat()).apply()
+    fun updateCategoryBudget(category: String, limit: Long) {
+        prefs.edit().putLong("category_budget_$category", limit).apply()
         val currentBudgets = _categoryBudgets.value.toMutableMap()
-        if (limit <= 0.0) {
+        if (limit <= 0L) {
             currentBudgets.remove(category)
         } else {
             currentBudgets[category] = limit
@@ -148,39 +148,39 @@ class FinancialTrackerViewModel(
         selectedBudgetOffset.value = offset
     }
 
-    fun updateMonthlyBudgetLimit(limit: Double) {
+    fun updateMonthlyBudgetLimit(limit: Long) {
         monthlyBudgetLimit.value = limit
-        prefs.edit().putFloat("monthly_budget_limit", limit.toFloat()).apply()
+        prefs.edit().putLong("monthly_budget_limit", limit).apply()
     }
 
-    val monthlySpendingTotal: StateFlow<Double> = combine(allRecords, selectedBudgetOffset) { records, offset ->
+    val monthlySpendingTotal: StateFlow<Long> = combine(allRecords, selectedBudgetOffset) { records, offset ->
         val (rangeStart, rangeEnd) = getMonthRange(offset)
         records.filter { it.type == "expense" && it.date in rangeStart..rangeEnd }
             .sumOf { it.amount }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0L)
 
-    val totalIncome: StateFlow<Double> = combine(allRecords, selectedBudgetOffset) { records, offset ->
+    val totalIncome: StateFlow<Long> = combine(allRecords, selectedBudgetOffset) { records, offset ->
         val (rangeStart, rangeEnd) = getMonthRange(offset)
         records.filter { it.type == "income" && it.date in rangeStart..rangeEnd }
             .sumOf { it.amount }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0L)
 
-    val totalExpense: StateFlow<Double> = combine(allRecords, selectedBudgetOffset) { records, offset ->
+    val totalExpense: StateFlow<Long> = combine(allRecords, selectedBudgetOffset) { records, offset ->
         val (rangeStart, rangeEnd) = getMonthRange(offset)
         records.filter { it.type == "expense" && it.date in rangeStart..rangeEnd }
             .sumOf { it.amount }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0L)
 
-    val currentBalance: StateFlow<Double> = combine(allRecords, selectedBudgetOffset) { records, offset ->
+    val currentBalance: StateFlow<Long> = combine(allRecords, selectedBudgetOffset) { records, offset ->
         val (rangeStart, rangeEnd) = getMonthRange(offset)
         records.sumOf { record ->
             if (record.date <= rangeEnd) {
                 if (record.type == "income") record.amount else -record.amount
             } else {
-                0.0
+                0L
             }
         }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0L)
 
     private fun getMonthRange(offset: Int): Pair<Long, Long> {
         val now = java.time.Instant.now()
@@ -215,10 +215,10 @@ class FinancialTrackerViewModel(
 
         // Reactively load category budgets when expenseCategories changes
         expenseCategories.onEach { categories ->
-            val budgets = mutableMapOf<String, Double>()
+            val budgets = mutableMapOf<String, Long>()
             categories.forEach { cat ->
-                val limit = prefs.getFloat("category_budget_$cat", 0f).toDouble()
-                if (limit > 0.0) {
+                val limit = prefs.getLong("category_budget_$cat", 0L)
+                if (limit > 0L) {
                     budgets[cat] = limit
                 }
             }
@@ -259,39 +259,39 @@ class FinancialTrackerViewModel(
 
                     // --- CURRENT MONTH ---
                     cal.set(java.util.Calendar.DAY_OF_MONTH, 10)
-                    sampleData.add(FinancialRecord(0, "Gaji Bulanan", 5000000.0, "income", "Gaji", cal.timeInMillis, "Gaji pokok"))
+                    sampleData.add(FinancialRecord(0, "Gaji Bulanan", 5000000L, "income", "Gaji", cal.timeInMillis, "Gaji pokok"))
                     cal.set(java.util.Calendar.DAY_OF_MONTH, 8)
-                    sampleData.add(FinancialRecord(0, "Makan Siang", 25000.0, "expense", "Makanan", cal.timeInMillis, "Bakso"))
+                    sampleData.add(FinancialRecord(0, "Makan Siang", 25000L, "expense", "Makanan", cal.timeInMillis, "Bakso"))
                     cal.set(java.util.Calendar.DAY_OF_MONTH, 5)
-                    sampleData.add(FinancialRecord(0, "Beli Buku", 150000.0, "expense", "Belanja", cal.timeInMillis, "Buku Android"))
+                    sampleData.add(FinancialRecord(0, "Beli Buku", 150000L, "expense", "Belanja", cal.timeInMillis, "Buku Android"))
                     cal.set(java.util.Calendar.DAY_OF_MONTH, 3)
-                    sampleData.add(FinancialRecord(0, "Transportasi Gojek", 20000.0, "expense", "Transportasi", cal.timeInMillis, "Ke kantor"))
+                    sampleData.add(FinancialRecord(0, "Transportasi Gojek", 20000L, "expense", "Transportasi", cal.timeInMillis, "Ke kantor"))
 
                     // --- LAST MONTH (1 Month Ago) ---
                     val lastMonthCal = java.util.Calendar.getInstance()
                     lastMonthCal.add(java.util.Calendar.MONTH, -1)
                     lastMonthCal.set(java.util.Calendar.DAY_OF_MONTH, 10)
-                    sampleData.add(FinancialRecord(0, "Gaji Bulanan", 5000000.0, "income", "Gaji", lastMonthCal.timeInMillis, "Gaji pokok"))
+                    sampleData.add(FinancialRecord(0, "Gaji Bulanan", 5000000L, "income", "Gaji", lastMonthCal.timeInMillis, "Gaji pokok"))
                     lastMonthCal.set(java.util.Calendar.DAY_OF_MONTH, 15)
-                    sampleData.add(FinancialRecord(0, "Belanja Sepatu Baru", 450000.0, "expense", "Belanja", lastMonthCal.timeInMillis, "Sepatu lari"))
+                    sampleData.add(FinancialRecord(0, "Belanja Sepatu Baru", 450000L, "expense", "Belanja", lastMonthCal.timeInMillis, "Sepatu lari"))
                     lastMonthCal.set(java.util.Calendar.DAY_OF_MONTH, 18)
-                    sampleData.add(FinancialRecord(0, "Makan Malam Bersama", 180000.0, "expense", "Makanan", lastMonthCal.timeInMillis, "Restoran"))
+                    sampleData.add(FinancialRecord(0, "Makan Malam Bersama", 180000L, "expense", "Makanan", lastMonthCal.timeInMillis, "Restoran"))
                     lastMonthCal.set(java.util.Calendar.DAY_OF_MONTH, 22)
-                    sampleData.add(FinancialRecord(0, "Langganan Netflix", 54000.0, "expense", "Hiburan", lastMonthCal.timeInMillis, "Paket Standard"))
+                    sampleData.add(FinancialRecord(0, "Langganan Netflix", 54000L, "expense", "Hiburan", lastMonthCal.timeInMillis, "Paket Standard"))
 
                     // --- 2 MONTHS AGO ---
                     val twoMonthsAgoCal = java.util.Calendar.getInstance()
                     twoMonthsAgoCal.add(java.util.Calendar.MONTH, -2)
                     twoMonthsAgoCal.set(java.util.Calendar.DAY_OF_MONTH, 10)
-                    sampleData.add(FinancialRecord(0, "Gaji Bulanan", 5000000.0, "income", "Gaji", twoMonthsAgoCal.timeInMillis, "Gaji pokok"))
+                    sampleData.add(FinancialRecord(0, "Gaji Bulanan", 5000000L, "income", "Gaji", twoMonthsAgoCal.timeInMillis, "Gaji pokok"))
                     twoMonthsAgoCal.set(java.util.Calendar.DAY_OF_MONTH, 5)
-                    sampleData.add(FinancialRecord(0, "Servis Motor", 350000.0, "expense", "Tagihan", twoMonthsAgoCal.timeInMillis, "Ganti oli & ban"))
+                    sampleData.add(FinancialRecord(0, "Servis Motor", 350000L, "expense", "Tagihan", twoMonthsAgoCal.timeInMillis, "Ganti oli & ban"))
                     twoMonthsAgoCal.set(java.util.Calendar.DAY_OF_MONTH, 12)
-                    sampleData.add(FinancialRecord(0, "Makan Bakso Lapangan", 30000.0, "expense", "Makanan", twoMonthsAgoCal.timeInMillis, ""))
+                    sampleData.add(FinancialRecord(0, "Makan Bakso Lapangan", 30000L, "expense", "Makanan", twoMonthsAgoCal.timeInMillis, ""))
                     twoMonthsAgoCal.set(java.util.Calendar.DAY_OF_MONTH, 20)
-                    sampleData.add(FinancialRecord(0, "Tagihan Internet Wifi", 150000.0, "expense", "Tagihan", twoMonthsAgoCal.timeInMillis, "Bulanan"))
+                    sampleData.add(FinancialRecord(0, "Tagihan Internet Wifi", 150000L, "expense", "Tagihan", twoMonthsAgoCal.timeInMillis, "Bulanan"))
                     twoMonthsAgoCal.set(java.util.Calendar.DAY_OF_MONTH, 25)
-                    sampleData.add(FinancialRecord(0, "Tiket Bioskop", 65000.0, "expense", "Hiburan", twoMonthsAgoCal.timeInMillis, "Nonton film"))
+                    sampleData.add(FinancialRecord(0, "Tiket Bioskop", 65000L, "expense", "Hiburan", twoMonthsAgoCal.timeInMillis, "Nonton film"))
 
                     sampleData.forEach { repository.insert(it) }
                 }
@@ -363,11 +363,7 @@ class FinancialTrackerViewModel(
         if (record != null) {
             editingRecordId = record.id
             formDescription.value = record.description
-            val rawAmt = if (record.amount % 1.0 == 0.0) {
-                record.amount.toLong().toString()
-            } else {
-                record.amount.toString().substringBefore(".")
-            }
+            val rawAmt = record.amount.toString()
             formAmount.value = FormatUtils.formatInputNumber(rawAmt)
             formType.value = record.type
             formCategory.value = record.category
@@ -410,7 +406,7 @@ class FinancialTrackerViewModel(
         }
 
         val amtStr = formAmount.value.trim().replace(".", "")
-        val amt = amtStr.toDoubleOrNull()
+        val amt = amtStr.toLongOrNull()
         if (amtStr.isEmpty()) {
             amountError.value = "Jumlah tidak boleh kosong"
             isValid = false
@@ -434,7 +430,7 @@ class FinancialTrackerViewModel(
         val record = FinancialRecord(
             id = editingRecordId ?: 0,
             description = desc,
-            amount = amt ?: 0.0,
+            amount = amt ?: 0L,
             type = formType.value,
             category = formCategory.value,
             date = formDate.value,
@@ -544,8 +540,8 @@ class FinancialTrackerViewModel(
                 val description = obj.optString("description", "").trim()
                 if (description.isEmpty()) throw IllegalArgumentException("Deskripsi baris ${i+1} kosong.")
 
-                val amount = obj.optDouble("amount", -1.0)
-                if (amount <= 0 || amount.isNaN()) throw IllegalArgumentException("Jumlah baris ${i+1} harus angka positif.")
+                val amount = obj.optLong("amount", -1L)
+                if (amount <= 0) throw IllegalArgumentException("Jumlah baris ${i+1} harus angka positif.")
 
                 val type = obj.optString("type", "")
                 if (type != "income" && type != "expense") throw IllegalArgumentException("Tipe baris ${i+1} harus 'income' atau 'expense'.")
@@ -769,8 +765,8 @@ class FinancialTrackerViewModel(
             paint.color = android.graphics.Color.parseColor("#E2E8F0")
             canvas.drawLine(40f, y, 555f, y, paint)
 
-            var totalIn = 0.0
-            var totalOut = 0.0
+            var totalIn = 0L
+            var totalOut = 0L
             monthRecords.forEach { record ->
                 if (record.type == "income") totalIn += record.amount else totalOut += record.amount
             }
@@ -874,14 +870,14 @@ class FinancialTrackerViewModel(
             canvas.drawText("Laporan Realisasi Anggaran:", 55f, y + 62f, paint)
 
             val budgetTextY = y + 71f
-            if (activeLimit <= 0.0) {
+            if (activeLimit <= 0L) {
                 paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.ITALIC)
                 paint.color = android.graphics.Color.parseColor("#64748B")
                 paint.textSize = 7f
                 canvas.drawText("Batas anggaran bulanan belum diatur.", 55f, budgetTextY, paint)
                 canvas.drawText("Silakan atur di Dashboard.", 55f, budgetTextY + 10f, paint)
             } else {
-                val budgetRatio = (totalOut / activeLimit).coerceAtMost(1.0).toFloat()
+                val budgetRatio = (totalOut.toDouble() / activeLimit).coerceAtMost(1.0).toFloat()
                 val overBudget = totalOut > activeLimit
 
                 paint.color = android.graphics.Color.parseColor("#E2E8F0") 
@@ -915,7 +911,7 @@ class FinancialTrackerViewModel(
             val expenseRecords = monthRecords.filter { it.type == "expense" }
             val totalExpense = expenseRecords.sumOf { it.amount }
 
-            if (totalExpense > 0.0) {
+            if (totalExpense > 0L) {
                 paint.color = android.graphics.Color.parseColor("#1E293B")
                 paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
                 paint.textSize = 8f
@@ -925,8 +921,8 @@ class FinancialTrackerViewModel(
                     .map { (cat, recs) -> cat to recs.sumOf { it.amount } }
                     .sortedByDescending { it.second }
 
-                val topSlices = mutableListOf<Pair<String, Double>>()
-                var otherSum = 0.0
+                val topSlices = mutableListOf<Pair<String, Long>>()
+                var otherSum = 0L
                 categoryStats.forEachIndexed { sIdx, pair ->
                     if (sIdx < 4) {
                         topSlices.add(pair)
@@ -934,7 +930,7 @@ class FinancialTrackerViewModel(
                         otherSum += pair.second
                     }
                 }
-                if (otherSum > 0.0) {
+                if (otherSum > 0L) {
                     topSlices.add("Lainnya" to otherSum)
                 }
 
@@ -951,7 +947,7 @@ class FinancialTrackerViewModel(
                 val pieRect = android.graphics.RectF(310f, y + 30f, 390f, y + 110f)
 
                 topSlices.forEachIndexed { sIdx, slice ->
-                    val ratio = (slice.second / totalExpense).toFloat()
+                    val ratio = (slice.second.toDouble() / totalExpense).toFloat()
                     val sweepAngle = ratio * 360f
                     val colorHex = if (slice.first == "Lainnya") "#64748B" else sliceColors[sIdx % sliceColors.size]
                     
@@ -1020,7 +1016,7 @@ class FinancialTrackerViewModel(
 
             y += 155f
 
-            val activeCatBudgets = categoryBudgets.value.filter { it.value > 0.0 }
+            val activeCatBudgets = categoryBudgets.value.filter { it.value > 0L }
             if (activeCatBudgets.isNotEmpty()) {
                 checkPageBreak(30f + activeCatBudgets.size * 14f)
                 paint.color = android.graphics.Color.parseColor("#0F172A")
@@ -1044,7 +1040,7 @@ class FinancialTrackerViewModel(
                 y += 16f
                 
                 activeCatBudgets.forEach { (cat, limit) ->
-                    val spent = categorySpending.value[cat] ?: 0.0
+                    val spent = categorySpending.value[cat] ?: 0L
                     val isOver = spent > limit
                     val remaining = limit - spent
                     
@@ -1177,7 +1173,7 @@ class FinancialTrackerViewModel(
 
     fun addRecurringTransaction(
         description: String,
-        amount: Double,
+        amount: Long,
         type: String,
         category: String,
         dayOfMonth: Int,

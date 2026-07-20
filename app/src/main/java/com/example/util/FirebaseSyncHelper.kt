@@ -125,7 +125,7 @@ object FirebaseSyncHelper {
                     val id = (idObj as? Number)?.toInt() ?: doc.id.toIntOrNull() ?: return@mapNotNull null
                     
                     val amountObj = doc.get("amount")
-                    val amount = (amountObj as? Number)?.toDouble() ?: 0.0
+                    val amount = (amountObj as? Number)?.toLong() ?: 0L
                     
                     val dateObj = doc.get("date")
                     val date = (dateObj as? Number)?.toLong() ?: 0L
@@ -231,7 +231,7 @@ object FirebaseSyncHelper {
                     val id = (idObj as? Number)?.toInt() ?: doc.id.toIntOrNull() ?: return@mapNotNull null
                     
                     val amountObj = doc.get("amount")
-                    val amount = (amountObj as? Number)?.toDouble() ?: 0.0
+                    val amount = (amountObj as? Number)?.toLong() ?: 0L
                     
                     val dayOfMonthObj = doc.get("dayOfMonth")
                     val dayOfMonth = (dayOfMonthObj as? Number)?.toInt() ?: 1

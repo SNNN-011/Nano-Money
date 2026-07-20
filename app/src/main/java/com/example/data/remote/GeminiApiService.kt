@@ -79,7 +79,7 @@ data class GeminiResponse(
 @JsonClass(generateAdapter = true)
 data class ExtractionResult(
     val description: String? = null,
-    val amount: Double? = null,
+    val amount: Long? = null,
     val type: String? = null,
     val category: String? = null,
     val date: Long? = null,

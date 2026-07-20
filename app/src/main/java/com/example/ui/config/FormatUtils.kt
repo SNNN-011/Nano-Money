@@ -41,10 +41,9 @@ object FormatUtils {
         return TextFieldValue(formatted, TextRange(newCursorPos))
     }
 
-    fun formatRupiah(amount: Double): String {
+    fun formatRupiah(amount: Long): String {
         return try {
             val format = NumberFormat.getCurrencyInstance(Locale.forLanguageTag("id-ID"))
-            // Some locales might have other decimal separator layouts, let's ensure clean Indonesian styling
             val formatted = format.format(amount)
             if (formatted.startsWith("Rp")) {
                 formatted.replace("Rp", "Rp ").substringBefore(",")
@@ -52,21 +51,21 @@ object FormatUtils {
                 "Rp " + NumberFormat.getNumberInstance(Locale.forLanguageTag("id-ID")).format(amount)
             }
         } catch (e: Exception) {
-            "Rp " + String.format(Locale.forLanguageTag("id-ID"), "%,.0f", amount)
+            "Rp " + NumberFormat.getNumberInstance(Locale.forLanguageTag("id-ID")).format(amount)
         }
     }
 
-    fun formatRupiahCompact(amount: Double): String {
+    fun formatRupiahCompact(amount: Long): String {
         if (amount >= 1_000_000_000) {
-            val formatted = String.format(Locale.forLanguageTag("id-ID"), "%.1f", amount / 1_000_000_000)
+            val formatted = String.format(Locale.forLanguageTag("id-ID"), "%.1f", amount / 1_000_000_000.0)
             return "Rp ${formatted.removeSuffix(".0")} M"
         }
         if (amount >= 1_000_000) {
-            val formatted = String.format(Locale.forLanguageTag("id-ID"), "%.1f", amount / 1_000_000)
+            val formatted = String.format(Locale.forLanguageTag("id-ID"), "%.1f", amount / 1_000_000.0)
             return "Rp ${formatted.removeSuffix(".0")} jt"
         }
         if (amount >= 1_000) {
-            val formatted = String.format(Locale.forLanguageTag("id-ID"), "%.1f", amount / 1_000)
+            val formatted = String.format(Locale.forLanguageTag("id-ID"), "%.1f", amount / 1_000.0)
             return "Rp ${formatted.removeSuffix(".0")} rb"
         }
         return formatRupiah(amount)

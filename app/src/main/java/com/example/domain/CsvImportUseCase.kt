@@ -109,8 +109,9 @@ class CsvImportUseCase {
             if (rawDesc.isEmpty()) continue
             
             val rawAmountStr = columns[amountIndex].trim()
-            val amount = rawAmountStr.replace(",", ".").toDoubleOrNull()
-            if (amount == null || amount <= 0 || amount.isNaN()) {
+            val cleanAmountStr = rawAmountStr.replace(".", "").replace(",", "")
+            val amount = cleanAmountStr.toLongOrNull()
+            if (amount == null || amount <= 0) {
                 throw IllegalArgumentException("Jumlah transaksi '$rawAmountStr' harus berupa angka positif.")
             }
             

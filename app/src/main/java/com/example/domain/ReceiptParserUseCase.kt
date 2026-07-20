@@ -16,7 +16,7 @@ import java.io.ByteArrayOutputStream
 
 data class ReceiptItem(
     val name: String,
-    val amount: Double,
+    val amount: Long,
     val category: String,
     val emoji: String = "📦",
     val type: String = "expense"
@@ -25,7 +25,7 @@ data class ReceiptItem(
 data class GroupedReceiptTransaction(
     val category: String,
     val description: String,
-    val amount: Double,
+    val amount: Long,
     val emoji: String = "📦",
     val type: String = "expense"
 )
@@ -34,7 +34,7 @@ data class ParsedReceipt(
     val title: String,
     val items: List<ReceiptItem>,
     val grouped: List<GroupedReceiptTransaction>,
-    val total: Double,
+    val total: Long,
     val dateMillis: Long,
     val error: String? = null
 )
@@ -127,7 +127,7 @@ class ReceiptParserUseCase {
                         title = "",
                         items = emptyList(),
                         grouped = emptyList(),
-                        total = 0.0,
+                        total = 0L,
                         dateMillis = System.currentTimeMillis(),
                         error = error
                     )
@@ -152,12 +152,12 @@ class ReceiptParserUseCase {
             
             val itemsList = mutableListOf<ReceiptItem>()
             val itemsArray = json.optJSONArray("items")
-            var calculatedTotal = 0.0
+            var calculatedTotal = 0L
             
             if (itemsArray != null) {
                 for (i in 0 until itemsArray.length()) {
                     val itemObj = itemsArray.getJSONObject(i)
-                    val amount = itemObj.optDouble("amount", 0.0)
+                    val amount = itemObj.optLong("amount", 0L)
                     val type = itemObj.optString("type", "expense").trim().lowercase().let { if (it == "income" || it == "pemasukan") "income" else "expense" }
                     
                     if (type == "income") {

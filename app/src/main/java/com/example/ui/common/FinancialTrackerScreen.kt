@@ -282,7 +282,7 @@ fun FinancialTrackerScreen(
                 }
                 expenseCategoriesState.forEach { cat ->
                     if (!updatedCategoryBudgets.containsKey(cat)) {
-                        viewModel.updateCategoryBudget(cat, 0.0)
+                        viewModel.updateCategoryBudget(cat, 0L)
                     }
                 }
                 showBudgetDialog = false

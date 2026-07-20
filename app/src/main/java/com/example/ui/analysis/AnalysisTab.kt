@@ -137,8 +137,8 @@ fun PeriodFilterRow(
 
 @Composable
 fun SummaryStatsCard(
-    totalIncome: Double,
-    totalExpense: Double,
+    totalIncome: Long,
+    totalExpense: Long,
     averageDailyExpense: Double,
     topCategoryName: String,
     totalTransactions: Int
@@ -210,7 +210,7 @@ val EaseInOutSine = CubicBezierEasing(0.37f, 0f, 0.63f, 1f)
 fun CombinedChartsCard(
     dailyTrends: List<DailyAggregation>,
     aggregations: List<CategoryAggregation>,
-    totalExpense: Double
+    totalExpense: Long
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),

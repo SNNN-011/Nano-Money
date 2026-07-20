@@ -187,7 +187,7 @@ class TransactionParserUseCase {
 
             val result = ExtractionResult(
                 description = json.optString("description", "Transaksi"),
-                amount = json.optDouble("amount", 0.0),
+                amount = json.optLong("amount", 0L),
                 type = json.optString("type", "PENGELUARAN"),
                 category = json.optString("category", "Lainnya"),
                 date = json.optLong("date", System.currentTimeMillis()),

@@ -414,8 +414,8 @@ fun CategoryManagementDialog(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MonthlyBudgetDialog(
-    currentBudgetLimit: Double,
-    categoryBudgets: Map<String, Double>,
+    currentBudgetLimit: Long,
+    categoryBudgets: Map<String, Long>,
     expenseCategories: List<String>,
     onConfirm: (Double, Map<String, Double>) -> Unit,
     onDismiss: () -> Unit
@@ -978,16 +978,16 @@ fun MonthlyBudgetDialog(
                         if (cleanDigits.isEmpty()) {
                             budgetError = "Harap masukkan nilai anggaran"
                         } else {
-                            val parsed = cleanDigits.toDoubleOrNull()
-                            if (parsed == null || parsed < 0.0) {
+                            val parsed = cleanDigits.toLongOrNull()
+                            if (parsed == null || parsed < 0L) {
                                 budgetError = "Nilai harus berupa angka positif"
                             } else {
-                                val resultBudgets = mutableMapOf<String, Double>()
+                                val resultBudgets = mutableMapOf<String, Long>()
                                 selectedEnabledCategories.forEach { cat ->
                                     val valStr = localCategoryBudgets[cat] ?: ""
                                     val cleanVal = valStr.filter { it.isDigit() }
-                                    val parsedVal = cleanVal.toDoubleOrNull()
-                                    if (parsedVal != null && parsedVal > 0.0) {
+                                    val parsedVal = cleanVal.toLongOrNull()
+                                    if (parsedVal != null && parsedVal > 0L) {
                                         resultBudgets[cat] = parsedVal
                                     }
                                 }
@@ -1083,7 +1083,7 @@ fun RecurringTransactionManagementDialog(
     recurringTransactions: List<com.example.data.RecurringTransaction>,
     incomeCategories: List<String>,
     expenseCategories: List<String>,
-    onAddRecurring: (description: String, amount: Double, type: String, category: String, dayOfMonth: Int, notes: String) -> Unit,
+    onAddRecurring: (description: String, amount: Long, type: String, category: String, dayOfMonth: Int, notes: String) -> Unit,
     onDeleteRecurring: (com.example.data.RecurringTransaction) -> Unit,
     onToggleRecurringActive: (com.example.data.RecurringTransaction) -> Unit,
     onDismissRequest: () -> Unit
@@ -1475,8 +1475,8 @@ fun RecurringTransactionManagementDialog(
                                 descError = "Harap masukkan deskripsi"
                                 valid = false
                             }
-                            val amt = amountInput.text.replace(".", "").trim().toDoubleOrNull()
-                            if (amt == null || amt <= 0.0) {
+                            val amt = amountInput.text.replace(".", "").trim().toLongOrNull()
+                            if (amt == null || amt <= 0L) {
                                 amountError = "Nilai harus berupa angka positif"
                                 valid = false
                             }

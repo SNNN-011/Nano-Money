@@ -649,7 +649,7 @@ fun ChatScreen(
                             ) {
                                 val isIncome = pending.type?.lowercase() == "income" || pending.type?.lowercase() == "pemasukan"
                                 val typeIcon = if (isIncome) "🟢 Masuk" else "🔴 Keluar"
-                                val amtStr = FormatUtils.formatRupiah(pending.amount ?: 0.0)
+                                val amtStr = FormatUtils.formatRupiah(pending.amount ?: 0L)
                                 val desc = if (pending.description.isNullOrBlank()) "Tanpa deskripsi" else pending.description
                                 val category = pending.category ?: "Umum"
 
@@ -740,7 +740,7 @@ fun ChatScreen(
                                 }
 
                                 // Amount block (compact basic input field)
-                                val amtStr = if (pending.amount == null || pending.amount == 0.0) "" else FormatUtils.formatInputNumber(pending.amount.toLong().toString())
+                                val amtStr = if (pending.amount == null || pending.amount == 0L) "" else FormatUtils.formatInputNumber(pending.amount.toString())
                                 val amtFieldValue = remember(amtStr) { androidx.compose.ui.text.input.TextFieldValue(amtStr, androidx.compose.ui.text.TextRange(amtStr.length)) }
                                 Row(
                                     modifier = Modifier
@@ -758,7 +758,7 @@ fun ChatScreen(
                                         onValueChange = { field ->
                                             val clean = field.text.replace(".", "")
                                             if (clean.length <= 11) {
-                                                val parsedAmt = clean.toDoubleOrNull() ?: 0.0
+                                                val parsedAmt = clean.toLongOrNull() ?: 0L
                                                 viewModel.updatePendingTransaction(pending.copy(amount = parsedAmt))
                                             }
                                         },
@@ -1150,7 +1150,7 @@ fun ChatScreen(
                                             }
 
                                             // Item Amount basic numeric field
-                                            val grpAmtStr = if (grp.amount == 0.0) "" else FormatUtils.formatInputNumber(grp.amount.toLong().toString())
+                                            val grpAmtStr = if (grp.amount == 0L) "" else FormatUtils.formatInputNumber(grp.amount.toString())
                                             val grpAmtFieldValue = remember(grpAmtStr) { androidx.compose.ui.text.input.TextFieldValue(grpAmtStr, androidx.compose.ui.text.TextRange(grpAmtStr.length)) }
                                             Row(
                                                 modifier = Modifier
@@ -1168,7 +1168,7 @@ fun ChatScreen(
                                                     onValueChange = { field ->
                                                         val clean = field.text.replace(".", "")
                                                         if (clean.length <= 11) {
-                                                            val parsedAmt = clean.toDoubleOrNull() ?: 0.0
+                                                            val parsedAmt = clean.toLongOrNull() ?: 0L
                                                             val updatedGrouped = receipt.grouped.toMutableList()
                                                             updatedGrouped[index] = grp.copy(amount = parsedAmt)
                                                             val newTotal = updatedGrouped.sumOf { it.amount }

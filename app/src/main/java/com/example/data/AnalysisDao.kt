@@ -6,7 +6,7 @@ import kotlinx.coroutines.flow.Flow
 
 data class CategoryAggregation(
     val category: String,
-    val totalAmount: Double,
+    val totalAmount: Long,
     val transactionCount: Int,
     val averageAmount: Double
 )
@@ -38,16 +38,16 @@ interface AnalysisDao {
     fun getAllTimeExpenseAggregation(): Flow<List<CategoryAggregation>>
 
     @Query("SELECT SUM(amount) FROM financial_records WHERE type = 'expense' AND date >= :startMs AND date <= :endMs AND isDeleted = 0")
-    fun getTotalExpense(startMs: Long, endMs: Long): Flow<Double?>
+    fun getTotalExpense(startMs: Long, endMs: Long): Flow<Long?>
 
     @Query("SELECT SUM(amount) FROM financial_records WHERE type = 'expense' AND isDeleted = 0")
-    fun getAllTimeTotalExpense(): Flow<Double?>
+    fun getAllTimeTotalExpense(): Flow<Long?>
 
     @Query("SELECT SUM(amount) FROM financial_records WHERE type = 'income' AND date >= :startMs AND date <= :endMs AND isDeleted = 0")
-    fun getTotalIncome(startMs: Long, endMs: Long): Flow<Double?>
+    fun getTotalIncome(startMs: Long, endMs: Long): Flow<Long?>
 
     @Query("SELECT SUM(amount) FROM financial_records WHERE type = 'income' AND isDeleted = 0")
-    fun getAllTimeTotalIncome(): Flow<Double?>
+    fun getAllTimeTotalIncome(): Flow<Long?>
 
     @Query("SELECT * FROM financial_records WHERE type = 'expense' AND date >= :startMs AND date <= :endMs AND isDeleted = 0 ORDER BY date ASC")
     fun getExpenseRecords(startMs: Long, endMs: Long): Flow<List<com.example.data.FinancialRecord>>

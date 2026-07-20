@@ -22,7 +22,7 @@ import java.text.SimpleDateFormat
 data class DailyAggregation(
     val dateString: String,
     val dateMs: Long,
-    val totalAmount: Double
+    val totalAmount: Long
 )
 
 class AnalysisViewModel(
@@ -66,7 +66,7 @@ class AnalysisViewModel(
                 SimpleDateFormat("dd/MM", Locale.forLanguageTag("id-ID"))
             }
             
-            val map = mutableMapOf<String, Pair<Long, Double>>()
+            val map = mutableMapOf<String, Pair<Long, Long>>()
             records.forEach { record ->
                 val dateStr = format.format(java.util.Date(record.date))
                 val existing = map[dateStr]
@@ -96,28 +96,28 @@ class AnalysisViewModel(
     }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    val totalExpense: StateFlow<Double> = combine(_selectedPeriod, _calendarMonth) { period, calendarMonth ->
+    val totalExpense: StateFlow<Long> = combine(_selectedPeriod, _calendarMonth) { period, calendarMonth ->
         Pair(period, calendarMonth)
     }.flatMapLatest { (period, calendarMonth) ->
         val (start, end) = getStatsTimeRange(period, calendarMonth)
         if (start != null && end != null) {
-            repository.getTotalExpense(start, end).map { it ?: 0.0 }
+            repository.getTotalExpense(start, end).map { it ?: 0L }
         } else {
-            repository.getAllTimeTotalExpense().map { it ?: 0.0 }
+            repository.getAllTimeTotalExpense().map { it ?: 0L }
         }
-    }.stateIn(viewModelScope, SharingStarted.Lazily, 0.0)
+    }.stateIn(viewModelScope, SharingStarted.Lazily, 0L)
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    val totalIncome: StateFlow<Double> = combine(_selectedPeriod, _calendarMonth) { period, calendarMonth ->
+    val totalIncome: StateFlow<Long> = combine(_selectedPeriod, _calendarMonth) { period, calendarMonth ->
         Pair(period, calendarMonth)
     }.flatMapLatest { (period, calendarMonth) ->
         val (start, end) = getStatsTimeRange(period, calendarMonth)
         if (start != null && end != null) {
-            repository.getTotalIncome(start, end).map { it ?: 0.0 }
+            repository.getTotalIncome(start, end).map { it ?: 0L }
         } else {
-            repository.getAllTimeTotalIncome().map { it ?: 0.0 }
+            repository.getAllTimeTotalIncome().map { it ?: 0L }
         }
-    }.stateIn(viewModelScope, SharingStarted.Lazily, 0.0)
+    }.stateIn(viewModelScope, SharingStarted.Lazily, 0L)
 
     val averageDailyExpense: StateFlow<Double> = combine(
         totalExpense,
@@ -125,7 +125,7 @@ class AnalysisViewModel(
         repository.getOldestExpenseDate()
     ) { total, (period, calendarMonth), oldestDateMs ->
         val days = getDaysInPeriod(period, calendarMonth, oldestDateMs)
-        if (days > 0) total / days else 0.0
+        if (days > 0) total.toDouble() / days else 0.0
     }.stateIn(viewModelScope, SharingStarted.Lazily, 0.0)
     
     val topCategory: StateFlow<CategoryAggregation?> = categoryAggregations.map { list ->

@@ -252,7 +252,7 @@ class ChatViewModel(
         viewModelScope.launch {
             var count = 0
             pending.grouped.forEach { grp ->
-                if (grp.amount > 0.0) {
+                if (grp.amount > 0L) {
                     val (_, cleanCatNameRaw) = com.example.ui.util.CategoryIconMapper.extractEmojiAndLabel(grp.category.trim())
                     val cleanCatName = cleanCatNameRaw.ifBlank { grp.category }.trim()
                     val allCategories = _incomeCategories.value + _expenseCategories.value
@@ -422,8 +422,8 @@ class ChatViewModel(
 
         val recordCategory = categoryNameOnly
 
-        val recordAmount = result.amount ?: 0.0
-        if (recordAmount <= 0.0) {
+        val recordAmount = result.amount ?: 0L
+        if (recordAmount <= 0L) {
             addAiMessage("Nominal tidak valid, coba tulis ulang ya 🙏")
             return
         }
@@ -486,7 +486,7 @@ class ChatViewModel(
         
         val rawType = result.type?.lowercase() ?: "expense"
         val tipe = if (rawType == "pemasukan" || rawType == "income") "Pemasukan" else "Pengeluaran"
-        val nominal = FormatUtils.formatRupiah(result.amount ?: 0.0)
+        val nominal = FormatUtils.formatRupiah(result.amount ?: 0L)
         
         val allCategories = _incomeCategories.value + _expenseCategories.value
         val resultCategoryRaw = result.category?.trim() ?: ""
