@@ -25,28 +25,10 @@ object SecurePrefsHelper {
             return prefs
         } catch (e: Exception) {
             SecureLog.e(TAG, "EncryptedSharedPreferences '$name' corrupt (${e.javaClass.simpleName}), melakukan reset paksa.", e)
-            // Backup PIN data sebelum wipe — PIN adalah data keamanan kritis
-            // TIDAK bisa via EncryptedPrefs API karena corrupt, baca XML langsung
-            val pinBackup = mutableMapOf<String, Any?>()
-            try {
-                val prefsFile = java.io.File(context.applicationContext.filesDir.parentFile, "shared_prefs/$name.xml")
-                if (prefsFile.exists()) {
-                    val xmlText = prefsFile.readText()
-                    // Parse XML sederhana — cari <string name="pin_hash">...</string>, dll
-                    val pinKeys = listOf("pin_hash", "pin_salt", "pin_enabled")
-                    for (key in pinKeys) {
-                        // String: <string name="pin_hash">base64data</string>
-                        val stringPattern = """<string\s+name="$key"[^>]*>([^<]*)</string>""".toRegex()
-                        stringPattern.find(xmlText)?.groups?.get(1)?.value?.let { pinBackup[key] = it }
-                        // Boolean: <boolean name="pin_enabled" value="true" />
-                        val boolPattern = """<boolean\s+name="$key"\s+value="(true|false)"\s*/>""".toRegex()
-                        boolPattern.find(xmlText)?.groups?.get(1)?.value?.let { pinBackup[key] = it.toBoolean() }
-                    }
-                    SecureLog.w(TAG, "Backup PIN data dari XML: ${pinBackup.keys}")
-                }
-            } catch (backupError: Exception) {
-                SecureLog.w(TAG, "Tidak bisa backup PIN data: ${backupError.message}")
-            }
+            // Cleanup: hapus file corrupt, Keystore alias, dan plain prefs sisa migrasi
+            // Tidak backup PIN dari XML — nilai di encrypted XML sudah terenkripsi,
+            // restore ke encrypted baru = double-encryption = verify gagal.
+            // User perlu set ulang PIN setelah recovery.
             try {
                 context.applicationContext.getSharedPreferences(name, Context.MODE_PRIVATE)
                     .edit().clear().commit()
@@ -62,20 +44,14 @@ object SecurePrefsHelper {
             } catch (ksError: Exception) {
                 SecureLog.e(TAG, "Gagal hapus Keystore alias: ${ksError.message}", ksError)
             }
+            // Hapus plain prefs sisa migrasi lama — hindari window plaintext
+            try {
+                context.applicationContext.getSharedPreferences(name, Context.MODE_PRIVATE)
+                    .edit().clear().commit()
+            } catch (_: Exception) {}
             return try {
                 val newPrefs = buildEncryptedPrefs(context, name)
-                // Restore PIN data setelah rebuild
-                if (pinBackup.isNotEmpty()) {
-                    val editor = newPrefs.edit()
-                    for ((key, value) in pinBackup) {
-                        when (value) {
-                            is String -> editor.putString(key, value)
-                            is Boolean -> editor.putBoolean(key, value)
-                        }
-                    }
-                    editor.apply()
-                    SecureLog.w(TAG, "PIN data restored setelah recovery: ${pinBackup.keys}")
-                }
+                SecureLog.w(TAG, "EncryptedPrefs '$name' berhasil di-rebuild. PIN perlu di-set ulang.")
                 newPrefs
             } catch (e2: Exception) {
                 SecureLog.e(TAG, "Gagal total membuat ulang encrypted prefs '$name'.", e2)

@@ -1,10 +1,12 @@
 package com.example.data
 
+import android.os.Parcelable
 import androidx.room.Entity
 import androidx.room.PrimaryKey
-import java.io.Serializable
+import kotlinx.parcelize.Parcelize
 
 @Entity(tableName = "recurring_transactions")
+@Parcelize
 data class RecurringTransaction(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
     val description: String,
@@ -15,4 +17,4 @@ data class RecurringTransaction(
     val notes: String = "",
     val lastRunDate: Long? = null, // epoch millis last run or null
     val isActive: Boolean = true
-) : Serializable
+) : Parcelable

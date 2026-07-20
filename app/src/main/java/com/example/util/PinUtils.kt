@@ -1,23 +1,23 @@
 package com.example.util
 
 import android.content.Context
-import java.security.MessageDigest
 import java.security.SecureRandom
 import java.util.Base64
+import javax.crypto.SecretKeyFactory
+import javax.crypto.spec.PBEKeySpec
 
 object PinUtils {
     private const val PREFS_NAME = "pin_prefs"
     private const val KEY_HASH = "pin_hash"
     private const val KEY_SALT = "pin_salt"
     private const val KEY_ENABLED = "pin_enabled"
+    private const val PBKDF2_ITERATIONS = 310_000 // OWASP 2023 recommendation for PBKDF2WithHmacSHA256
+    private const val PBKDF2_KEY_LENGTH = 256
 
-    // Plain SharedPreferences — PIN sudah one-way hash (SHA-256 + salt),
+    // Plain SharedPreferences — PIN sudah one-way hash (PBKDF2 + salt),
     // EncryptedSharedPreferences redundant dan data loss di cold start (MIUI/dll)
     private fun prefs(context: Context) =
         context.applicationContext.getSharedPreferences(PREFS_NAME, android.content.Context.MODE_PRIVATE)
-
-    private fun sha256(input: String): ByteArray =
-        MessageDigest.getInstance("SHA-256").digest(input.toByteArray(Charsets.UTF_8))
 
     fun generateSalt(): String {
         val salt = ByteArray(16)
@@ -26,7 +26,11 @@ object PinUtils {
     }
 
     fun hashPin(pin: String, salt: String): String {
-        val hash = sha256(pin + salt)
+        val saltBytes = Base64.getDecoder().decode(salt)
+        val spec = PBEKeySpec(pin.toCharArray(), saltBytes, PBKDF2_ITERATIONS, PBKDF2_KEY_LENGTH)
+        val factory = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256")
+        val hash = factory.generateSecret(spec).encoded
+        spec.clearPassword()
         return Base64.getEncoder().encodeToString(hash)
     }
 

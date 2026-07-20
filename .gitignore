@@ -17,6 +17,7 @@ local.properties
 .env
 app/.env
 debug.keystore
+app/google-services.json
 
 # Android Studio local config
 .idea/
