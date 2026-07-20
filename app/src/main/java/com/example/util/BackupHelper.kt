@@ -280,6 +280,14 @@ object BackupHelper {
                 tempDbFile.delete()
             }
 
+            // Whitelist: only restore known app settings prefs, never security-critical ones
+            val allowedPrefsFiles = setOf(
+                "financial_tracker_prefs.xml",
+                "app_security_prefs.xml",
+                "security_prefs.xml",
+                "pin_prefs.xml"
+            )
+
             if (isZipFile(backupFile)) {
                 ZipInputStream(backupFile.inputStream()).use { zis ->
                     var entry = zis.nextEntry
@@ -288,6 +296,12 @@ object BackupHelper {
                             val fileName = entry.name.substringAfter("shared_prefs/")
                             if (fileName.contains("..")) {
                                 SecureLog.w("BackupHelper", "ZipSlip detected in entry: ${entry.name}")
+                                zis.closeEntry()
+                                entry = zis.nextEntry
+                                continue
+                            }
+                            if (fileName !in allowedPrefsFiles) {
+                                SecureLog.w("BackupHelper", "Skipping non-whitelisted prefs file: $fileName")
                                 zis.closeEntry()
                                 entry = zis.nextEntry
                                 continue

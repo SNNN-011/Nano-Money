@@ -185,14 +185,36 @@ class TransactionParserUseCase {
                 return@withContext RequestResult.Success(ExtractionResult(error = error, pertanyaan = p))
             }
 
+            val rawDescription = json.optString("description", "Transaksi").trim()
+            val rawAmount = json.optLong("amount", 0L)
+            val rawType = json.optString("type", "PENGELUARAN").trim()
+            val rawCategory = json.optString("category", "Lainnya").trim()
+            val rawDate = json.optLong("date", System.currentTimeMillis())
+            val rawNotes = json.optString("notes", "").trim()
+            val rawEmoji = json.optString("emoji", "📦").trim()
+
+            // Validate AI response fields
+            if (rawAmount <= 0L) {
+                return@withContext RequestResult.Error("Jumlah transaksi tidak valid", null)
+            }
+            if (rawDescription.length > 500) {
+                return@withContext RequestResult.Error("Deskripsi terlalu panjang", null)
+            }
+            if (rawCategory.length > 100) {
+                return@withContext RequestResult.Error("Kategori terlalu panjang", null)
+            }
+            val validType = if (rawType.uppercase() in setOf("PENGELUARAN", "PEMASUKAN", "EXPENSE", "INCOME")) rawType.uppercase() else "PENGELUARAN"
+            val safeEmoji = if (rawEmoji.length <= 4) rawEmoji else "📦"
+            val safeDate = if (rawDate > 0L) rawDate else System.currentTimeMillis()
+
             val result = ExtractionResult(
-                description = json.optString("description", "Transaksi"),
-                amount = json.optLong("amount", 0L),
-                type = json.optString("type", "PENGELUARAN"),
-                category = json.optString("category", "Lainnya"),
-                date = json.optLong("date", System.currentTimeMillis()),
-                notes = json.optString("notes", ""),
-                emoji = json.optString("emoji", "📦").trim()
+                description = rawDescription,
+                amount = rawAmount,
+                type = validType,
+                category = rawCategory,
+                date = safeDate,
+                notes = rawNotes,
+                emoji = safeEmoji
             )
 
             RequestResult.Success(result)
