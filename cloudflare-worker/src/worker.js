@@ -25,15 +25,9 @@ async function verifyFirebaseToken(idToken, projectId) {
 
 export default {
   async fetch(request, env, ctx) {
-    // 1. Tangani CORS Preflight Request
+    // 1. Tolak CORS Preflight — backend mobile-only, browser tidak perlu akses
     if (request.method === 'OPTIONS') {
-      return new Response(null, {
-        headers: {
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-          'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-        }
-      });
+      return new Response(null, { status: 403 });
     }
 
     const projectId = env.FIREBASE_PROJECT_ID;
@@ -116,8 +110,8 @@ export default {
 
     // 5. Kembalikan response Gemini ke klien Android
     const responseHeaders = new Headers(geminiResponse.headers);
-    responseHeaders.set('Access-Control-Allow-Origin', '*'); // Pastikan CORS tetap diizinkan
-    
+    // CORS header sengaja tidak ditambah — backend mobile-only, Android OkHttp tidak pakai CORS
+
     // Karena Gemini kadang mengembalikan transfer-encoding: chunked yang bisa bermasalah jika proxy
     // menghapus content-encoding, lebih baik teruskan body as is.
     return new Response(geminiResponse.body, {
