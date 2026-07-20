@@ -177,8 +177,20 @@ object BackupHelper {
                     while (entry != null) {
                         if (!entry.isDirectory && entry.name == "database/financial_tracker_database") {
                             tempDbFile.parentFile?.mkdirs()
+                            // Decompression bomb guard: max 500MB for database
+                            var bytesWritten = 0L
+                            val maxBytes = 500L * 1024 * 1024
                             tempDbFile.outputStream().use { output ->
-                                zis.copyTo(output)
+                                val buffer = ByteArray(8192)
+                                var read: Int
+                                while (zis.read(buffer).also { read = it } != -1) {
+                                    bytesWritten += read
+                                    if (bytesWritten > maxBytes) {
+                                        SecureLog.w("BackupHelper", "Database file too large, aborting restore")
+                                        break
+                                    }
+                                    output.write(buffer, 0, read)
+                                }
                             }
                             break
                         }
@@ -274,14 +286,32 @@ object BackupHelper {
                     while (entry != null) {
                         if (!entry.isDirectory && entry.name.startsWith("shared_prefs/")) {
                             val fileName = entry.name.substringAfter("shared_prefs/")
+                            if (fileName.contains("..")) {
+                                SecureLog.w("BackupHelper", "ZipSlip detected in entry: ${entry.name}")
+                                zis.closeEntry()
+                                entry = zis.nextEntry
+                                continue
+                            }
                             val dataDir = context.applicationContext.dataDir ?: context.filesDir.parentFile ?: context.dataDir
                             val sharedPrefsDir = File(dataDir, "shared_prefs")
                             if (!sharedPrefsDir.exists()) {
                                 sharedPrefsDir.mkdirs()
                             }
                             val targetPrefFile = File(sharedPrefsDir, fileName)
+                            // Decompression bomb guard: max 1MB per shared_prefs file
+                            var bytesWritten = 0L
+                            val maxBytes = 1L * 1024 * 1024
                             targetPrefFile.outputStream().use { output ->
-                                zis.copyTo(output)
+                                val buffer = ByteArray(8192)
+                                var read: Int
+                                while (zis.read(buffer).also { read = it } != -1) {
+                                    bytesWritten += read
+                                    if (bytesWritten > maxBytes) {
+                                        SecureLog.w("BackupHelper", "Shared_prefs file too large, aborting: ${entry.name}")
+                                        break
+                                    }
+                                    output.write(buffer, 0, read)
+                                }
                             }
                         }
                         zis.closeEntry()

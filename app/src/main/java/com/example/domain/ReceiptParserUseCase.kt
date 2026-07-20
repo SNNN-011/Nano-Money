@@ -214,7 +214,8 @@ class ReceiptParserUseCase {
                 com.example.util.AuthHelper.getValidIdToken(true)
                 return@withContext RequestResult.Error("Sesi login bermasalah, silakan coba lagi", e)
             }
-            RequestResult.Error("Gagal menganalisis struk: ${e.localizedMessage ?: "kesalahan tidak dikenal"}", e)
+            com.example.util.SecureLog.e("ReceiptParser", "Gagal menganalisis struk", e)
+            RequestResult.Error("Gagal menganalisis struk. Silakan coba lagi.", e)
         }
     }
 
