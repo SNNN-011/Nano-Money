@@ -96,7 +96,6 @@ secrets {
 // This makes it easy to add them back in the future if needed.
 dependencies {
    // Import the Firebase BoM
-  implementation(platform("com.google.firebase:firebase-bom:34.14.1"))
   // When using the BoM, don't specify versions in Firebase dependencies
   implementation(libs.firebase.analytics)
   implementation(libs.firebase.crashlytics)
@@ -137,7 +136,7 @@ dependencies {
   // implementation(libs.firebase.ai)
   implementation(libs.kotlinx.coroutines.android)
   implementation(libs.kotlinx.coroutines.core)
-  implementation(libs.logging.interceptor)
+  debugImplementation(libs.logging.interceptor)
   implementation(libs.moshi.kotlin)
   implementation(libs.okhttp)
   implementation(libs.androidx.compose.ui.text.google.fonts)

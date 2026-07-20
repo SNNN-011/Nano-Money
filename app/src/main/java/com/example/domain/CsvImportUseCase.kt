@@ -3,6 +3,14 @@ package com.example.domain
 import com.example.data.FinancialRecord
 
 class CsvImportUseCase {
+    // Neutralize spreadsheet formula injection on import
+    private fun sanitizeCsvField(value: String): String {
+        val trimmed = value.trim()
+        return if (trimmed.isNotEmpty() && trimmed[0] in setOf('=', '+', '-', '@', '\t', '\r', '\n')) {
+            "'" + trimmed
+        } else trimmed
+    }
+
     // Parses a single CSV line acknowledging quotes and double quotes escape
     private fun parseCsvLine(line: String): List<String> {
         val result = mutableListOf<String>()
@@ -105,9 +113,9 @@ class CsvImportUseCase {
                 continue
             }
             
-            val rawDesc = columns[descIndex].trim()
+            val rawDesc = sanitizeCsvField(columns[descIndex].trim())
             if (rawDesc.isEmpty()) continue
-            
+
             val rawAmountStr = columns[amountIndex].trim()
             val cleanAmountStr = rawAmountStr.replace(".", "").replace(",", "")
             val amount = cleanAmountStr.toLongOrNull()
@@ -124,7 +132,7 @@ class CsvImportUseCase {
                 throw java.lang.IllegalArgumentException("Tipe transaksi '$type' harus 'Pemasukan' atau 'Pengeluaran'.")
             }
             
-            val category = columns[catIndex].trim()
+            val category = sanitizeCsvField(columns[catIndex].trim())
             if (category.isEmpty()) {
                 throw java.lang.IllegalArgumentException("Kategori transaksi tidak boleh kosong.")
             }
@@ -145,7 +153,7 @@ class CsvImportUseCase {
                 }
             }
             
-            val notes = if (notesIndex != -1 && notesIndex < columns.size) columns[notesIndex].trim() else ""
+            val notes = if (notesIndex != -1 && notesIndex < columns.size) sanitizeCsvField(columns[notesIndex].trim()) else ""
             
             parsedList.add(
                 FinancialRecord(

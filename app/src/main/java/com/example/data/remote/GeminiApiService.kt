@@ -122,12 +122,18 @@ object GeminiClient {
     private var tokenExpiryMs: Long = 0L
     private const val TOKEN_CACHE_TTL_MS = 50_000L // 50 seconds — Firebase tokens last 60min, this prevents stale on refresh
 
+    /** Clear cached token on logout */
+    fun clearCachedToken() {
+        cachedToken = null
+        tokenExpiryMs = 0L
+    }
+
     /**
      * Get cached token or fetch synchronously. Called from OkHttp interceptor thread.
      * Uses Tasks.await() (Google Play Services pattern) instead of runBlocking.
      */
     private fun getCachedOrFetchToken(): String? {
-        val now = System.currentTimeMillis()
+        val now = android.os.SystemClock.elapsedRealtime()
         cachedToken?.let { token ->
             if (now < tokenExpiryMs) return token
         }

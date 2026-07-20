@@ -45,14 +45,14 @@ class MainActivity : FragmentActivity() {
     // Inisialisasi Firebase Telemetry (Crashlytics dan Analytics)
     com.example.util.TelemetryHelper.initialize(applicationContext)
     
-    // Mengontrol status keamanan pencegahan screen capture secara dinamis via Firebase Remote Config
+    // Default: screenshot protection ON. Remote Config can only reinforce, never disable.
+    window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
     lifecycleScope.launch {
       com.example.util.RemoteConfigHelper.preventScreenshot.collect { prevent ->
         if (prevent) {
           window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
-        } else {
-          window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE)
         }
+        // Never clear FLAG_SECURE — Remote Config cannot disable screenshot protection
       }
     }
     

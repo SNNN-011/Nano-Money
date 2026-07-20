@@ -50,6 +50,8 @@ object FirebaseSyncHelper {
 
     fun signOut() {
         FirebaseAuth.getInstance().signOut()
+        // Clear cached bearer token for Gemini proxy
+        com.example.data.remote.GeminiClient.clearCachedToken()
     }
 
     suspend fun uploadRecordToFirestoreDirectly(record: FinancialRecord) {
