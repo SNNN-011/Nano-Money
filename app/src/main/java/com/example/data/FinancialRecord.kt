@@ -1,12 +1,10 @@
 package com.example.data
 
-import android.os.Parcelable
 import androidx.room.Entity
 import androidx.room.PrimaryKey
-import kotlinx.parcelize.Parcelize
+import java.io.Serializable
 
 @Entity(tableName = "financial_records")
-@Parcelize
 data class FinancialRecord(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
     val description: String,
@@ -16,4 +14,4 @@ data class FinancialRecord(
     val date: Long, // timestamp in ms
     val notes: String,
     val isDeleted: Boolean = false
-) : Parcelable
+) : Serializable

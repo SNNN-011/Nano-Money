@@ -111,4 +111,3 @@ google-devtools-ksp = { id = "com.google.devtools.ksp", version.ref = "googleDev
 roborazzi = { id = "io.github.takahirom.roborazzi", version.ref = "roborazzi" }
 secrets = { id = "com.google.android.libraries.mapsplatform.secrets-gradle-plugin", version.ref = "secretsGradlePlugin" }
 firebase-crashlytics = { id = "com.google.firebase.crashlytics", version = "3.0.2" }
-kotlin-parcelize = { id = "org.jetbrains.kotlin.plugin.parcelize" }

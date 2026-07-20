@@ -2,7 +2,6 @@ plugins {
   alias(libs.plugins.android.application)
   id("com.google.gms.google-services")
   alias(libs.plugins.kotlin.compose)
-  alias(libs.plugins.kotlin.parcelize)
   alias(libs.plugins.google.devtools.ksp)
   alias(libs.plugins.roborazzi)
   alias(libs.plugins.secrets)
