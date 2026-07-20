@@ -409,9 +409,9 @@ fun DashboardStatsSection(
                     )
                 }
             } else {
-                val progress = if (balanceVisible) (monthlySpendingTotal / monthlyBudgetLimit).coerceIn(0.0, 1.0).toFloat() else 0f
+                val progress = if (balanceVisible) (monthlySpendingTotal.toDouble() / monthlyBudgetLimit).coerceIn(0.0, 1.0).toFloat() else 0f
                 val isOverBudget = monthlySpendingTotal > monthlyBudgetLimit
-                val isWarningPercent = (monthlySpendingTotal / monthlyBudgetLimit) >= 0.8
+                val isWarningPercent = (monthlySpendingTotal.toDouble() / monthlyBudgetLimit) >= 0.8
                 
                 val progressColor = when {
                     !balanceVisible -> GhostWhite.copy(alpha = 0.2f)
@@ -490,7 +490,7 @@ fun DashboardStatsSection(
                             text = if (!balanceVisible) {
                                 "Sisa: Rp ••••••"
                             } else if (isOverBudget) {
-                                "Sisa: " + FormatUtils.formatRupiah(0.0) + " (Over " + FormatUtils.formatRupiah(monthlySpendingTotal - monthlyBudgetLimit) + ")"
+                                "Sisa: " + FormatUtils.formatRupiah(0L) + " (Over " + FormatUtils.formatRupiah(monthlySpendingTotal - monthlyBudgetLimit) + ")"
                             } else {
                                 "Sisa: " + FormatUtils.formatRupiah(monthlyBudgetLimit - monthlySpendingTotal)
                             },
@@ -510,7 +510,7 @@ fun DashboardStatsSection(
                         )
                     }
 
-                    val percentInt = ((monthlySpendingTotal / monthlyBudgetLimit) * 100).toInt()
+                    val percentInt = ((monthlySpendingTotal.toDouble() / monthlyBudgetLimit) * 100).toInt()
                     Box(
                         modifier = Modifier
                             .background(
@@ -585,12 +585,12 @@ fun DashboardStatsSection(
                             verticalArrangement = Arrangement.spacedBy(Spacing.md)
                         ) {
                             activeCategoryBudgets.forEach { (cat, limit) ->
-                                val spent = if (balanceVisible) (categorySpending[cat] ?: 0.0) else 0.0
-                                val catProgress = if (limit > 0.0) (spent / limit).coerceIn(0.0, 1.0).toFloat() else 0f
+                                val spent = if (balanceVisible) (categorySpending[cat] ?: 0L) else 0L
+                                val catProgress = if (limit > 0L) (spent.toDouble() / limit).coerceIn(0.0, 1.0).toFloat() else 0f
                                 val isCatOver = spent > limit
-                                val isCatWarning = (spent / limit) >= 0.8
-                                
-                                val catPercent = ((spent / limit) * 100).toInt()
+                                val isCatWarning = (spent.toDouble() / limit) >= 0.8
+
+                                val catPercent = ((spent.toDouble() / limit) * 100).toInt()
 
                                 val catColor = when {
                                     !balanceVisible -> GhostWhite.copy(alpha = 0.2f)

@@ -417,7 +417,7 @@ fun MonthlyBudgetDialog(
     currentBudgetLimit: Long,
     categoryBudgets: Map<String, Long>,
     expenseCategories: List<String>,
-    onConfirm: (Double, Map<String, Double>) -> Unit,
+    onConfirm: (Long, Map<String, Long>) -> Unit,
     onDismiss: () -> Unit
 ) {
     var budgetInput by remember {
