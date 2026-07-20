@@ -463,7 +463,7 @@ fun CombinedChartsCard(
                 Column(modifier = Modifier.fillMaxWidth()) {
                     aggregations.forEachIndexed { index, agg ->
                         val color = donutColors[index % donutColors.size]
-                        val percentage = if (totalExpense > 0) (agg.totalAmount / totalExpense) * 100 else 0.0
+                        val percentage = if (totalExpense > 0) (agg.totalAmount.toDouble() / totalExpense) * 100 else 0.0
 
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
