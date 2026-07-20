@@ -118,6 +118,17 @@ class FinancialTrackerViewModel(
             ?.split(",")?.filter { it.isNotEmpty() } ?: listOf("Makanan", "Transportasi", "Tagihan", "Hiburan", "Belanja", "Lainnya")
     )
 
+    // Reload categories when prefs change (e.g. after Firestore sync)
+    private val prefsListener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+        if (key in setOf("income_categories_list", "expense_categories_list", "monthly_budget_limit")) {
+            reloadCategoriesFromPrefs()
+        }
+    }
+
+    init {
+        prefs.registerOnSharedPreferenceChangeListener(prefsListener)
+    }
+
     val monthlyBudgetLimit = MutableStateFlow(prefs.getLong("monthly_budget_limit", 0L))
     val selectedBudgetOffset = MutableStateFlow(0)
 
@@ -311,6 +322,15 @@ class FinancialTrackerViewModel(
         val cleanedList = list.map {  com.example.ui.util.CategoryIconMapper.extractEmojiAndLabel(it).second.ifBlank { it }.trim() }.distinct()
         expenseCategories.value = cleanedList
         prefs.edit().putString("expense_categories_list", cleanedList.joinToString(",")).apply()
+    }
+
+    /** Reload categories from prefs — called after Firestore sync restores data */
+    fun reloadCategoriesFromPrefs() {
+        incomeCategories.value = prefs.getString("income_categories_list", "Gaji,Investasi,Freelance,Lainnya")
+            ?.split(",")?.filter { it.isNotEmpty() } ?: listOf("Gaji", "Investasi", "Freelance", "Lainnya")
+        expenseCategories.value = prefs.getString("expense_categories_list", "Makanan,Transportasi,Tagihan,Hiburan,Belanja,Lainnya")
+            ?.split(",")?.filter { it.isNotEmpty() } ?: listOf("Makanan", "Transportasi", "Tagihan", "Hiburan", "Belanja", "Lainnya")
+        monthlyBudgetLimit.value = prefs.getLong("monthly_budget_limit", 0L)
     }
 
     fun addCategory(type: String, category: String): Boolean {
