@@ -316,12 +316,24 @@ class FinancialTrackerViewModel(
         val cleanedList = list.map {  com.example.ui.util.CategoryIconMapper.extractEmojiAndLabel(it).second.ifBlank { it }.trim() }.distinct()
         incomeCategories.value = cleanedList
         prefs.edit().putString("income_categories_list", cleanedList.joinToString(",")).apply()
+        // Upload to Firestore immediately so categories stay in sync
+        if (com.example.util.FirebaseSyncHelper.isUserSignedIn()) {
+            viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                com.example.util.FirebaseSyncHelper.uploadCategoriesToFirestore(getApplication())
+            }
+        }
     }
 
     private fun saveExpenseCategories(list: List<String>) {
         val cleanedList = list.map {  com.example.ui.util.CategoryIconMapper.extractEmojiAndLabel(it).second.ifBlank { it }.trim() }.distinct()
         expenseCategories.value = cleanedList
         prefs.edit().putString("expense_categories_list", cleanedList.joinToString(",")).apply()
+        // Upload to Firestore immediately so categories stay in sync
+        if (com.example.util.FirebaseSyncHelper.isUserSignedIn()) {
+            viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                com.example.util.FirebaseSyncHelper.uploadCategoriesToFirestore(getApplication())
+            }
+        }
     }
 
     /** Reload categories from prefs — called after Firestore sync restores data */

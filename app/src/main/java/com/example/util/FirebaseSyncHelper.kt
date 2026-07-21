@@ -92,6 +92,23 @@ object FirebaseSyncHelper {
         }
     }
 
+    /** Upload category settings to Firestore immediately when user adds/deletes a category */
+    suspend fun uploadCategoriesToFirestore(context: Context) {
+        val uid = getCurrentUid() ?: return
+        val db = FirebaseFirestore.getInstance()
+        val prefs = com.example.util.SecurePrefsHelper.getEncryptedPrefs(context, "financial_tracker_prefs")
+        val categories = hashMapOf<String, Any>()
+        prefs.getString("income_categories_list", null)?.let { categories["income_categories_list"] = it }
+        prefs.getString("expense_categories_list", null)?.let { categories["expense_categories_list"] = it }
+
+        suspendCancellableCoroutine<Unit> { continuation ->
+            db.collection("users").document(uid).collection("settings")
+                .document("financial_tracker_prefs")
+                .set(categories, com.google.firebase.firestore.SetOptions.merge())
+                .addOnCompleteListener { continuation.resume(Unit) }
+        }
+    }
+
     suspend fun syncFinancialRecordsWithFirestore(context: Context): Result<String> {
         val uid = getCurrentUid()
             ?: return Result.failure(Exception("Silakan hubungkan akun Google Anda terlebih dahulu untuk penyelarasan cloud."))
