@@ -830,10 +830,10 @@ fun MonthlyBudgetDialog(
                                         PremiumButton(
                                             text = "Selesai",
                                             onClick = { showCategoryPickerPopup = false },
+                                            isActive = true,
                                             fillMaxWidth = false,
-                                            horizontalPadding = 20.dp,
-                                            verticalPadding = 6.dp,
-                                            modifier = Modifier.height(40.dp)
+                                            horizontalPadding = 14.dp,
+                                            verticalPadding = 6.dp
                                         )
                                     }
                                 }
