@@ -47,9 +47,14 @@ object PinUtils {
 
     fun verifyPin(context: Context, pin: String): Boolean {
         val p = prefs(context)
-        val storedHash = p.getString(KEY_HASH, null) ?: return false
-        val salt = p.getString(KEY_SALT, null) ?: return false
-        return storedHash == hashPin(pin, salt)
+        val storedHash = p.getString(KEY_HASH, null)
+        val salt = p.getString(KEY_SALT, null)
+        android.util.Log.d("PinUtils", "verifyPin: hasHash=${storedHash != null}, hasSalt=${salt != null}, pinLen=${pin.length}")
+        if (storedHash == null || salt == null) return false
+        val computed = hashPin(pin, salt)
+        val match = storedHash == computed
+        android.util.Log.d("PinUtils", "verifyPin: match=$match")
+        return match
     }
 
     fun isPinEnabled(context: Context): Boolean {
