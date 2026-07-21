@@ -206,12 +206,18 @@ fun PinScreen(
                     error = null
                     when {
                         isUnlock || isChange -> {
-                            if (PinUtils.verifyPin(context, currentInput)) {
-                                onSuccess(currentInput)
-                            } else {
-                                error = "PIN salah"
-                                currentInput = ""
-                                coroutineScope.launch { triggerShake() }
+                            val input = currentInput
+                            coroutineScope.launch {
+                                val ok = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                    PinUtils.verifyPin(context, input)
+                                }
+                                if (ok) {
+                                    onSuccess(input)
+                                } else {
+                                    error = "PIN salah"
+                                    currentInput = ""
+                                    triggerShake()
+                                }
                             }
                         }
                         step == 0 && mode == PinMode.SETUP -> {
