@@ -304,35 +304,47 @@ fun EksporImporTabContent(
             var showPinDialog by remember { mutableStateOf(false) }
             var pinEnabled by remember { mutableStateOf(com.example.util.PinUtils.isPinEnabled(context)) }
 
-            // PIN Settings Card
-            com.example.ui.components.GlassCard(
-                modifier = Modifier.fillMaxWidth()
+            // Security Card
+            Card(
+                modifier = Modifier.fillMaxWidth().testTag("security_card"),
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = TranslucentForm.copy(alpha = 0.65f)),
+                border = BorderStroke(
+                    width = 1.dp,
+                    brush = Brush.verticalGradient(
+                        colors = listOf(GhostWhite.copy(alpha = 0.15f), GhostWhite.copy(alpha = 0.02f))
+                    )
+                )
             ) {
                 Column(
-                    modifier = Modifier.fillMaxWidth().padding(20.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                    modifier = Modifier.padding(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
-                    // Section header
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Lock,
-                            contentDescription = null,
-                            tint = SteelBlue,
-                            modifier = Modifier.size(20.dp)
+                    // Header with accent bar
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .width(3.dp)
+                                .height(20.dp)
+                                .background(
+                                    brush = Brush.verticalGradient(
+                                        colors = listOf(SteelBlue, SteelBlue.copy(alpha = 0.4f))
+                                    ),
+                                    shape = RoundedCornerShape(2.dp)
+                                )
                         )
                         Spacer(modifier = Modifier.width(10.dp))
                         Text(
                             text = "Keamanan",
-                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold, fontSize = 14.sp),
                             color = GhostWhite
                         )
                     }
 
-                    HorizontalDivider(
-                        color = GhostWhite.copy(alpha = 0.08f),
-                        thickness = 1.dp
+                    Text(
+                        text = "Kunci aplikasi dengan PIN untuk melindungi data Anda.",
+                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp, lineHeight = 16.sp),
+                        color = GhostWhite.copy(alpha = 0.55f)
                     )
 
                     // PIN toggle row
@@ -349,7 +361,7 @@ fun EksporImporTabContent(
                             )
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
-                                text = if (pinEnabled) "Aktif — aplikasi terkunci saat dibuka" else "Nonaktif",
+                                text = if (pinEnabled) "Aktif" else "Nonaktif",
                                 color = GhostWhite.copy(alpha = 0.45f),
                                 style = MaterialTheme.typography.labelSmall
                             )
@@ -373,7 +385,7 @@ fun EksporImporTabContent(
                         )
                     }
 
-                    // Change PIN button (when enabled)
+                    // Change PIN (when enabled)
                     AnimatedVisibility(visible = pinEnabled) {
                         Box(
                             modifier = Modifier
@@ -398,11 +410,9 @@ fun EksporImporTabContent(
                                     shape = RoundedCornerShape(CornerRadius.md)
                                 )
                                 .clickable { showPinDialog = true }
-                                .padding(horizontal = 16.dp, vertical = 14.dp)
+                                .padding(horizontal = 16.dp, vertical = 12.dp)
                         ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(
                                     imageVector = Icons.Default.LockReset,
                                     contentDescription = null,
