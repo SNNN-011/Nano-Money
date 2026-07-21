@@ -52,8 +52,29 @@ fun PinScreen(
     var firstPin by remember { mutableStateOf("") }
     var currentInput by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
+    var isVerifying by remember { mutableStateOf(false) }
     // Shake animation for wrong PIN
     val shakeOffset = remember { Animatable(0f) }
+    // Pulse animation for verifying state
+    val infiniteTransition = rememberInfiniteTransition(label = "verify-pulse")
+    val pulseAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.3f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(600, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulse-alpha"
+    )
+    val pulseScale by infiniteTransition.animateFloat(
+        initialValue = 0.95f,
+        targetValue = 1.05f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(600, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulse-scale"
+    )
 
     val isUnlock = mode == PinMode.UNLOCK
     val isChange = mode == PinMode.CHANGE_OLD
@@ -65,13 +86,13 @@ fun PinScreen(
         step == 1 && mode == PinMode.SETUP -> "Konfirmasi PIN"
         else -> "Masukkan PIN"
     }
-    val resolvedSubtitle = subtitle ?: when {
+    val resolvedSubtitle = if (isVerifying) "Memverifikasi..." else (subtitle ?: when {
         isUnlock -> "Masukkan PIN untuk membuka aplikasi"
         isChange -> "Verifikasi PIN lama sebelum mengganti"
         step == 0 -> "PIN 4–6 digit"
         step == 1 -> "Masukkan ulang PIN baru"
         else -> ""
-    }
+    })
 
     suspend fun triggerShake() {
         val shake = listOf(12f, -12f, 8f, -8f, 4f, -4f, 0f)
@@ -98,12 +119,20 @@ fun PinScreen(
             // --- Lock Icon ---
             Icon(
                 imageVector = when {
+                    isVerifying -> Icons.Default.Lock
                     isUnlock -> Icons.Default.Lock
                     else -> Icons.Default.LockReset
                 },
                 contentDescription = null,
-                tint = SteelBlue,
-                modifier = Modifier.size(56.dp)
+                tint = if (isVerifying) SteelBlue.copy(alpha = pulseAlpha) else SteelBlue,
+                modifier = Modifier
+                    .size(56.dp)
+                    .graphicsLayer {
+                        if (isVerifying) {
+                            scaleX = pulseScale
+                            scaleY = pulseScale
+                        }
+                    }
             )
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -175,12 +204,14 @@ fun PinScreen(
             // --- Numeric Keypad ---
             PinNumericKeypad(
                 onDigit = { digit ->
+                    if (isVerifying) return@PinNumericKeypad
                     if (error != null) error = null
                     if (currentInput.length < 6) {
                         currentInput += digit
                     }
                 },
                 onDelete = {
+                    if (isVerifying) return@PinNumericKeypad
                     if (error != null) error = null
                     if (currentInput.isNotEmpty()) {
                         currentInput = currentInput.dropLast(1)
@@ -191,7 +222,7 @@ fun PinScreen(
             Spacer(modifier = Modifier.height(20.dp))
 
             // --- Konfirmasi / Submit Button ---
-            val canSubmit = currentInput.length in 4..6
+            val canSubmit = currentInput.length in 4..6 && !isVerifying
             val coroutineScope = rememberCoroutineScope()
 
             GlassSubmitButton(
@@ -207,10 +238,13 @@ fun PinScreen(
                     when {
                         isUnlock || isChange -> {
                             val input = currentInput
+                            isVerifying = true
+                            error = null
                             coroutineScope.launch {
                                 val ok = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                                     PinUtils.verifyPin(context, input)
                                 }
+                                isVerifying = false
                                 if (ok) {
                                     onSuccess(input)
                                 } else {
