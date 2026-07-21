@@ -113,14 +113,14 @@ fun PremiumButton(
         Box(
             modifier = Modifier
                 .padding(Spacing.xs)
-                .clip(RoundedCornerShape(CornerRadius.lg))
+                .clip(RoundedCornerShape(20.dp))
                 .then(
                     if (isActive) {
                         Modifier.background(
                             brush = Brush.verticalGradient(
                                 colors = gradientColors
                             ),
-                            shape = RoundedCornerShape(CornerRadius.lg)
+                            shape = RoundedCornerShape(20.dp)
                         )
                     } else {
                         Modifier.background(Color.Transparent)
