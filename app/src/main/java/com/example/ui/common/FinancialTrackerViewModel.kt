@@ -304,7 +304,7 @@ class FinancialTrackerViewModel(
                     twoMonthsAgoCal.set(java.util.Calendar.DAY_OF_MONTH, 25)
                     sampleData.add(FinancialRecord(0, "Tiket Bioskop", 65000L, "expense", "Hiburan", twoMonthsAgoCal.timeInMillis, "Nonton film"))
 
-                    sampleData.forEach { repository.insert(it) }
+                    repository.insertAll(sampleData)
                 }
             } catch (e: Exception) {
                 e.printStackTrace()

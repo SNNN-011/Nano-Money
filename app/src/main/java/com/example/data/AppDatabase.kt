@@ -8,7 +8,7 @@ import net.sqlcipher.database.SupportFactory
 import net.sqlcipher.database.SQLiteDatabase
 import com.example.util.DatabaseKeyManager
 
-@Database(entities = [FinancialRecord::class, RecurringTransaction::class], version = 5, exportSchema = false)
+@Database(entities = [FinancialRecord::class, RecurringTransaction::class], version = 5, exportSchema = true)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun financialRecordDao(): FinancialRecordDao
     abstract fun analysisDao(): AnalysisDao

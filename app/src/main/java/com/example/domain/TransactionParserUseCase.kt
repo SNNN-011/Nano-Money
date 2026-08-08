@@ -153,7 +153,7 @@ class TransactionParserUseCase {
             var rawResponseText: String? = null
             var lastException: Throwable? = null
 
-            val modelsToTry = listOf(modelName)
+            val modelsToTry = listOf(modelName, "gemini-2.0-flash", "gemini-1.5-flash").distinct()
 
             for (model in modelsToTry) {
                 try {
@@ -218,6 +218,8 @@ class TransactionParserUseCase {
             )
 
             RequestResult.Success(result)
+        } catch (e: org.json.JSONException) {
+            RequestResult.Error("Respon AI tidak sesuai format JSON yang diharapkan", e)
         } catch (e: Exception) {
             RequestResult.Error(e.message ?: "Kesalahan pemrosesan data", e)
         }

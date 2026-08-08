@@ -139,14 +139,28 @@ object GeminiClient {
         }
         return try {
             val user = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser ?: return null
-            val result = com.google.android.gms.tasks.Tasks.await(user.getIdToken(false))
+            val result = com.google.android.gms.tasks.Tasks.await(
+                user.getIdToken(false),
+                10,
+                java.util.concurrent.TimeUnit.SECONDS
+            )
             val token = result.token
             if (token != null) {
                 cachedToken = token
                 tokenExpiryMs = now + TOKEN_CACHE_TTL_MS
             }
             token
+        } catch (e: java.util.concurrent.ExecutionException) {
+            cachedToken = null
+            com.example.util.SecureLog.w("GeminiClient", "Execution exception fetching Firebase token", e)
+            null
+        } catch (e: InterruptedException) {
+            Thread.currentThread().interrupt()
+            cachedToken = null
+            com.example.util.SecureLog.w("GeminiClient", "Interrupted fetching Firebase token", e)
+            null
         } catch (e: Exception) {
+            cachedToken = null
             com.example.util.SecureLog.w("GeminiClient", "Failed to fetch Firebase token", e)
             null
         }

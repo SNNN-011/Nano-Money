@@ -370,14 +370,19 @@ object FirebaseSyncHelper {
                 // PIN keys: selalu local wins — PIN adalah data keamanan lokal device
                 val pinKeys = listOf("pin_hash", "pin_salt", "pin_enabled")
 
-                // For all other keys: Firestore first, local overwrite (local wins)
-                // Skip category keys (handled above) and PIN keys (handled below)
-                val skipKeys = categoryKeys + pinKeys
+                // Filter out category keys, PIN keys, and legacy security fields at point of collection
+                val legacySecurityKeys = setOf(
+                    "saved_pin",
+                    "security_question", "security_answer", "security_question_answer",
+                    "answer_salt", "answer_hash", "biometric_enabled"
+                )
+                val skipKeys = categoryKeys + pinKeys + legacySecurityKeys
+
                 for ((k, v) in firestoreSettingsMap) {
                     if (k !in skipKeys) mergedSettings[k] = v
                 }
                 for ((k, v) in localSettingsMap) {
-                    if (v != null && k !in categoryKeys) {
+                    if (v != null && k !in skipKeys) {
                         if (v is Set<*>) {
                             mergedSettings[k] = v.toList()
                         } else {
@@ -386,19 +391,8 @@ object FirebaseSyncHelper {
                     }
                 }
 
-                // PIN keys: only write local value — never sync PIN to/from Firestore
-                for (pinKey in pinKeys) {
-                    mergedSettings.remove(pinKey)
-                }
-
-                // Remove legacy security fields (not PIN feature keys)
-                val legacySecurityKeys = listOf(
-                    "saved_pin",
-                    "security_question", "security_answer", "security_question_answer",
-                    "answer_salt", "answer_hash", "biometric_enabled"
-                )
+                // Cleanup legacy security fields from local SharedPreferences
                 for (key in legacySecurityKeys) {
-                    mergedSettings.remove(key)
                     prefs.edit().remove(key).apply()
                 }
                 

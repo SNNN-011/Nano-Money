@@ -81,10 +81,21 @@ object TelemetryHelper {
 
     fun setUserId(userId: String) {
         try {
-            firebaseAnalytics?.setUserId(userId)
-            firebaseCrashlytics?.setUserId(userId)
+            val hashedId = hashStringSha256(userId)
+            firebaseAnalytics?.setUserId(hashedId)
+            firebaseCrashlytics?.setUserId(hashedId)
         } catch (e: Exception) {
             logNonFatal(e, "Gagal menset userId")
+        }
+    }
+
+    private fun hashStringSha256(input: String): String {
+        return try {
+            val digest = java.security.MessageDigest.getInstance("SHA-256")
+            val hashBytes = digest.digest(input.toByteArray(Charsets.UTF_8))
+            hashBytes.joinToString("") { "%02x".format(it) }
+        } catch (e: Exception) {
+            "anonymous_user"
         }
     }
 

@@ -55,6 +55,7 @@ object BackupScheduler {
 
         val constraints = androidx.work.Constraints.Builder()
             .setRequiredNetworkType(androidx.work.NetworkType.CONNECTED)
+            .setRequiresBatteryNotLow(true)
             .build()
 
         val periodicWorkRequest = PeriodicWorkRequestBuilder<BackupWorker>(

@@ -162,9 +162,18 @@ class ChatViewModel(
         _pendingReceiptConfirmation.value = updated
     }
 
+    private var lastRequestTime = 0L
+    private val _isAiProcessing = MutableStateFlow(false)
+    val isAiProcessing: StateFlow<Boolean> = _isAiProcessing.asStateFlow()
+
     private val receiptUseCase = com.example.domain.ReceiptParserUseCase()
 
     fun scanReceipt(bitmap: Bitmap) {
+        val now = System.currentTimeMillis()
+        if (now - lastRequestTime < 600L || _isAiProcessing.value) return
+        lastRequestTime = now
+        _isAiProcessing.value = true
+
         // Tampilkan scanning receipt indicator
         val currentList = _messages.value.toMutableList()
         currentList.add(ChatMessage.UserImageMessage(bitmap))
@@ -175,38 +184,42 @@ class ChatViewModel(
         _messages.value = listWithTyping
 
         viewModelScope.launch {
-            val apiKeyRaw = try { BuildConfig.GEMINI_API_KEY } catch (e: Throwable) { "" } ?: ""
-            val apiKey = if (apiKeyRaw.isEmpty() || apiKeyRaw == "MY_GEMINI_API_KEY" || apiKeyRaw == "GEMINI_API_KEY") {
-                "CF_PROXY_KEY"
-            } else {
-                apiKeyRaw
-            }
-
-            val resultStatus = receiptUseCase.parseReceipt(
-                apiKey = apiKey,
-                bitmap = bitmap,
-                expenseCategories = _expenseCategories.value
-            )
-
-            removeTypingIndicator()
-
-            when (resultStatus) {
-                is com.example.domain.RequestResult.Error -> {
-                    val msg = if (resultStatus.message == "Sesi login bermasalah, silakan coba lagi") {
-                        resultStatus.message
-                    } else {
-                        "Gagal memproses struk: ${resultStatus.message}"
-                    }
-                    addAiMessage(msg)
+            try {
+                val apiKeyRaw = try { BuildConfig.GEMINI_API_KEY } catch (e: Throwable) { "" } ?: ""
+                val apiKey = if (apiKeyRaw.isEmpty() || apiKeyRaw == "MY_GEMINI_API_KEY" || apiKeyRaw == "GEMINI_API_KEY") {
+                    "CF_PROXY_KEY"
+                } else {
+                    apiKeyRaw
                 }
-                is com.example.domain.RequestResult.Success -> {
-                    val parsed = resultStatus.data
-                    if (parsed.error == "bukan_struk") {
-                        addAiMessage("Maaf, gambar yang dikirim sepertinya bukan struk belanjaan yang valid atau tidak dapat dibaca dengan jelas. Silakan coba unggah foto struk yang lebih terang dan jelas ya 😊")
-                    } else {
-                        showReceiptConfirmation(parsed)
+
+                val resultStatus = receiptUseCase.parseReceipt(
+                    apiKey = apiKey,
+                    bitmap = bitmap,
+                    expenseCategories = _expenseCategories.value
+                )
+
+                removeTypingIndicator()
+
+                when (resultStatus) {
+                    is com.example.domain.RequestResult.Error -> {
+                        val msg = if (resultStatus.message == "Sesi login bermasalah, silakan coba lagi") {
+                            resultStatus.message
+                        } else {
+                            "Gagal memproses struk: ${resultStatus.message}"
+                        }
+                        addAiMessage(msg)
+                    }
+                    is com.example.domain.RequestResult.Success -> {
+                        val parsed = resultStatus.data
+                        if (parsed.error == "bukan_struk") {
+                            addAiMessage("Maaf, gambar yang dikirim sepertinya bukan struk belanjaan yang valid atau tidak dapat dibaca dengan jelas. Silakan coba unggah foto struk yang lebih terang dan jelas ya 😊")
+                        } else {
+                            showReceiptConfirmation(parsed)
+                        }
                     }
                 }
+            } finally {
+                _isAiProcessing.value = false
             }
         }
     }
@@ -315,7 +328,11 @@ class ChatViewModel(
     private val useCase = com.example.domain.TransactionParserUseCase()
 
     fun sendMessage(userText: String) {
+        val now = System.currentTimeMillis()
+        if (now - lastRequestTime < 600L || _isAiProcessing.value) return
         if (userText.trim().isEmpty()) return
+        lastRequestTime = now
+        _isAiProcessing.value = true
 
         // 1. Tambahkan pesan user ke list
         val currentList = _messages.value.toMutableList()
@@ -328,6 +345,7 @@ class ChatViewModel(
         _messages.value = listWithTyping
 
         viewModelScope.launch {
+            try {
             val modelName = _selectedModel.value
 
             val apiKeyRaw = try { BuildConfig.GEMINI_API_KEY } catch (e: Throwable) { "" } ?: ""
@@ -461,6 +479,9 @@ class ChatViewModel(
         // Reset pending clarification context setelah transaksi sukses
         _pendingClarificationContext.value = null
         _clarificationAttempts.value = 0
+            } finally {
+                _isAiProcessing.value = false
+            }
     }
 
     private fun removeTypingIndicator() {

@@ -39,6 +39,7 @@ class CalendarViewModel(
                     }
                 }
         }
+        .flowOn(kotlinx.coroutines.Dispatchers.Default)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
 
     @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)

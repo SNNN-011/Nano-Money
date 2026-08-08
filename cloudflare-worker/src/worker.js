@@ -94,8 +94,18 @@ export default {
       await env.RATE_LIMIT_KV.put(kvKey, (currentUsage + 1).toString(), { expirationTtl: 86400 });
     }
 
-    // 4. Lanjutkan request ke Gemini API
+    // 4. Lanjutkan request ke Gemini API (dengan whitelist path yang diizinkan)
     const url = new URL(request.url);
+    const allowedPathPrefixes = [
+      '/v1beta/models/gemini-',
+      '/v1/models/gemini-'
+    ];
+    if (!allowedPathPrefixes.some(prefix => url.pathname.startsWith(prefix))) {
+      return new Response(JSON.stringify({ error: "Forbidden: Endpoint API tidak diizinkan" }), {
+        status: 403,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
     
     // Ganti host dari request Worker ke host Gemini API
     const geminiUrl = new URL(`https://generativelanguage.googleapis.com${url.pathname}${url.search}`);

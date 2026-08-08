@@ -85,7 +85,7 @@ object RemoteConfigHelper {
         _welcomeMessage.value = remoteConfig.getString("welcome_message")
         
         val colorParam = remoteConfig.getString("welcome_message_color")
-        if (colorParam.isNotEmpty()) {
+        if (colorParam.matches(Regex("^#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$"))) {
             _welcomeMessageColor.value = colorParam
         }
         

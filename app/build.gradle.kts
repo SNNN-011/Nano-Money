@@ -38,6 +38,10 @@ android {
     buildConfigField("String", "GEMINI_BASE_URL", "\"${readLocalProp("GEMINI_BASE_URL", "https://your-cloudflare-worker-url.workers.dev/")}\"")
   }
 
+  ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
+  }
+
   signingConfigs {
     create("release") {
       val keystorePath = System.getenv("KEYSTORE_PATH") ?: "${rootDir}/my-upload-key.jks"

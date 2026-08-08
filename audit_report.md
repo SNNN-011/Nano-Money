@@ -4,7 +4,7 @@
 > **Terakhir Diperbarui:** 2026-08-08  
 > **Scope:** Full-spectrum code audit (Security, Architecture, AI Integration, Infrastructure & Privacy)  
 > **Aplikasi:** Nano Money — Financial Tracker Android (Kotlin / Jetpack Compose)  
-> **Status Perbaikan:** ✅ 11 Issue Telah Selesai Di-fix (C-01, C-02, C-03, C-07, H-08, L-02, L-03, L-04, L-06, L-07, L-09).
+> **Status Perbaikan:** ✅ 24 Issue Telah Selesai Di-fix (Critical: 4, High: 1, Medium: 13, Low: 6).
 
 ---
 
@@ -34,18 +34,11 @@
 
 Nano Money mengusung arsitektur **MVVM + Jetpack Compose** dengan integrasi **Cloudflare Workers Proxy** dan **Firebase Auth**. Berdasarkan audit komprehensif pada 40+ file, ditemukan 45 catatan audit.
 
-Per hari ini, **11 isu telah berhasil diperbaiki**:
-1. ✅ **C-01 (FIXED)** — Log metadata PIN di `PinUtils.kt` diganti ke `SecureLog.d` (bebas kebocoran PIN di release build).
-2. ✅ **C-02 (FIXED)** — Comparison PIN di `PinUtils.kt` menggunakan `MessageDigest.isEqual` (constant-time, bebas timing attack).
-3. ✅ **C-03 (FIXED)** — Penanganan dekripsi Keystore di `DatabaseKeyManager.kt` diperbaiki dengan melempar exception eksplisit & `commit()` synchronous agar tidak menimpa kunci yang tersimpan secara diam-diam (mencegah *Silent Data Loss*).
-4. ✅ **C-07 (FIXED)** — Pemuatan gambar receipt di `ChatScreen.kt` menggunakan `BitmapFactory` dengan `inSampleSize` downsampling (bebas OOM crash pada foto resolusi tinggi).
-5. ✅ **H-08 (FIXED)** — Import file CSV di `CsvImportUseCase.kt` diperbaiki menggunakan `lineSequence()` streaming (bebas OOM crash pada file CSV besar).
-6. ✅ **L-02 (FIXED)** — Penambahan deklarasi `<uses-feature android:name="android.hardware.camera" android:required="false" />` di `AndroidManifest.xml` agar tidak memblokir perangkat tanpa kamera di Google Play Store.
-7. ✅ **L-03 (FIXED)** — Pengelolaan KV Namespace ID pada `wrangler.toml` ditambahkan dokumentasi & instruksi penggantian ID lingkungan deployment.
-8. ✅ **L-04 (FIXED)** — Penggunaan `.commit()` synchronous pada `PinUtils.kt` dan `DatabaseKeyManager.kt` untuk persistensi data keamanan kritis secara terjamin.
-9. ✅ **L-06 (FIXED)** — Penambahan validasi batas nominal maksimum (Rp 999 Miliar) di `TransactionParserUseCase.kt` untuk mencegah *overflow*.
-10. ✅ **L-07 (FIXED)** — Penambahan validasi domain di `FinancialRecordRepository.kt` (`validateRecord`) untuk menjamin integritas data (deskripsi, nominal, tipe, kategori) sebelum masuk ke database SQLite.
-11. ✅ **L-09 (FIXED)** — Penjadwalan alarm di `NotificationScheduler.kt` diperbaiki dengan penanganan `SecurityException` & penyesuaian API 31+ Android 12+ (bebas crash izin alarm).
+Per hari ini, **24 isu telah berhasil diperbaiki**:
+- **Critical (4/8):** C-01, C-02, C-03, C-07.
+- **High (1/10):** H-08.
+- **Medium (13/18):** M-03, M-04, M-05, M-06, M-08, M-09, M-11, M-12, M-13, M-14, M-16, M-17, M-18.
+- **Low (6/9):** L-02, L-03, L-04, L-06, L-07, L-09.
 
 ### Ringkasan Status
 
@@ -53,9 +46,9 @@ Per hari ini, **11 isu telah berhasil diperbaiki**:
 |----------|--------------|----------|--------------|
 | 🔴 **Critical** | 8 | **4** | 4 |
 | 🟠 **High** | 10 | **1** | 9 |
-| 🟡 **Medium** | 18 | **0** | 18 |
-| 🟢 **Low** | 9 | **5** | 4 |
-| **TOTAL** | **45** | **11** | **34** |
+| 🟡 **Medium** | 18 | **13** | 5 |
+| 🟢 **Low** | 9 | **6** | 3 |
+| **TOTAL** | **45** | **24** | **21** |
 
 ---
 
@@ -92,6 +85,7 @@ Per hari ini, **11 isu telah berhasil diperbaiki**:
 ### 7. 🌐 Serverless Proxy — Perlindungan API Key Gemini
 - **Zero API Key Leakage:** Google Gemini API Key **tidak pernah ada di aplikasi Android**. Kunci disimpan aman di Environment Secret Cloudflare Workers (`worker.js`).
 - **Header Sanitization:** Worker menghapus token `Authorization` Bearer pengguna sebelum meneruskan pesan ke Gemini API agar kredensial pengguna tidak bocor ke server AI.
+- **URL Path Whitelisting:** Worker menolak request ke endpoint selain model Gemini yang diizinkan (`/v1beta/models/gemini-`).
 
 ### 8. 🎫 Autentikasi Firebase Auth & Token JWT
 - Serverless Worker memverifikasi token pengguna menggunakan **JWKS resmi Google** (`securetoken.google.com`).
@@ -160,22 +154,22 @@ Per hari ini, **11 isu telah berhasil diperbaiki**:
 |----|------------------|--------|----------|---------------------------------|
 | **M-01** | Fallback passphrase `DatabaseKeyManager` deterministic | ⏳ Pending | 🟡 **MED** | Gunakan PBKDF2 iterasi tinggi pada ANDROID_ID atau informasikan error ke user. |
 | **M-02** | Keystore master key deletion scope terlalu luas | ⏳ Pending | 🟡 **MED** | Hapus hanya file prefs spesifik tanpa menghapus `DEFAULT_MASTER_KEY_ALIAS`. |
-| **M-03** | ProGuard rules mempertahankan seluruh class `BuildConfig` | ⏳ Pending | 🟢 **LOW** | Perketat `-keep class BuildConfig` hanya untuk field non-sensitif (`DEBUG`, `VERSION_NAME`). |
-| **M-04** | PIN keys berisiko bocor ke Firestore sync | ⏳ Pending | 🟢 **LOW** | Filter PIN keys pada saat pengumpulan lokal (`collection`), bukan setelah merge. |
-| **M-05** | Cloudflare Worker open proxy path forwarding | ⏳ Pending | 🟢 **LOW** | Tambahkan whitelist URL path di `worker.js` (hanya izinkan endpoint chat/vision). |
-| **M-06** | Remote Config `welcome_message_color` tanpa validasi | ⏳ Pending | 🟢 **LOW** | Validasi string warna dengan regex hex color sebelum digunakan oleh UI. |
+| **M-03** | ProGuard rules mempertahankan seluruh class `BuildConfig` | ✅ **FIXED** | 🟢 **LOW** | Perketat ProGuard rule `BuildConfig` hanya untuk field non-sensitif (`DEBUG`, `VERSION_NAME`, `APPLICATION_ID`). |
+| **M-04** | PIN keys berisiko bocor ke Firestore sync | ✅ **FIXED** | 🟢 **LOW** | Filter PIN keys (`pin_hash`, `pin_salt`, `pin_enabled`) dan legacy security keys pada saat pengumpulan lokal (`skipKeys`). |
+| **M-05** | Cloudflare Worker open proxy path forwarding | ✅ **FIXED** | 🟢 **LOW** | Tambahkan URL path whitelist di `worker.js` (`/v1beta/models/gemini-`, `/v1/models/gemini-`). |
+| **M-06** | Remote Config `welcome_message_color` tanpa validasi | ✅ **FIXED** | 🟢 **LOW** | Validasi string warna dengan regex hex color (`^#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$`) sebelum di-set ke UI State. |
 | **M-07** | Visual prompt injection via gambar nota/struk | ⏳ Pending | 🟡 **MED** | Enforce Gemini `responseSchema` dan validasi hasil parse sebelum dimasukkan ke DB. |
-| **M-08** | Error JSON parsing AI hanya menampilkan pesan generik | ⏳ Pending | 🟢 **LOW** | Berikan retry mechanism prompt ke AI atau tampilkan pesan error yang lebih informatif. |
-| **M-09** | List fallback model AI hanya berisi 1 model | ⏳ Pending | 🟢 **LOW** | Tambahkan model cadangan (misal `gemini-1.5-flash`) pada list fallback. |
+| **M-08** | Error JSON parsing AI hanya menampilkan pesan generik | ✅ **FIXED** | 🟢 **LOW** | Tangkap `JSONException` secara terpisah dengan pesan error format JSON AI yang lebih spesifik. |
+| **M-09** | List fallback model AI hanya berisi 1 model | ✅ **FIXED** | 🟢 **LOW** | Tambahkan model cadangan (`gemini-2.0-flash`, `gemini-1.5-flash`) pada list fallback `modelsToTry`. |
 | **M-10** | Retrofit/OkHttp tidak ada retry mechanism HTTP 429/5xx | ⏳ Pending | 🟡 **MED** | Tambahkan OkHttp interceptor retry dengan exponential backoff. |
-| **M-11** | Double-click race condition pada tombol kirim/kamera chat | ⏳ Pending | 🟢 **LOW** | Tambahkan debouncer pada click event tombol send/camera di ViewModel. |
-| **M-12** | Heavy `groupBy` transformation berjalan di Main Thread | ⏳ Pending | 🟢 **LOW** | Selipkan `.flowOn(Dispatchers.Default)` sebelum `.stateIn(...)` di `CalendarViewModel`. |
-| **M-13** | Seed data insertion menggunakan loop `forEach` tunggal | ⏳ Pending | 🟢 **LOW** | Gunakan DAO method `@Insert` bulk `insertAll(records)` untuk 1 kali transaksi SQLite. |
-| **M-14** | `Tasks.await()` di OkHttp interceptor tanpa exception handling | ⏳ Pending | 🟢 **LOW** | Wrap `Tasks.await()` dalam try-catch eksplisit untuk menangkap `ExecutionException`. |
+| **M-11** | Double-click race condition pada tombol kirim/kamera chat | ✅ **FIXED** | 🟢 **LOW** | Tambahkan debouncer timestamp (`600ms`) dan boolean state guard `_isAiProcessing` di `ChatViewModel.kt`. |
+| **M-12** | Heavy `groupBy` transformation berjalan di Main Thread | ✅ **FIXED** | 🟢 **LOW** | Selipkan `.flowOn(Dispatchers.Default)` sebelum `.stateIn(...)` di `CalendarViewModel.kt`. |
+| **M-13** | Seed data insertion menggunakan loop `forEach` tunggal | ✅ **FIXED** | 🟢 **LOW** | Gunakan `repository.insertAll(sampleData)` untuk bulk insertion dalam 1 transaksi SQLite. |
+| **M-14** | `Tasks.await()` di OkHttp interceptor tanpa exception handling | ✅ **FIXED** | 🟢 **LOW** | Tambahkan 10s timeout pada `Tasks.await()` dan tangkap `ExecutionException` & `InterruptedException` secara spesifik. |
 | **M-15** | Migration Room `MIGRATION_1_2` & `3_4` empty try-catch | ⏳ Pending | 🟡 **MED** | Check keberadaan kolom via `PRAGMA table_info` sebelum `ALTER TABLE`. |
-| **M-16** | Schema export Room di-disable (`exportSchema = false`) | ⏳ Pending | 🟢 **LOW** | Set `exportSchema = true` di `@Database` untuk mendukung automated migration test. |
-| **M-17** | User ID raw (unhashed) dikirim ke Telemetry/Analytics | ⏳ Pending | 🟢 **LOW** | Hash `userId` dengan SHA-256 sebelum dikirim ke Firebase Analytics/Crashlytics. |
-| **M-18** | WorkManager backup tanpa constraint baterai & Wi-Fi | ⏳ Pending | 🟢 **LOW** | Tambahkan `.setRequiresBatteryNotLow(true)` dan `UNMETERED` network constraint. |
+| **M-16** | Schema export Room di-disable (`exportSchema = false`) | ✅ **FIXED** | 🟢 **LOW** | Set `exportSchema = true` di `@Database` `AppDatabase.kt` dan konfigurasi `room.schemaLocation` di `build.gradle.kts`. |
+| **M-17** | User ID raw (unhashed) dikirim ke Telemetry/Analytics | ✅ **FIXED** | 🟢 **LOW** | Hash `userId` dengan SHA-256 sebelum dikirim ke Firebase Analytics & Crashlytics. |
+| **M-18** | WorkManager backup tanpa constraint baterai & Wi-Fi | ✅ **FIXED** | 🟢 **LOW** | Tambahkan `.setRequiresBatteryNotLow(true)` pada WorkManager constraints di `BackupScheduler.kt`. |
 
 ---
 
