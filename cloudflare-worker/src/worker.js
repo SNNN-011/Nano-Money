@@ -18,7 +18,7 @@ async function verifyFirebaseToken(idToken, projectId) {
     });
     return payload;
   } catch (e) {
-    console.error('Token verification failed:', e);
+    console.error('Token verification failed:', e?.code || e?.message || 'invalid token');
     return null;
   }
 }

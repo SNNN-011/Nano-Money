@@ -294,12 +294,6 @@ object BackupHelper {
                     while (entry != null) {
                         if (!entry.isDirectory && entry.name.startsWith("shared_prefs/")) {
                             val fileName = entry.name.substringAfter("shared_prefs/")
-                            if (fileName.contains("..")) {
-                                SecureLog.w("BackupHelper", "ZipSlip detected in entry: ${entry.name}")
-                                zis.closeEntry()
-                                entry = zis.nextEntry
-                                continue
-                            }
                             if (fileName !in allowedPrefsFiles) {
                                 SecureLog.w("BackupHelper", "Skipping non-whitelisted prefs file: $fileName")
                                 zis.closeEntry()
@@ -312,6 +306,12 @@ object BackupHelper {
                                 sharedPrefsDir.mkdirs()
                             }
                             val targetPrefFile = File(sharedPrefsDir, fileName)
+                            if (!targetPrefFile.canonicalPath.startsWith(sharedPrefsDir.canonicalPath + File.separator)) {
+                                SecureLog.w("BackupHelper", "Zip Slip attack detected in entry: ${entry.name}")
+                                zis.closeEntry()
+                                entry = zis.nextEntry
+                                continue
+                            }
                             // Decompression bomb guard: max 1MB per shared_prefs file
                             var bytesWritten = 0L
                             val maxBytes = 1L * 1024 * 1024

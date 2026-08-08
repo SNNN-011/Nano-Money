@@ -42,7 +42,7 @@ object SecurityUtil {
                         lowerLine.contains("edxposed") ||
                         lowerLine.contains("lsposed") ||
                         lowerLine.contains("substrate")) {
-                        SecureLog.e(TAG, "Hooking framework detected via memory map: $line")
+                        SecureLog.e(TAG, "Hooking framework detected via memory map scan")
                         kotlin.system.exitProcess(0) // Forcefully exit
                     }
                 }

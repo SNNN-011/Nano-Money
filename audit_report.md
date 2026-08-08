@@ -4,7 +4,7 @@
 > **Terakhir Diperbarui:** 2026-08-08  
 > **Scope:** Full-spectrum code audit (Security, Architecture, AI Integration, Infrastructure & Privacy)  
 > **Aplikasi:** Nano Money — Financial Tracker Android (Kotlin / Jetpack Compose)  
-> **Status Perbaikan:** ✅ 24 Issue Telah Selesai Di-fix (Critical: 4, High: 1, Medium: 13, Low: 6).
+> **Status Perbaikan:** ✅ 28 Issue Telah Selesai Di-fix (Critical: 4, High: 5, Medium: 13, Low: 6).
 
 ---
 
@@ -34,9 +34,9 @@
 
 Nano Money mengusung arsitektur **MVVM + Jetpack Compose** dengan integrasi **Cloudflare Workers Proxy** dan **Firebase Auth**. Berdasarkan audit komprehensif pada 40+ file, ditemukan 45 catatan audit.
 
-Per hari ini, **24 isu telah berhasil diperbaiki**:
+Per hari ini, **28 isu telah berhasil diperbaiki**:
 - **Critical (4/8):** C-01, C-02, C-03, C-07.
-- **High (1/10):** H-08.
+- **High (5/10):** H-02, H-03, H-05, H-08, H-09.
 - **Medium (13/18):** M-03, M-04, M-05, M-06, M-08, M-09, M-11, M-12, M-13, M-14, M-16, M-17, M-18.
 - **Low (6/9):** L-02, L-03, L-04, L-06, L-07, L-09.
 
@@ -45,10 +45,10 @@ Per hari ini, **24 isu telah berhasil diperbaiki**:
 | Severity | Total Temuan | Fixed ✅ | Remaining ⏳ |
 |----------|--------------|----------|--------------|
 | 🔴 **Critical** | 8 | **4** | 4 |
-| 🟠 **High** | 10 | **1** | 9 |
+| 🟠 **High** | 10 | **5** | 5 |
 | 🟡 **Medium** | 18 | **13** | 5 |
 | 🟢 **Low** | 9 | **6** | 3 |
-| **TOTAL** | **45** | **24** | **21** |
+| **TOTAL** | **45** | **28** | **17** |
 
 ---
 
@@ -71,7 +71,7 @@ Per hari ini, **24 isu telah berhasil diperbaiki**:
 
 ### 4. 🕵️ Anti-Debugging & Anti-Hooking (Runtime Protection)
 - **Deteksi Debugger (TracerPid):** Memindai `/proc/self/status`. Jika ada debugger yang menempel saat runtime, aplikasi langsung dimatikan (`exitProcess(0)`).
-- **Deteksi Framework Hooking:** Memindai `/proc/self/maps` secara runtime untuk memblokir alat *reverse-engineering* / *hooking* seperti **Frida, Xposed, EdXposed, LSPosed, dan Substrate**.
+- **Deteksi Framework Hooking:** Memindai `/proc/self/maps` secara runtime untuk memblokir alat *reverse-engineering* / *hooking* seperti **Frida, Xposed, EdXposed, LSPosed, dan Substrate**. Sanitasi log menghilangkan kebocoran alamat memori.
 
 ### 5. 📱 Deteksi Device Root Multi-Lapis (3-Layer Check)
 - **Build Tags:** Memeriksa keberadaan `test-keys` pada `Build.TAGS`.
@@ -86,6 +86,7 @@ Per hari ini, **24 isu telah berhasil diperbaiki**:
 - **Zero API Key Leakage:** Google Gemini API Key **tidak pernah ada di aplikasi Android**. Kunci disimpan aman di Environment Secret Cloudflare Workers (`worker.js`).
 - **Header Sanitization:** Worker menghapus token `Authorization` Bearer pengguna sebelum meneruskan pesan ke Gemini API agar kredensial pengguna tidak bocor ke server AI.
 - **URL Path Whitelisting:** Worker menolak request ke endpoint selain model Gemini yang diizinkan (`/v1beta/models/gemini-`).
+- **Log Error Sanitization:** Sanitasi log verifikasi JWT `console.error` di `worker.js` hanya mencatat `e.code`/`e.message` tanpa mencetak fragmen token.
 
 ### 8. 🎫 Autentikasi Firebase Auth & Token JWT
 - Serverless Worker memverifikasi token pengguna menggunakan **JWKS resmi Google** (`securetoken.google.com`).
@@ -113,6 +114,7 @@ Per hari ini, **24 isu telah berhasil diperbaiki**:
 ### 15. 🛡️ Validasi Integritas Data & Sanitasi Input
 - **Spreadsheet Formula Injection Defense:** Impor CSV menyanitasi karakter khusus (`=`, `+`, `-`, `@`) agar aman saat dibuka di Microsoft Excel / Google Sheets (`CsvImportUseCase.kt`).
 - **Domain Layer Validation:** `FinancialRecordRepository.kt` memvalidasi batas nominal (Rp 1 s/d Rp 999 Miliar), panjang deskripsi, tipe, dan kategori sebelum masuk ke database.
+- **Zip Slip Defense:** Pengujian restore backup `BackupHelper.kt` divalidasi dengan `canonicalPath` untuk menolak serangan traversal direktori ZIP.
 
 ---
 
@@ -136,14 +138,14 @@ Per hari ini, **24 isu telah berhasil diperbaiki**:
 | ID | Deskripsi Temuan | Status | Fix Risk | Deskripsi Ringkas & Rekomendasi |
 |----|------------------|--------|----------|---------------------------------|
 | **H-01** | Prompt injection sanitization regex naif | ⏳ Pending | 🟡 **MED** | Andalkan pemisahan `systemInstruction` Gemini API + validation schema terstruktur. |
-| **H-02** | `google-services.json` ter-commit di git history | ⏳ Pending | 🟢 **LOW** | Jalankan `git rm --cached app/google-services.json` dan rotate API key jika repo public. |
-| **H-03** | Production error logging berlebih di `worker.js` | ⏳ Pending | 🟢 **LOW** | Ubah `console.error(e)` menjadi `console.error(e.message)` agar token tidak bocor ke log sink. |
+| **H-02** | `google-services.json` ter-commit di git history | ✅ **FIXED** | 🟢 **LOW** | File telah di-untrack dan di-ignore secara benar via `.gitignore` (`app/google-services.json`). |
+| **H-03** | Production error logging berlebih di `worker.js` | ✅ **FIXED** | 🟢 **LOW** | `console.error` di-sanitize hanya mencetak `e.code`/`e.message` tanpa mendump fragmen token. |
 | **H-04** | Rate limiting TOCTOU race condition di Cloudflare Worker | ⏳ Pending | 🔴 **HIGH** | Evaluasi Cloudflare Durable Objects atau native rate limiting. |
-| **H-05** | Anti-hook detection mem-print baris memory map | ⏳ Pending | 🟢 **LOW** | Hapus variabel `$line` dari log agar ASLR layout tidak terekspos. |
+| **H-05** | Anti-hook detection mem-print baris memory map | ✅ **FIXED** | 🟢 **LOW** | Menghapus penulisan variabel `$line` dari log agar layout alamat memori ASLR tidak terekspos. |
 | **H-06** | In-memory aggregation di ViewModel (filter/sumOf) | ⏳ Pending | 🔴 **HIGH** | Migrasikan agregasi saldo & pengeluaran ke Room SQL queries (`SELECT SUM(...)`). |
 | **H-07** | Raw `Bitmap` disimpan di ViewModel StateFlow | ⏳ Pending | 🟡 **MED** | Simpan `Uri` atau path file lokal di ViewModel State, bukan objek `Bitmap`. |
 | **H-08** | CSV import memuat seluruh file ke memory | ✅ **FIXED** | 🟢 **LOW** | Di-refactor menggunakan `lineSequence()` streaming di `CsvImportUseCase.kt`. |
-| **H-09** | Zip Slip vulnerability pada restore backup | ⏳ Pending | 🟢 **LOW** | Tambahkan validasi `canonicalPath` saat ekstraksi ZIP file. |
+| **H-09** | Zip Slip vulnerability pada restore backup | ✅ **FIXED** | 🟢 **LOW** | Menambahkan validasi `canonicalPath` pada `BackupHelper.kt` saat ekstraksi ZIP file. |
 | **H-10** | Missing database indices pada kolom yang sering di-query | ⏳ Pending | 🟡 **MED** | Tambahkan `@Index` pada entity Room untuk kolom `date`, `category`, `type`. |
 
 ---
