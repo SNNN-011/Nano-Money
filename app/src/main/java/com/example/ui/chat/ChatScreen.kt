@@ -183,8 +183,23 @@ fun ChatScreen(
         uri?.let {
             try {
                 val bitmap = if (Build.VERSION.SDK_INT < 28) {
-                    @Suppress("DEPRECATION")
-                    MediaStore.Images.Media.getBitmap(context.contentResolver, it)
+                    val maxDimension = 2048
+                    val boundsOptions = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                    context.contentResolver.openInputStream(it)?.use { stream ->
+                        android.graphics.BitmapFactory.decodeStream(stream, null, boundsOptions)
+                    }
+                    var sampleSize = 1
+                    val w = boundsOptions.outWidth
+                    val h = boundsOptions.outHeight
+                    if (w > 0 && h > 0) {
+                        while (w / sampleSize > maxDimension || h / sampleSize > maxDimension) {
+                            sampleSize *= 2
+                        }
+                    }
+                    val decodeOptions = android.graphics.BitmapFactory.Options().apply { inSampleSize = sampleSize }
+                    context.contentResolver.openInputStream(it)?.use { stream ->
+                        android.graphics.BitmapFactory.decodeStream(stream, null, decodeOptions)
+                    } ?: throw IllegalStateException("Gagal memuat gambar.")
                 } else {
                     val source = ImageDecoder.createSource(context.contentResolver, it)
                     ImageDecoder.decodeBitmap(source) { decoder, info, _ ->

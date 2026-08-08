@@ -41,7 +41,7 @@ object PinUtils {
             putString(KEY_HASH, hash)
             putString(KEY_SALT, salt)
             putBoolean(KEY_ENABLED, true)
-            apply()
+            commit()
         }
     }
 
@@ -49,11 +49,14 @@ object PinUtils {
         val p = prefs(context)
         val storedHash = p.getString(KEY_HASH, null)
         val salt = p.getString(KEY_SALT, null)
-        android.util.Log.d("PinUtils", "verifyPin: hasHash=${storedHash != null}, hasSalt=${salt != null}, pinLen=${pin.length}")
+        SecureLog.d("PinUtils", "verifyPin: hasHash=${storedHash != null}, hasSalt=${salt != null}")
         if (storedHash == null || salt == null) return false
         val computed = hashPin(pin, salt)
-        val match = storedHash == computed
-        android.util.Log.d("PinUtils", "verifyPin: match=$match")
+        val match = java.security.MessageDigest.isEqual(
+            storedHash.toByteArray(Charsets.UTF_8),
+            computed.toByteArray(Charsets.UTF_8)
+        )
+        SecureLog.d("PinUtils", "verifyPin: match=$match")
         return match
     }
 
@@ -70,7 +73,7 @@ object PinUtils {
             remove(KEY_HASH)
             remove(KEY_SALT)
             putBoolean(KEY_ENABLED, false)
-            apply()
+            commit()
         }
     }
 

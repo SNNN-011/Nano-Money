@@ -194,8 +194,8 @@ class TransactionParserUseCase {
             val rawEmoji = json.optString("emoji", "📦").trim()
 
             // Validate AI response fields
-            if (rawAmount <= 0L) {
-                return@withContext RequestResult.Error("Jumlah transaksi tidak valid", null)
+            if (rawAmount <= 0L || rawAmount > 999_999_999_999L) {
+                return@withContext RequestResult.Error("Jumlah transaksi tidak valid (harus antara Rp 1 s/d Rp 999 Miliar)", null)
             }
             if (rawDescription.length > 500) {
                 return@withContext RequestResult.Error("Deskripsi terlalu panjang", null)

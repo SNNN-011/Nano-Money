@@ -19,6 +19,8 @@ object DatabaseKeyManager {
     private const val KEY_IV = "db_passphrase_iv"
     private const val AES_GCM_NOPADDING = "AES/GCM/NoPadding"
 
+    private const val TAG = "DatabaseKeyManager"
+
     @Synchronized
     fun getOrCreatePassphrase(context: Context): ByteArray {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -36,7 +38,8 @@ object DatabaseKeyManager {
                 cipher.init(Cipher.DECRYPT_MODE, secretKey, spec)
                 return cipher.doFinal(encryptedBytes)
             } catch (e: Exception) {
-                // Jika terjadi gagal dekripsi (e.g. KeyStore rusak / reset), kita bisa fallback/generate ulang
+                SecureLog.e(TAG, "Gagal mendekripsi passphrase database dari KeyStore.", e)
+                throw IllegalStateException("Gagal mendekripsi kunci database terenkripsi. Keystore perangkat mungkin telah di-reset.", e)
             }
         }
 
@@ -55,11 +58,16 @@ object DatabaseKeyManager {
             val newEncryptedBase64 = Base64.encodeToString(encryptedBytes, Base64.DEFAULT)
             val newIvBase64 = Base64.encodeToString(iv, Base64.DEFAULT)
 
-            prefs.edit()
+            val committed = prefs.edit()
                 .putString(KEY_ENCRYPTED_PASSPHRASE, newEncryptedBase64)
                 .putString(KEY_IV, newIvBase64)
-                .apply()
+                .commit()
+
+            if (!committed) {
+                SecureLog.e(TAG, "Gagal menyimpan passphrase terenkripsi ke SharedPreferences (commit returned false).")
+            }
         } catch (e: Exception) {
+            SecureLog.e(TAG, "Gagal membuat/menyimpan key di KeyStore, menggunakan fallback passphrase.", e)
             return getFallbackPassphrase(context)
         }
 

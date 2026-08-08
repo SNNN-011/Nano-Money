@@ -5,11 +5,12 @@ compatibility_date = "2024-03-20"
 # Binding untuk Rate Limiting
 # Langkah: buat KV namespace di Cloudflare Dashboard > Workers > KV > Create
 # Jalankan: wrangler kv namespace create RATE_LIMIT_KV
-# Ganti id di bawah dengan ID yang dikembalikan perintah di atas
+# Ganti id di bawah dengan ID KV namespace lingkungan Anda
 kv_namespaces = [
-  { binding = "RATE_LIMIT_KV", id = "257ad118314d4dd2b626ff0b79d0f99d" }
+  { binding = "RATE_LIMIT_KV", id = "257ad118314d4dd2b626ff0b79d0f99d" } # Ganti dengan KV Namespace ID milik Anda saat deploy
 ]
 
 # Environment variables (Bisa di-set di sini untuk non-sensitive data)
 [vars]
-FIREBASE_PROJECT_ID = "nano-money-a44b0"
+FIREBASE_PROJECT_ID = "nano-money-a44b0" # Ganti dengan Firebase Project ID milik Anda
+

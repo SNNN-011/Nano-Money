@@ -82,10 +82,19 @@ class CsvImportUseCase {
 
     // Import from spreadsheet Excel / CSV
     fun parseCsvString(csvStr: String): List<FinancialRecord> {
-        val lines = csvStr.split(Regex("\\r?\\n"))
-        if (lines.isEmpty()) throw IllegalArgumentException("File CSV kosong.")
+        val reader = java.io.BufferedReader(java.io.StringReader(csvStr))
+        val iterator = reader.lineSequence().iterator()
+        if (!iterator.hasNext()) throw IllegalArgumentException("File CSV kosong.")
         
-        val firstLine = lines.firstOrNull { it.trim().isNotEmpty() } ?: throw IllegalArgumentException("File CSV tidak memiliki data.")
+        var firstLine: String? = null
+        while (iterator.hasNext()) {
+            val line = iterator.next()
+            if (line.trim().isNotEmpty()) {
+                firstLine = line
+                break
+            }
+        }
+        if (firstLine == null) throw IllegalArgumentException("File CSV tidak memiliki data.")
         val headers = parseCsvLine(firstLine).map { it.trim().lowercase() }
         
         val descIndex = headers.indexOfFirst { it.contains("deskripsi") || it.contains("description") }
@@ -100,13 +109,9 @@ class CsvImportUseCase {
         }
         
         val parsedList = mutableListOf<FinancialRecord>()
-        var headerSkipped = false
-        for (line in lines) {
+        while (iterator.hasNext()) {
+            val line = iterator.next()
             if (line.trim().isEmpty()) continue
-            if (!headerSkipped) {
-                headerSkipped = true
-                continue
-            }
             
             val columns = parseCsvLine(line)
             if (columns.size <= maxOf(descIndex, amountIndex, typeIndex, catIndex)) {
