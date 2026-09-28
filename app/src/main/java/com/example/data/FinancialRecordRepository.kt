@@ -32,6 +32,11 @@ class FinancialRecordRepository(private val dao: FinancialRecordDao) {
         return dao.insertRecord(record)
     }
 
+    suspend fun insertAll(records: List<FinancialRecord>) {
+        records.forEach { validateRecord(it) }
+        dao.insertAll(records)
+    }
+
     suspend fun update(record: FinancialRecord) {
         validateRecord(record)
         dao.updateRecord(record)

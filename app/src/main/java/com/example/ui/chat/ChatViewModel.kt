@@ -412,6 +412,9 @@ class ChatViewModel(
                     }
                 }
             }
+            } finally {
+                _isAiProcessing.value = false
+            }
         }
     }
 
@@ -479,9 +482,6 @@ class ChatViewModel(
         // Reset pending clarification context setelah transaksi sukses
         _pendingClarificationContext.value = null
         _clarificationAttempts.value = 0
-            } finally {
-                _isAiProcessing.value = false
-            }
     }
 
     private fun removeTypingIndicator() {
