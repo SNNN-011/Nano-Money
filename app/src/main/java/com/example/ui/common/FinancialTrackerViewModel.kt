@@ -507,6 +507,52 @@ class FinancialTrackerViewModel(
         }
     }
 
+    // ---- Sampah (trash) ----
+    // Penghapusan bersifat soft delete, jadi record yang "dihapus" masih
+    // bisa dipulihkan dari sini.
+    val deletedRecords: StateFlow<List<FinancialRecord>> = repository.getDeletedRecords()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    fun restoreFromTrash(record: FinancialRecord) {
+        viewModelScope.launch {
+            try {
+                repository.restore(record)
+                com.example.util.FirebaseSyncHelper.uploadRecordToFirestoreDirectly(record.copy(isDeleted = false))
+                uiEvent.emit(UiEvent.ShowToast("${record.description} berhasil dipulihkan!"))
+            } catch (e: Exception) {
+                uiEvent.emit(UiEvent.ShowAlert("Gagal Memulihkan", "Gagal memulihkan transaksi: ${e.localizedMessage ?: "kesalahan database"}"))
+            }
+        }
+    }
+
+    fun restoreAllFromTrash() {
+        viewModelScope.launch {
+            try {
+                val items = repository.getDeletedRecords().first()
+                if (items.isEmpty()) {
+                    uiEvent.emit(UiEvent.ShowToast("Sampah sudah kosong."))
+                    return@launch
+                }
+                repository.restore(items)
+                items.forEach { com.example.util.FirebaseSyncHelper.uploadRecordToFirestoreDirectly(it.copy(isDeleted = false)) }
+                uiEvent.emit(UiEvent.ShowToast("${items.size} transaksi berhasil dipulihkan!"))
+            } catch (e: Exception) {
+                uiEvent.emit(UiEvent.ShowAlert("Gagal Memulihkan", "Gagal memulihkan transaksi: ${e.localizedMessage ?: "kesalahan database"}"))
+            }
+        }
+    }
+
+    fun emptyTrash() {
+        viewModelScope.launch {
+            try {
+                repository.emptyTrash()
+                uiEvent.emit(UiEvent.ShowToast("Sampah dikosongkan."))
+            } catch (e: Exception) {
+                uiEvent.emit(UiEvent.ShowAlert("Gagal Mengosongkan", "Gagal mengosongkan sampah: ${e.localizedMessage ?: "kesalahan database"}"))
+            }
+        }
+    }
+
     // Export validation and logic
     fun getExportJsonString(): String {
         val array = JSONArray()

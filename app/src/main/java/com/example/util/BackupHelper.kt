@@ -246,10 +246,29 @@ object BackupHelper {
                 )
                 try {
                     restoredVersion = probe.version
-                    // Pastikan tabel benar-benar ada & bisa dibaca, bukan sekadar file valid.
+                    // Hitung baris yang BENAR-BENAR terlihat di UI (isDeleted = 0).
+                    // COUNT(*) biasa tidak berguna: record "terhapus" cuma ditandai
+                    // isDeleted = 1, jadi barisnya masih ada dan ikut terhitung.
+                    var total = -1
+                    var visible = -1
+                    var deletedIds = ""
                     probe.rawQuery("SELECT COUNT(*) FROM financial_records", null).use { c ->
-                        if (c.moveToFirst()) c.getInt(0)
+                        if (c.moveToFirst()) total = c.getInt(0)
                     }
+                    probe.rawQuery("SELECT COUNT(*) FROM financial_records WHERE isDeleted = 0", null).use { c ->
+                        if (c.moveToFirst()) visible = c.getInt(0)
+                    }
+                    probe.rawQuery("SELECT id FROM financial_records WHERE isDeleted = 1 ORDER BY id DESC", null).use { c ->
+                        val ids = mutableListOf<String>()
+                        while (c.moveToNext()) ids.add(c.getString(0))
+                        // Tampilkan 12 ID TERAKHIR (paling baru) supaya kelihatan
+                        // record mana yang baru saja dihapus.
+                        deletedIds = ids.takeLast(12).joinToString(",")
+                    }
+                    SecureLog.d(
+                        "BackupHelper",
+                        "VALIDASI: total=$total terlihat=$visible terhapus=${deletedIds.ifEmpty { "tidak ada" }}"
+                    )
                     isValid = true
                 } finally {
                     probe.close()
@@ -302,6 +321,42 @@ object BackupHelper {
             }
             if (walFile.exists()) walFile.delete()
             if (shmFile.exists()) shmFile.delete()
+
+            // Buka file yang baru dipasang dan hitung barisnya, untuk memastikan
+            // data hasil restore benar-benar terbaca sebelum app direstart.
+            try {
+                val verifyPass = DatabaseKeyManager.getOrCreatePassphrase(context)
+                try {
+                    val check = net.sqlcipher.database.SQLiteDatabase.openDatabase(
+                        dbFile.absolutePath, verifyPass, null,
+                        net.sqlcipher.database.SQLiteDatabase.OPEN_READWRITE, null, null
+                    )
+                    try {
+                        var rows = -1
+                        var vis = -1
+                        var dIds = ""
+                        check.rawQuery("SELECT COUNT(*) FROM financial_records", null).use { c ->
+                            if (c.moveToFirst()) rows = c.getInt(0)
+                        }
+                        check.rawQuery("SELECT COUNT(*) FROM financial_records WHERE isDeleted = 0", null).use { c ->
+                            if (c.moveToFirst()) vis = c.getInt(0)
+                        }
+                        check.rawQuery("SELECT id FROM financial_records WHERE isDeleted = 1", null).use { c ->
+                            val ids = mutableListOf<String>()
+                            while (c.moveToNext()) ids.add(c.getString(0))
+                            dIds = ids.take(20).joinToString(",")
+                        }
+                        SecureLog.d(
+                            "BackupHelper",
+                            "SETELAH RESTORE: total=$rows terlihat=$vis terhapus=${dIds.ifEmpty { "tidak ada" }}"
+                        )
+                    } finally { check.close() }
+                } finally {
+                    java.util.Arrays.fill(verifyPass, 0.toByte())
+                }
+            } catch (e: Exception) {
+                SecureLog.e("BackupHelper", "Gagal verifikasi file setelah restore", e)
+            }
 
             // Whitelist: only restore known app settings prefs, never security-critical ones
             val allowedPrefsFiles = setOf(

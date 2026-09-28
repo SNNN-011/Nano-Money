@@ -14,6 +14,17 @@ import kotlin.coroutines.resumeWithException
 
 object FirebaseSyncHelper {
 
+    private fun recordToMap(r: FinancialRecord): Map<String, Any> = hashMapOf(
+        "id" to r.id,
+        "description" to r.description,
+        "amount" to r.amount,
+        "type" to r.type,
+        "category" to r.category,
+        "date" to r.date,
+        "notes" to r.notes,
+        "isDeleted" to r.isDeleted
+    )
+
     fun isUserSignedIn(): Boolean {
         return FirebaseAuth.getInstance().currentUser != null
     }
@@ -168,40 +179,31 @@ object FirebaseSyncHelper {
             var uploadedCount = 0
             var downloadedCount = 0
 
+            // Cloud (Firestore) adalah acuan.
+            // - Record hanya ada di lokal  -> kirim ke cloud.
+            // - Record ada di cloud         -> versi cloud menimpa versi lokal.
             val recordsToWrite = mutableListOf<Pair<String, Map<String, Any>>>()
+            val recordsToOverwriteLocally = mutableListOf<FinancialRecord>()
 
             for (localRecord in localRecords) {
                 val firestoreRecord = firestoreRecordsMap[localRecord.id]
-                if (localRecord.isDeleted) {
-                    if (firestoreRecord == null || !firestoreRecord.isDeleted) {
-                        val docData = hashMapOf<String, Any>(
-                            "id" to localRecord.id,
-                            "description" to localRecord.description,
-                            "amount" to localRecord.amount,
-                            "type" to localRecord.type,
-                            "category" to localRecord.category,
-                            "date" to localRecord.date,
-                            "notes" to localRecord.notes,
-                            "isDeleted" to true
-                        )
-                        recordsToWrite.add(localRecord.id.toString() to docData)
+
+                if (firestoreRecord == null) {
+                    if (!localRecord.isDeleted) {
+                        recordsToWrite.add(localRecord.id.toString() to recordToMap(localRecord))
                     }
-                } else {
-                    if (firestoreRecord != null && firestoreRecord.isDeleted) {
-                        dao.updateRecord(localRecord.copy(isDeleted = true))
-                    } else if (firestoreRecord == null || firestoreRecord != localRecord) {
-                        val docData = hashMapOf<String, Any>(
-                            "id" to localRecord.id,
-                            "description" to localRecord.description,
-                            "amount" to localRecord.amount,
-                            "type" to localRecord.type,
-                            "category" to localRecord.category,
-                            "date" to localRecord.date,
-                            "notes" to localRecord.notes,
-                            "isDeleted" to false
-                        )
-                        recordsToWrite.add(localRecord.id.toString() to docData)
-                    }
+                    continue
+                }
+
+                if (firestoreRecord != localRecord) {
+                    recordsToOverwriteLocally.add(firestoreRecord)
+                }
+            }
+
+            if (recordsToOverwriteLocally.isNotEmpty()) {
+                for (r in recordsToOverwriteLocally) {
+                    dao.updateRecord(r)
+                    downloadedCount++
                 }
             }
 

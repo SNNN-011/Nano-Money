@@ -12,6 +12,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.automirrored.filled.*
+import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import kotlinx.coroutines.Dispatchers
@@ -45,6 +46,7 @@ import com.example.ui.chat.ChatViewModel
 import com.example.ui.home.BerandaTabContent
 import com.example.ui.home.DashboardStatsSection
 import com.example.ui.transaction.TransaksiBaruTabContent
+import com.example.ui.transaction.TrashTab
 import com.example.ui.calendar.CalendarTabContent
 import com.example.ui.calendar.CalendarViewModel
 import com.example.ui.analysis.AnalysisViewModel
@@ -61,7 +63,8 @@ enum class TrackerTab {
     TRANSAKSI_BARU,
     KALENDER,
     CHAT,
-    EKSPOR_IMPOR
+    EKSPOR_IMPOR,
+    SAMPAH
 }
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
@@ -383,6 +386,7 @@ fun FinancialTrackerScreen(
                                             TrackerTab.KALENDER.name -> "KALENDER"
                                             TrackerTab.CHAT.name -> "AI CHATBOT"
                                             TrackerTab.EKSPOR_IMPOR.name -> "CADANGKAN & PEMULIHAN"
+                                            TrackerTab.SAMPAH.name -> "SAMPAH"
                                             else -> ""
                                         },
                                         style = MaterialTheme.typography.labelSmall,
@@ -514,6 +518,39 @@ fun FinancialTrackerScreen(
                         ),
                         modifier = Modifier.testTag("nav_ekspor_impor")
                     )
+                    NavigationBarItem(
+                        selected = currentRoute == TrackerTab.SAMPAH.name,
+                        onClick = {
+                            focusManager.clearFocus()
+                            navController.navigate(TrackerTab.SAMPAH.name) {
+                                popUpTo(TrackerTab.BERANDA.name) { inclusive = false }
+                                launchSingleTop = true
+                            }
+                        },
+                        icon = {
+                            BadgedBox(
+                                badge = {
+                                    if (viewModel.deletedRecords.value.isNotEmpty()) {
+                                        Badge(
+                                            containerColor = NeonViolet,
+                                            contentColor = Color.White
+                                        ) { Text("${viewModel.deletedRecords.value.size}") }
+                                    }
+                                }
+                            ) {
+                                Icon(Icons.Outlined.DeleteOutline, contentDescription = "Sampah", modifier = Modifier.size(20.dp))
+                            }
+                        },
+                        label = { Text("Sampah", fontSize = 11.sp, fontWeight = FontWeight.Medium) },
+                        colors = NavigationBarItemDefaults.colors(
+                            selectedIconColor = SteelBlue,
+                            selectedTextColor = SteelBlue,
+                            unselectedIconColor = GhostWhite.copy(alpha = 0.5f),
+                            unselectedTextColor = GhostWhite.copy(alpha = 0.5f),
+                            indicatorColor = TranslucentGlass
+                        ),
+                        modifier = Modifier.testTag("nav_sampah")
+                    )
                 }
                 }
             }
@@ -634,6 +671,15 @@ fun FinancialTrackerScreen(
 
                     composable(TrackerTab.CHAT.name) {
                         ChatScreen(viewModel = chatViewModel)
+                    }
+
+                    composable(TrackerTab.SAMPAH.name) {
+                        TrashTab(
+                            deletedRecords = viewModel.deletedRecords.collectAsState().value,
+                            onRestore = { viewModel.restoreFromTrash(it) },
+                            onRestoreAll = { viewModel.restoreAllFromTrash() },
+                            onEmptyTrash = { viewModel.emptyTrash() }
+                        )
                     }
 
                     composable(TrackerTab.EKSPOR_IMPOR.name) {

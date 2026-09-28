@@ -388,6 +388,18 @@ fun DatabaseBackupSection(
             }
         }
 
+        // ============================================================
+        // CADANGKAN & PULIHKAN DATABASE LOKAL - DISEMBUNYIKAN SEMENTARA
+        // ============================================================
+        // Fitur ini sengaja dinonaktifkan dari tampilan (28 Sep 2026).
+        // DIBUNGKUS lewat flag di bawah, bukan dihapus, supaya mudah
+        // dihidupkan lagi kalau sewaktu-waktu dibutuhkan.
+        // Alasan: sinkronisasi Firebase + export Excel sudah menutup kebutuhan
+        // pencadangan, dan UI ini membingungkan (data hasil "pulihkan" masih
+        // bisa tertimpa sinkronisasi cloud).
+        // Cara menghidupkan lagi: ubah SHOW_LOCAL_BACKUP_UI jadi true.
+        val SHOW_LOCAL_BACKUP_UI = false
+        if (SHOW_LOCAL_BACKUP_UI) {
         Card(
             modifier = Modifier.fillMaxWidth().testTag("database_backup_card"),
         shape = RoundedCornerShape(20.dp),
@@ -1574,6 +1586,7 @@ fun DatabaseBackupSection(
         */
         } // Closing Column database_backup_card
     } // Closing Card database_backup_card
+        } // Closing if (SHOW_LOCAL_BACKUP_UI)
     } // Closing main Column
 
     if (backupFileToDelete != null) {

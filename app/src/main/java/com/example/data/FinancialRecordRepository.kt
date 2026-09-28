@@ -44,6 +44,14 @@ class FinancialRecordRepository(private val dao: FinancialRecordDao) {
 
     suspend fun delete(record: FinancialRecord) = dao.updateRecord(record.copy(isDeleted = true))
 
+    fun getDeletedRecords(): Flow<List<FinancialRecord>> = dao.getDeletedRecords()
+
+    suspend fun restore(records: List<FinancialRecord>) = dao.restoreRecords(records.map { it.id })
+
+    suspend fun restore(record: FinancialRecord) = dao.restoreRecords(listOf(record.id))
+
+    suspend fun emptyTrash() = dao.purgeDeletedRecords()
+
     suspend fun replaceAll(records: List<FinancialRecord>) {
         records.forEach { validateRecord(it) }
         dao.replaceAllRecords(records)
