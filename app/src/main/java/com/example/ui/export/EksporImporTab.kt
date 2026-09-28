@@ -19,6 +19,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Info
 import com.example.util.BackupHelper
+import com.example.data.FinancialRecord
 import com.example.util.BackupScheduler
 import com.example.util.GoogleDriveHelper
 import com.google.android.gms.auth.api.signin.GoogleSignIn
@@ -121,6 +122,10 @@ fun EksporImporTabContent(
     onImportCsvFile: () -> Unit,
     onExportCsvFile: (List<YearMonth>) -> Unit,
     onExportPdfFile: (List<YearMonth>) -> Unit,
+    deletedRecords: List<FinancialRecord> = emptyList(),
+    onRestoreRecord: (FinancialRecord) -> Unit = {},
+    onRestoreAllRecords: () -> Unit = {},
+    onEmptyTrash: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -297,6 +302,16 @@ fun EksporImporTabContent(
                     val client = GoogleDriveHelper.getGoogleSignInClient(context)
                     googleSignInLauncher.launch(client.signInIntent)
                 }
+            )
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Sampah: transaksi yang dihapus masih bisa dipulihkan.
+            TrashSection(
+                deletedRecords = deletedRecords,
+                onRestore = onRestoreRecord,
+                onRestoreAll = onRestoreAllRecords,
+                onEmptyTrash = onEmptyTrash
             )
 
             // DIALOGS & OVERLAYS
