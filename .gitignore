@@ -26,3 +26,7 @@ app/google-services.json
 gradle/wrapper/
 gradlew
 gradlew.bat
+
+# JVM crash logs
+hs_err_pid*.log
+replay_pid*.log
