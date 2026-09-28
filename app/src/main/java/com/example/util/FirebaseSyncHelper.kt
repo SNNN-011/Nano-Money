@@ -14,6 +14,17 @@ import kotlin.coroutines.resumeWithException
 
 object FirebaseSyncHelper {
 
+    private fun recordToMap(r: FinancialRecord): Map<String, Any> = hashMapOf(
+        "id" to r.id,
+        "description" to r.description,
+        "amount" to r.amount,
+        "type" to r.type,
+        "category" to r.category,
+        "date" to r.date,
+        "notes" to r.notes,
+        "isDeleted" to r.isDeleted
+    )
+
     fun isUserSignedIn(): Boolean {
         return FirebaseAuth.getInstance().currentUser != null
     }
@@ -50,6 +61,8 @@ object FirebaseSyncHelper {
 
     fun signOut() {
         FirebaseAuth.getInstance().signOut()
+        // Clear cached bearer token for Gemini proxy
+        com.example.data.remote.GeminiClient.clearCachedToken()
     }
 
     suspend fun uploadRecordToFirestoreDirectly(record: FinancialRecord) {
@@ -90,6 +103,23 @@ object FirebaseSyncHelper {
         }
     }
 
+    /** Upload category settings to Firestore immediately when user adds/deletes a category */
+    suspend fun uploadCategoriesToFirestore(context: Context) {
+        val uid = getCurrentUid() ?: return
+        val db = FirebaseFirestore.getInstance()
+        val prefs = com.example.util.SecurePrefsHelper.getEncryptedPrefs(context, "financial_tracker_prefs")
+        val categories = hashMapOf<String, Any>()
+        prefs.getString("income_categories_list", null)?.let { categories["income_categories_list"] = it }
+        prefs.getString("expense_categories_list", null)?.let { categories["expense_categories_list"] = it }
+
+        suspendCancellableCoroutine<Unit> { continuation ->
+            db.collection("users").document(uid).collection("settings")
+                .document("financial_tracker_prefs")
+                .set(categories, com.google.firebase.firestore.SetOptions.merge())
+                .addOnCompleteListener { continuation.resume(Unit) }
+        }
+    }
+
     suspend fun syncFinancialRecordsWithFirestore(context: Context): Result<String> {
         val uid = getCurrentUid()
             ?: return Result.failure(Exception("Silakan hubungkan akun Google Anda terlebih dahulu untuk penyelarasan cloud."))
@@ -125,7 +155,7 @@ object FirebaseSyncHelper {
                     val id = (idObj as? Number)?.toInt() ?: doc.id.toIntOrNull() ?: return@mapNotNull null
                     
                     val amountObj = doc.get("amount")
-                    val amount = (amountObj as? Number)?.toDouble() ?: 0.0
+                    val amount = (amountObj as? Number)?.toLong() ?: 0L
                     
                     val dateObj = doc.get("date")
                     val date = (dateObj as? Number)?.toLong() ?: 0L
@@ -149,40 +179,31 @@ object FirebaseSyncHelper {
             var uploadedCount = 0
             var downloadedCount = 0
 
+            // Cloud (Firestore) adalah acuan.
+            // - Record hanya ada di lokal  -> kirim ke cloud.
+            // - Record ada di cloud         -> versi cloud menimpa versi lokal.
             val recordsToWrite = mutableListOf<Pair<String, Map<String, Any>>>()
+            val recordsToOverwriteLocally = mutableListOf<FinancialRecord>()
 
             for (localRecord in localRecords) {
                 val firestoreRecord = firestoreRecordsMap[localRecord.id]
-                if (localRecord.isDeleted) {
-                    if (firestoreRecord == null || !firestoreRecord.isDeleted) {
-                        val docData = hashMapOf<String, Any>(
-                            "id" to localRecord.id,
-                            "description" to localRecord.description,
-                            "amount" to localRecord.amount,
-                            "type" to localRecord.type,
-                            "category" to localRecord.category,
-                            "date" to localRecord.date,
-                            "notes" to localRecord.notes,
-                            "isDeleted" to true
-                        )
-                        recordsToWrite.add(localRecord.id.toString() to docData)
+
+                if (firestoreRecord == null) {
+                    if (!localRecord.isDeleted) {
+                        recordsToWrite.add(localRecord.id.toString() to recordToMap(localRecord))
                     }
-                } else {
-                    if (firestoreRecord != null && firestoreRecord.isDeleted) {
-                        dao.updateRecord(localRecord.copy(isDeleted = true))
-                    } else if (firestoreRecord == null || firestoreRecord != localRecord) {
-                        val docData = hashMapOf<String, Any>(
-                            "id" to localRecord.id,
-                            "description" to localRecord.description,
-                            "amount" to localRecord.amount,
-                            "type" to localRecord.type,
-                            "category" to localRecord.category,
-                            "date" to localRecord.date,
-                            "notes" to localRecord.notes,
-                            "isDeleted" to false
-                        )
-                        recordsToWrite.add(localRecord.id.toString() to docData)
-                    }
+                    continue
+                }
+
+                if (firestoreRecord != localRecord) {
+                    recordsToOverwriteLocally.add(firestoreRecord)
+                }
+            }
+
+            if (recordsToOverwriteLocally.isNotEmpty()) {
+                for (r in recordsToOverwriteLocally) {
+                    dao.updateRecord(r)
+                    downloadedCount++
                 }
             }
 
@@ -231,7 +252,7 @@ object FirebaseSyncHelper {
                     val id = (idObj as? Number)?.toInt() ?: doc.id.toIntOrNull() ?: return@mapNotNull null
                     
                     val amountObj = doc.get("amount")
-                    val amount = (amountObj as? Number)?.toDouble() ?: 0.0
+                    val amount = (amountObj as? Number)?.toLong() ?: 0L
                     
                     val dayOfMonthObj = doc.get("dayOfMonth")
                     val dayOfMonth = (dayOfMonthObj as? Number)?.toInt() ?: 1
@@ -316,13 +337,54 @@ object FirebaseSyncHelper {
                 }
 
                 val firestoreSettingsMap = settingsSnapshot?.data ?: emptyMap<String, Any>()
-                val localSettingsMap = prefs.all
+                val localSettingsMap = prefs.all.toMutableMap()
+
+                // Explicitly read category keys — prefs.all sometimes misses them in EncryptedSharedPreferences
+                val categoryKeys = listOf("income_categories_list", "expense_categories_list")
+                for (key in categoryKeys) {
+                    if (!localSettingsMap.containsKey(key)) {
+                        prefs.getString(key, null)?.let { localSettingsMap[key] = it }
+                    }
+                }
 
                 val mergedSettings = mutableMapOf<String, Any>()
-                mergedSettings.putAll(firestoreSettingsMap)
-                
+
+                // Category keys: local wins if user customized, Firestore wins if local still default
+                val defaultCategories = mapOf(
+                    "income_categories_list" to "Gaji,Investasi,Freelance,Lainnya",
+                    "expense_categories_list" to "Makanan,Transportasi,Tagihan,Hiburan,Belanja,Lainnya"
+                )
+                for (key in categoryKeys) {
+                    val localValue = localSettingsMap[key] as? String
+                    val firestoreValue = firestoreSettingsMap[key] as? String
+                    val isDefault = localValue.isNullOrBlank() || localValue == defaultCategories[key]
+                    if (!isDefault) {
+                        // User customized locally — local is source of truth (supports delete)
+                        mergedSettings[key] = localValue!!
+                    } else if (!firestoreValue.isNullOrBlank()) {
+                        // Local still default — use Firestore (restore scenario)
+                        mergedSettings[key] = firestoreValue
+                    } else if (!localValue.isNullOrBlank()) {
+                        mergedSettings[key] = localValue
+                    }
+                }
+
+                // PIN keys: selalu local wins — PIN adalah data keamanan lokal device
+                val pinKeys = listOf("pin_hash", "pin_salt", "pin_enabled")
+
+                // Filter out category keys, PIN keys, and legacy security fields at point of collection
+                val legacySecurityKeys = setOf(
+                    "saved_pin",
+                    "security_question", "security_answer", "security_question_answer",
+                    "answer_salt", "answer_hash", "biometric_enabled"
+                )
+                val skipKeys = categoryKeys + pinKeys + legacySecurityKeys
+
+                for ((k, v) in firestoreSettingsMap) {
+                    if (k !in skipKeys) mergedSettings[k] = v
+                }
                 for ((k, v) in localSettingsMap) {
-                    if (v != null) {
+                    if (v != null && k !in skipKeys) {
                         if (v is Set<*>) {
                             mergedSettings[k] = v.toList()
                         } else {
@@ -331,14 +393,8 @@ object FirebaseSyncHelper {
                     }
                 }
 
-                // Remove all PIN & security lock related settings
-                val pinKeys = listOf(
-                    "saved_pin", "pin_enabled", "pin_salt", "pin_hash",
-                    "security_question", "security_answer", "security_question_answer",
-                    "answer_salt", "answer_hash", "biometric_enabled"
-                )
-                for (key in pinKeys) {
-                    mergedSettings.remove(key)
+                // Cleanup legacy security fields from local SharedPreferences
+                for (key in legacySecurityKeys) {
                     prefs.edit().remove(key).apply()
                 }
                 

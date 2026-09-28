@@ -8,7 +8,7 @@ import net.sqlcipher.database.SupportFactory
 import net.sqlcipher.database.SQLiteDatabase
 import com.example.util.DatabaseKeyManager
 
-@Database(entities = [FinancialRecord::class, RecurringTransaction::class], version = 4, exportSchema = false)
+@Database(entities = [FinancialRecord::class, RecurringTransaction::class], version = 5, exportSchema = true)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun financialRecordDao(): FinancialRecordDao
     abstract fun analysisDao(): AnalysisDao
@@ -59,6 +59,64 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        // v4 -> v5: kolom `amount` berubah dari REAL (Double) menjadi INTEGER (Long)
+        // pada financial_records dan recurring_transactions. Tanpa migrasi ini Room
+        // jatuh ke fallbackToDestructiveMigration() dan MENGHAPUS seluruh data.
+        val MIGRATION_4_5 = object : androidx.room.migration.Migration(4, 5) {
+            override fun migrate(database: androidx.sqlite.db.SupportSQLiteDatabase) {
+                database.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `financial_records_new` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `description` TEXT NOT NULL,
+                        `amount` INTEGER NOT NULL,
+                        `type` TEXT NOT NULL,
+                        `category` TEXT NOT NULL,
+                        `date` INTEGER NOT NULL,
+                        `notes` TEXT NOT NULL,
+                        `isDeleted` INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
+                database.execSQL(
+                    """
+                    INSERT INTO `financial_records_new`
+                        (`id`, `description`, `amount`, `type`, `category`, `date`, `notes`, `isDeleted`)
+                    SELECT `id`, `description`, CAST(`amount` AS INTEGER), `type`, `category`, `date`, `notes`, `isDeleted`
+                    FROM `financial_records`
+                    """.trimIndent()
+                )
+                database.execSQL("DROP TABLE `financial_records`")
+                database.execSQL("ALTER TABLE `financial_records_new` RENAME TO `financial_records`")
+
+                database.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `recurring_transactions_new` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `description` TEXT NOT NULL,
+                        `amount` INTEGER NOT NULL,
+                        `type` TEXT NOT NULL,
+                        `category` TEXT NOT NULL,
+                        `dayOfMonth` INTEGER NOT NULL,
+                        `notes` TEXT NOT NULL,
+                        `lastRunDate` INTEGER,
+                        `isActive` INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
+                database.execSQL(
+                    """
+                    INSERT INTO `recurring_transactions_new`
+                        (`id`, `description`, `amount`, `type`, `category`, `dayOfMonth`, `notes`, `lastRunDate`, `isActive`)
+                    SELECT `id`, `description`, CAST(`amount` AS INTEGER), `type`, `category`, `dayOfMonth`, `notes`, `lastRunDate`, `isActive`
+                    FROM `recurring_transactions`
+                    """.trimIndent()
+                )
+                database.execSQL("DROP TABLE `recurring_transactions`")
+                database.execSQL("ALTER TABLE `recurring_transactions_new` RENAME TO `recurring_transactions`")
+            }
+        }
+
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val passphraseBytes = com.example.util.DatabaseKeyManager.getOrCreatePassphrase(context)
@@ -72,8 +130,10 @@ abstract class AppDatabase : RoomDatabase() {
                     "financial_tracker_database"
                 )
                 .openHelperFactory(factory)
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
-                .fallbackToDestructiveMigration()
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+                // Sengaja TIDAK memakai fallbackToDestructiveMigration(): kalau ada
+                // versi DB tanpa migrasi, aplikasi harus error dengan jelas, bukan
+                // diam-diam menghapus seluruh data keuangan pengguna.
                 .build()
                 INSTANCE = instance
                 instance
@@ -139,7 +199,7 @@ abstract class AppDatabase : RoomDatabase() {
                     }
                 }
             } catch (e: Exception) {
-                android.util.Log.e("AppDatabase", "Gagal memigrasi database menjadi terenkripsi: ${e.message}", e)
+                com.example.util.SecureLog.e("AppDatabase", "Gagal memigrasi database menjadi terenkripsi: ${e.message}", e)
             } finally {
                 if (tempFile.exists()) {
                     tempFile.delete()

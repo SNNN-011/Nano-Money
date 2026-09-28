@@ -8,6 +8,19 @@ plugins {
   alias(libs.plugins.firebase.crashlytics)
 }
 
+// Read API keys from local.properties at build time
+fun readLocalProp(key: String, default: String): String {
+    val f = rootProject.file("local.properties")
+    if (!f.exists()) return default
+    return f.readLines()
+        .map { it.trim() }
+        .firstOrNull { it.startsWith("$key=") && !it.startsWith("#") }
+        ?.substringAfter("=")
+        ?.trim()
+        ?.ifBlank { default }
+        ?: default
+}
+
 android {
   namespace = "com.example"
   compileSdk { version = release(36) { minorApiLevel = 1 } }
@@ -20,6 +33,13 @@ android {
     versionName = "1.0"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+    buildConfigField("String", "GEMINI_API_KEY", "\"${readLocalProp("GEMINI_API_KEY", "MY_GEMINI_API_KEY")}\"")
+    buildConfigField("String", "GEMINI_BASE_URL", "\"${readLocalProp("GEMINI_BASE_URL", "https://your-cloudflare-worker-url.workers.dev/")}\"")
+  }
+
+  ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
   }
 
   signingConfigs {
@@ -70,10 +90,9 @@ android {
   }
 }
 
-// Configure the Secrets Gradle Plugin to use .env and .env.example files
-// to match the convention used in Web projects.
+// Secrets Gradle Plugin reads API keys from local.properties
 secrets {
-  propertiesFileName = ".env"
+  propertiesFileName = "local.properties"
   defaultPropertiesFileName = ".env.example"
 }
 
@@ -81,7 +100,6 @@ secrets {
 // This makes it easy to add them back in the future if needed.
 dependencies {
    // Import the Firebase BoM
-  implementation(platform("com.google.firebase:firebase-bom:34.14.1"))
   // When using the BoM, don't specify versions in Firebase dependencies
   implementation(libs.firebase.analytics)
   implementation(libs.firebase.crashlytics)
@@ -122,9 +140,10 @@ dependencies {
   // implementation(libs.firebase.ai)
   implementation(libs.kotlinx.coroutines.android)
   implementation(libs.kotlinx.coroutines.core)
-  implementation(libs.logging.interceptor)
+  debugImplementation(libs.logging.interceptor)
   implementation(libs.moshi.kotlin)
   implementation(libs.okhttp)
+  implementation(libs.androidx.compose.ui.text.google.fonts)
   // implementation(libs.play.services.location)
   implementation(libs.retrofit)
   testImplementation(libs.androidx.compose.ui.test.junit4)

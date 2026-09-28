@@ -10,7 +10,7 @@ object AuthHelper {
             val result = user.getIdToken(forceRefresh).await()
             result.token
         } catch (e: Exception) {
-            android.util.Log.e("AuthHelper", "Failed to get Firebase token", e)
+            SecureLog.e("AuthHelper", "Failed to get Firebase token", e)
             null
         }
     }

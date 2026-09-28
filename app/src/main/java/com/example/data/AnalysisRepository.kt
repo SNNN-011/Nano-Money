@@ -12,19 +12,19 @@ class AnalysisRepository(private val dao: AnalysisDao) {
         return dao.getAllTimeExpenseAggregation()
     }
 
-    fun getTotalExpense(startMs: Long, endMs: Long): Flow<Double?> {
+    fun getTotalExpense(startMs: Long, endMs: Long): Flow<Long?> {
         return dao.getTotalExpense(startMs, endMs)
     }
 
-    fun getAllTimeTotalExpense(): Flow<Double?> {
+    fun getAllTimeTotalExpense(): Flow<Long?> {
         return dao.getAllTimeTotalExpense()
     }
 
-    fun getTotalIncome(startMs: Long, endMs: Long): Flow<Double?> {
+    fun getTotalIncome(startMs: Long, endMs: Long): Flow<Long?> {
         return dao.getTotalIncome(startMs, endMs)
     }
 
-    fun getAllTimeTotalIncome(): Flow<Double?> {
+    fun getAllTimeTotalIncome(): Flow<Long?> {
         return dao.getAllTimeTotalIncome()
     }
 

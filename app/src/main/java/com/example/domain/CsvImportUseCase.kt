@@ -3,6 +3,14 @@ package com.example.domain
 import com.example.data.FinancialRecord
 
 class CsvImportUseCase {
+    // Neutralize spreadsheet formula injection on import
+    private fun sanitizeCsvField(value: String): String {
+        val trimmed = value.trim()
+        return if (trimmed.isNotEmpty() && trimmed[0] in setOf('=', '+', '-', '@', '\t', '\r', '\n')) {
+            "'" + trimmed
+        } else trimmed
+    }
+
     // Parses a single CSV line acknowledging quotes and double quotes escape
     private fun parseCsvLine(line: String): List<String> {
         val result = mutableListOf<String>()
@@ -74,10 +82,19 @@ class CsvImportUseCase {
 
     // Import from spreadsheet Excel / CSV
     fun parseCsvString(csvStr: String): List<FinancialRecord> {
-        val lines = csvStr.split(Regex("\\r?\\n"))
-        if (lines.isEmpty()) throw IllegalArgumentException("File CSV kosong.")
+        val reader = java.io.BufferedReader(java.io.StringReader(csvStr))
+        val iterator = reader.lineSequence().iterator()
+        if (!iterator.hasNext()) throw IllegalArgumentException("File CSV kosong.")
         
-        val firstLine = lines.firstOrNull { it.trim().isNotEmpty() } ?: throw IllegalArgumentException("File CSV tidak memiliki data.")
+        var firstLine: String? = null
+        while (iterator.hasNext()) {
+            val line = iterator.next()
+            if (line.trim().isNotEmpty()) {
+                firstLine = line
+                break
+            }
+        }
+        if (firstLine == null) throw IllegalArgumentException("File CSV tidak memiliki data.")
         val headers = parseCsvLine(firstLine).map { it.trim().lowercase() }
         
         val descIndex = headers.indexOfFirst { it.contains("deskripsi") || it.contains("description") }
@@ -92,25 +109,22 @@ class CsvImportUseCase {
         }
         
         val parsedList = mutableListOf<FinancialRecord>()
-        var headerSkipped = false
-        for (line in lines) {
+        while (iterator.hasNext()) {
+            val line = iterator.next()
             if (line.trim().isEmpty()) continue
-            if (!headerSkipped) {
-                headerSkipped = true
-                continue
-            }
             
             val columns = parseCsvLine(line)
             if (columns.size <= maxOf(descIndex, amountIndex, typeIndex, catIndex)) {
                 continue
             }
             
-            val rawDesc = columns[descIndex].trim()
+            val rawDesc = sanitizeCsvField(columns[descIndex].trim())
             if (rawDesc.isEmpty()) continue
-            
+
             val rawAmountStr = columns[amountIndex].trim()
-            val amount = rawAmountStr.replace(",", ".").toDoubleOrNull()
-            if (amount == null || amount <= 0 || amount.isNaN()) {
+            val cleanAmountStr = rawAmountStr.replace(".", "").replace(",", "")
+            val amount = cleanAmountStr.toLongOrNull()
+            if (amount == null || amount <= 0) {
                 throw IllegalArgumentException("Jumlah transaksi '$rawAmountStr' harus berupa angka positif.")
             }
             
@@ -123,7 +137,7 @@ class CsvImportUseCase {
                 throw java.lang.IllegalArgumentException("Tipe transaksi '$type' harus 'Pemasukan' atau 'Pengeluaran'.")
             }
             
-            val category = columns[catIndex].trim()
+            val category = sanitizeCsvField(columns[catIndex].trim())
             if (category.isEmpty()) {
                 throw java.lang.IllegalArgumentException("Kategori transaksi tidak boleh kosong.")
             }
@@ -144,7 +158,7 @@ class CsvImportUseCase {
                 }
             }
             
-            val notes = if (notesIndex != -1 && notesIndex < columns.size) columns[notesIndex].trim() else ""
+            val notes = if (notesIndex != -1 && notesIndex < columns.size) sanitizeCsvField(columns[notesIndex].trim()) else ""
             
             parsedList.add(
                 FinancialRecord(

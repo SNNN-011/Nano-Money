@@ -6,7 +6,7 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.os.Build
-import android.util.Log
+import com.example.util.SecureLog
 import androidx.core.app.NotificationCompat
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
@@ -21,7 +21,7 @@ class BackupWorker(
 ) : CoroutineWorker(context, workerParams) {
 
     override suspend fun doWork(): Result {
-        Log.d("BackupWorker", "Memulai pencadangan otomatis via WorkManager... Attempt: $runAttemptCount")
+        SecureLog.d("BackupWorker", "Memulai pencadangan otomatis via WorkManager... Attempt: $runAttemptCount")
         val context = applicationContext
         val securityPrefs = com.example.util.SecurePrefsHelper.getEncryptedPrefs(context, "security_prefs")
         val now = System.currentTimeMillis()
@@ -29,12 +29,12 @@ class BackupWorker(
         try {
             when (val result = BackupHelper.performBackup(context, isAuto = true)) {
                 is BackupHelper.BackupResult.Success -> {
-                    Log.d("BackupWorker", "Pencadangan otomatis sukses: ${result.fileName}")
+                    SecureLog.d("BackupWorker", "Pencadangan otomatis sukses: ${result.fileName}")
                     securityPrefs.edit()
                         .putString("last_auto_backup_local_status", "Sukses (${result.fileName})")
                         .putLong("last_auto_backup_local_time", now)
                         .apply()
-                    
+
                     val isDriveBackupEnabled = securityPrefs.getBoolean("drive_backup_enabled", true)
                     var driveStatus = "Tidak Aktif"
                     // Silently upload to Google Drive if account is connected and backup is enabled
@@ -44,7 +44,7 @@ class BackupWorker(
                             val backupFile = File(backupDir, result.fileName)
                             when (val uploadRes = GoogleDriveHelper.uploadBackupToDrive(context, backupFile)) {
                                 is GoogleDriveHelper.DriveResult.Success -> {
-                                    Log.d("BackupWorker", "Unggah otomatis cadangan ke Google Drive sukses: fileId=${uploadRes.data}")
+                                    SecureLog.d("BackupWorker", "Unggah otomatis cadangan ke Google Drive sukses: fileId=${uploadRes.data}")
                                     securityPrefs.edit()
                                         .putString("last_auto_backup_drive_status", "Sukses")
                                         .putLong("last_auto_backup_drive_time", now)
@@ -52,24 +52,24 @@ class BackupWorker(
                                     driveStatus = "Berhasil"
                                 }
                                 is GoogleDriveHelper.DriveResult.Error -> {
-                                    Log.e("BackupWorker", "Gagal mengunggah otomatis cadangan ke Google Drive: ${uploadRes.message}")
+                                    SecureLog.e("BackupWorker", "Gagal mengunggah otomatis cadangan ke Google Drive: ${uploadRes.message}")
                                     securityPrefs.edit()
-                                        .putString("last_auto_backup_drive_status", "Gagal: ${uploadRes.message}")
+                                        .putString("last_auto_backup_drive_status", "Gagal")
                                         .putLong("last_auto_backup_drive_time", now)
                                         .apply()
-                                    driveStatus = "Gagal (${uploadRes.message})"
+                                    driveStatus = "Gagal"
                                     if (runAttemptCount < 3) {
                                         shouldRetry = true
                                     }
                                 }
                             }
                         } catch (uploadException: Exception) {
-                            Log.e("BackupWorker", "Terganggu saat mencoba mengunggah otomatis ke Google Drive", uploadException)
+                            SecureLog.e("BackupWorker", "Terganggu saat mencoba mengunggah otomatis ke Google Drive", uploadException)
                             securityPrefs.edit()
-                                .putString("last_auto_backup_drive_status", "Gagal: ${uploadException.localizedMessage}")
+                                .putString("last_auto_backup_drive_status", "Gagal")
                                 .putLong("last_auto_backup_drive_time", now)
                                 .apply()
-                            driveStatus = "Gagal (${uploadException.localizedMessage})"
+                            driveStatus = "Gagal"
                             if (runAttemptCount < 3) {
                                 shouldRetry = true
                             }
@@ -92,40 +92,40 @@ class BackupWorker(
                     showSuccessNotification(context, result.fileName, driveStatus)
                 }
                 is BackupHelper.BackupResult.Error -> {
-                    Log.e("BackupWorker", "Pencadangan otomatis gagal: ${result.message}")
+                    SecureLog.e("BackupWorker", "Pencadangan otomatis gagal: ${result.message}")
                     securityPrefs.edit()
-                        .putString("last_auto_backup_local_status", "Gagal: ${result.message}")
+                        .putString("last_auto_backup_local_status", "Gagal")
                         .putLong("last_auto_backup_local_time", now)
                         .apply()
-                    showFailureNotification(context, result.message)
+                    showFailureNotification(context)
                     if (runAttemptCount < 3) {
                         shouldRetry = true
                     }
                 }
             }
         } catch (e: Exception) {
-            Log.e("BackupWorker", "Gagal melakukan pencadangan otomatis: ${e.message}")
+            SecureLog.e("BackupWorker", "Gagal melakukan pencadangan otomatis", e)
             securityPrefs.edit()
-                .putString("last_auto_backup_local_status", "Gagal: ${e.message}")
+                .putString("last_auto_backup_local_status", "Gagal")
                 .putLong("last_auto_backup_local_time", now)
                 .apply()
-            showFailureNotification(context, e.localizedMessage ?: e.toString())
+            showFailureNotification(context)
             if (runAttemptCount < 3) {
                 shouldRetry = true
             }
         }
         return if (shouldRetry) {
-            Log.d("BackupWorker", "Menjadwalkan ulang pencadangan otomatis via WorkManager retry")
+            SecureLog.d("BackupWorker", "Menjadwalkan ulang pencadangan otomatis via WorkManager retry")
             Result.retry()
         } else {
             Result.success()
         }
     }
 
-    private fun showFailureNotification(context: Context, errorMessage: String) {
+    private fun showFailureNotification(context: Context) {
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         val channelId = "backup_failure_notifications"
-        
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 channelId,
@@ -136,7 +136,7 @@ class BackupWorker(
             }
             notificationManager.createNotificationChannel(channel)
         }
-        
+
         val clickIntent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
         }
@@ -146,17 +146,17 @@ class BackupWorker(
             PendingIntent.FLAG_UPDATE_CURRENT
         }
         val pendingIntent = PendingIntent.getActivity(context, 1002, clickIntent, pendingIntentFlags)
-        
+
         val notification = NotificationCompat.Builder(context, channelId)
             .setSmallIcon(android.R.drawable.ic_dialog_alert)
             .setContentTitle("Pencadangan Otomatis Gagal ⚠️")
-            .setContentText("Gagal mencadangkan database: $errorMessage. Ketuk untuk membuka aplikasi dan mencadangkan secara manual.")
-            .setStyle(NotificationCompat.BigTextStyle().bigText("Gagal mencadangkan database: $errorMessage. Silakan ketuk untuk membuka aplikasi dan mencoba melakukan pencadangan secara manual agar data Anda tetap aman."))
+            .setContentText("Pencadangan database gagal. Ketuk untuk membuka aplikasi dan mencadangkan secara manual.")
+            .setStyle(NotificationCompat.BigTextStyle().bigText("Pencadangan otomatis database gagal dilakukan. Silakan ketuk untuk membuka aplikasi dan mencoba melakukan pencadangan secara manual agar data Anda tetap aman."))
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)
             .build()
-            
+
         notificationManager.notify(1002, notification)
     }
 

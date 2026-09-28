@@ -16,8 +16,8 @@ object TelemetryHelper {
             firebaseCrashlytics = FirebaseCrashlytics.getInstance()
             
             val isDebug = (context.applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0
-            firebaseCrashlytics?.setCrashlyticsCollectionEnabled(true)
-            firebaseAnalytics?.setAnalyticsCollectionEnabled(true)
+            firebaseCrashlytics?.setCrashlyticsCollectionEnabled(false)
+            firebaseAnalytics?.setAnalyticsCollectionEnabled(false)
             
             logCrashlytics("TelemetryHelper initialized successfully. IsDebug: $isDebug")
         } catch (e: Exception) {
@@ -81,10 +81,21 @@ object TelemetryHelper {
 
     fun setUserId(userId: String) {
         try {
-            firebaseAnalytics?.setUserId(userId)
-            firebaseCrashlytics?.setUserId(userId)
+            val hashedId = hashStringSha256(userId)
+            firebaseAnalytics?.setUserId(hashedId)
+            firebaseCrashlytics?.setUserId(hashedId)
         } catch (e: Exception) {
             logNonFatal(e, "Gagal menset userId")
+        }
+    }
+
+    private fun hashStringSha256(input: String): String {
+        return try {
+            val digest = java.security.MessageDigest.getInstance("SHA-256")
+            val hashBytes = digest.digest(input.toByteArray(Charsets.UTF_8))
+            hashBytes.joinToString("") { "%02x".format(it) }
+        } catch (e: Exception) {
+            "anonymous_user"
         }
     }
 
@@ -96,8 +107,8 @@ object TelemetryHelper {
         logEvent(FirebaseAnalytics.Event.SCREEN_VIEW, bundle)
     }
 
-    fun trackTransactionAction(action: String, type: String, category: String, amount: Double) {
-        val amountTier = if (amount < 100000.0) "KECIL" else "BESAR"
+    fun trackTransactionAction(action: String, type: String, category: String, amount: Long) {
+        val amountTier = if (amount < 100000L) "KECIL" else "BESAR"
         val bundle = Bundle().apply {
             putString("transaction_action", action)
             putString("transaction_type", type)

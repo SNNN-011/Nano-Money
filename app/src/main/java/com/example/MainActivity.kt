@@ -32,7 +32,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import com.example.ui.FinancialTrackerScreen
+import com.example.ui.common.FinancialTrackerScreen
 import com.example.ui.theme.*
 
 class MainActivity : FragmentActivity() {
@@ -74,7 +74,7 @@ class MainActivity : FragmentActivity() {
           }
           
           if (securityStatus != com.example.util.SecurityUtil.SecurityStatus.SAFE) {
-            com.example.ui.SecurityViolationScreen(securityStatus = securityStatus)
+            com.example.ui.common.SecurityViolationScreen(securityStatus = securityStatus)
           } else {
             val securityPrefs = remember { com.example.util.SecurePrefsHelper.getEncryptedPrefs(context, "app_security_prefs") }
             
@@ -100,34 +100,49 @@ class MainActivity : FragmentActivity() {
           }
           
           var isLaunching by remember { mutableStateOf(true) }
-          
+          // null = belum dicek, true = sudah unlock/PIN tidak aktif, false = perlu PIN
+          var pinUnlocked by remember { mutableStateOf<Boolean?>(null) }
+
           val permissionLauncher = rememberLauncherForActivityResult(
               contract = ActivityResultContracts.RequestMultiplePermissions()
           ) { _ ->
               securityPrefs.edit().putBoolean("permission_dialog_shown", true).apply()
           }
 
-          LaunchedEffect(isLaunching) {
-              if (!isLaunching) {
-                  if (!securityPrefs.getBoolean("permission_dialog_shown", false)) {
-                      val permissions = mutableListOf<String>()
-                      if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
-                          permissions.add(android.Manifest.permission.POST_NOTIFICATIONS)
-                      }
-                      permissions.add(android.Manifest.permission.CAMERA)
-                      permissionLauncher.launch(permissions.toTypedArray())
-                      securityPrefs.edit().putBoolean("permission_dialog_shown", true).apply()
+          // Cek PIN segera di background, parallel dengan splash
+          LaunchedEffect(Unit) {
+              val needsPin = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                  com.example.util.PinUtils.isPinEnabled(context)
+              }
+              pinUnlocked = !needsPin
+              // Permission check — setelah PIN dicek
+              if (!securityPrefs.getBoolean("permission_dialog_shown", false)) {
+                  val permissions = mutableListOf<String>()
+                  if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                      permissions.add(android.Manifest.permission.POST_NOTIFICATIONS)
                   }
+                  permissions.add(android.Manifest.permission.CAMERA)
+                  permissionLauncher.launch(permissions.toTypedArray())
+                  securityPrefs.edit().putBoolean("permission_dialog_shown", true).apply()
               }
           }
-          
-          if (isLaunching) {
-            com.example.ui.StartupScreen(
-                visible = true,
-                onFinished = { isLaunching = false }
-            )
-          } else {
-            FinancialTrackerScreen(application = application, showStartupSplash = false)
+
+          when {
+            isLaunching || pinUnlocked == null -> {
+                  com.example.ui.common.StartupScreen(
+                      visible = true,
+                      onFinished = { isLaunching = false }
+                  )
+              }
+              pinUnlocked == false -> {
+                  com.example.ui.common.PinUnlockScreen(
+                      onUnlocked = { pinUnlocked = true },
+                      onExit = { finish() }
+                  )
+              }
+              else -> {
+                  FinancialTrackerScreen(application = application, showStartupSplash = false)
+              }
           }
          }
         }

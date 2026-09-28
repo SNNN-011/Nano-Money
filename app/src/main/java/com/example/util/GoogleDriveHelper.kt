@@ -1,7 +1,7 @@
 package com.example.util
 
 import android.content.Context
-import android.util.Log
+import com.example.util.SecureLog
 import com.google.android.gms.auth.GoogleAuthUtil
 import com.google.android.gms.auth.UserRecoverableAuthException
 import com.google.android.gms.auth.api.signin.GoogleSignIn
@@ -102,19 +102,19 @@ object GoogleDriveHelper {
                 try {
                     val existingToken = GoogleAuthUtil.getToken(context, sysAccount, scopeString)
                     GoogleAuthUtil.invalidateToken(context, existingToken)
-                    Log.d(TAG, "Token lama berhasil di-invalidasi karena forceRefresh=true")
+                    SecureLog.d(TAG, "Token lama berhasil di-invalidasi karena forceRefresh=true")
                 } catch (e: Exception) {
-                    Log.w(TAG, "Selesai meng-invalidasi token kadaluarsa: ${e.message}")
+                    SecureLog.w(TAG, "Selesai meng-invalidasi token kadaluarsa: ${e.message}")
                 }
             }
             
             val token = GoogleAuthUtil.getToken(context, sysAccount, scopeString)
             DriveResult.Success(token)
         } catch (recoverable: UserRecoverableAuthException) {
-            Log.w(TAG, "Izin tambahan diperlukan oleh sistem Google: ${recoverable.message}")
+            SecureLog.w(TAG, "Izin tambahan diperlukan oleh sistem Google: ${recoverable.message}")
             DriveResult.Error("Izin otorisasi tambahan diperlukan.", recoverable.intent)
         } catch (e: Exception) {
-            Log.e(TAG, "Gagal mendapatkan token OAuth2: ${e.message}", e)
+            SecureLog.e(TAG, "Gagal mendapatkan token OAuth2: ${e.message}", e)
             DriveResult.Error("Gagal otentikasi Google: ${e.localizedMessage ?: "Kesalahan tidak diketahui."}")
         }
     }
@@ -144,7 +144,7 @@ object GoogleDriveHelper {
                     return filesArr.getJSONObject(0).getString("id")
                 }
             } else {
-                Log.w(TAG, "Gagal mencari folder Backup Nano Money: HTTP ${response.code}")
+                SecureLog.w(TAG, "Gagal mencari folder Backup Nano Money: HTTP ${response.code}")
             }
 
             // Folder does not exist, let's create it
@@ -169,16 +169,16 @@ object GoogleDriveHelper {
                 val jsonResponse = JSONObject(responseBody)
                 val newFolderId = jsonResponse.optString("id")
                 if (!newFolderId.isNullOrEmpty()) {
-                    Log.i(TAG, "Berhasil membuat folder baru di Google Drive: $newFolderId")
+                    SecureLog.i(TAG, "Berhasil membuat folder baru di Google Drive: $newFolderId")
                     return newFolderId
                 }
             } else {
-                Log.e(TAG, "Gagal membuat folder di Google Drive: HTTP ${createResponse.code}")
+                SecureLog.e(TAG, "Gagal membuat folder di Google Drive: HTTP ${createResponse.code}")
             }
         } catch (unauthorized: UnauthorizedException) {
             throw unauthorized
         } catch (e: Exception) {
-            Log.e(TAG, "Kesalahan saat melacak atau membuat folder di Google Drive", e)
+            SecureLog.e(TAG, "Kesalahan saat melacak atau membuat folder di Google Drive", e)
         }
         return null
     }
@@ -215,7 +215,7 @@ object GoogleDriveHelper {
         } catch (unauthorized: UnauthorizedException) {
             throw unauthorized
         } catch (e: Exception) {
-            Log.e(TAG, "Kesalahan saat melacak berkas duplikat di Google Drive", e)
+            SecureLog.e(TAG, "Kesalahan saat melacak berkas duplikat di Google Drive", e)
         }
         return null
     }
@@ -226,7 +226,7 @@ object GoogleDriveHelper {
         val fileIdToUpload: String
 
         if (!existingFileId.isNullOrEmpty()) {
-            Log.i(TAG, "Ditemukan berkas cadangan dengan nama yang sama: $existingFileId. Menggunakan mode timpa (overwrite).")
+            SecureLog.i(TAG, "Ditemukan berkas cadangan dengan nama yang sama: $existingFileId. Menggunakan mode timpa (overwrite).")
             fileIdToUpload = existingFileId
         } else {
             // Step 1: Create the file metadata in Google Drive inside the directory
@@ -251,7 +251,7 @@ object GoogleDriveHelper {
             }
             if (!metadataResponse.isSuccessful) {
                 val errorBody = metadataResponse.body?.string() ?: ""
-                Log.e(TAG, "Gagal membuat metadata di Drive: Code=${metadataResponse.code}, Body=$errorBody")
+                SecureLog.e(TAG, "Gagal membuat metadata di Drive: Code=${metadataResponse.code}, Body=$errorBody")
                 val detailedMsg = extractErrorMessage(metadataResponse.code, errorBody)
                 return DriveResult.Error("Gagal membuat metadata berkas Google Drive: $detailedMsg")
             }
@@ -279,7 +279,7 @@ object GoogleDriveHelper {
         }
         if (!mediaResponse.isSuccessful) {
             val errorBody = mediaResponse.body?.string() ?: ""
-            Log.e(TAG, "Gagal mengunggah konten berkas ke Drive: Code=${mediaResponse.code}, Body=$errorBody")
+            SecureLog.e(TAG, "Gagal mengunggah konten berkas ke Drive: Code=${mediaResponse.code}, Body=$errorBody")
             // Clean up the empty metadata file ONLY if it was brand-newly created
             if (existingFileId.isNullOrEmpty()) {
                 tryDeleteDriveFile(token, fileIdToUpload)
@@ -288,7 +288,7 @@ object GoogleDriveHelper {
             return DriveResult.Error("Gagal mentransfer data berkas cadangan ke Google Drive: $detailedMsg")
         }
 
-        Log.d(TAG, "Berkas berhasil diunggah/diperbarui ke Google Drive: $fileIdToUpload")
+        SecureLog.d(TAG, "Berkas berhasil diunggah/diperbarui ke Google Drive: $fileIdToUpload")
         return DriveResult.Success(fileIdToUpload)
     }
 
@@ -299,11 +299,11 @@ object GoogleDriveHelper {
                 for (i in 5 until driveFiles.size) {
                     val fileToDelete = driveFiles[i]
                     deleteBackupFromDriveInternal(token, fileToDelete.id)
-                    Log.i(TAG, "Menghapus cadangan Drive lama untuk membatasi maksimal 5: ${fileToDelete.name} (${fileToDelete.id})")
+                    SecureLog.i(TAG, "Menghapus cadangan Drive lama untuk membatasi maksimal 5: ${fileToDelete.name} (${fileToDelete.id})")
                 }
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Gagal membersihkan cadangan Drive lama: ${e.message}", e)
+            SecureLog.e(TAG, "Gagal membersihkan cadangan Drive lama: ${e.message}", e)
         }
     }
 
@@ -329,7 +329,7 @@ object GoogleDriveHelper {
             }
             result
         } catch (unauthorized: UnauthorizedException) {
-            Log.w(TAG, "Koneksi Google Drive unauthorized (token expired). Mencoba menyegarkan token...")
+            SecureLog.w(TAG, "Koneksi Google Drive unauthorized (token expired). Mencoba menyegarkan token...")
             tokenResult = fetchAccessToken(context, forceRefresh = true)
             if (tokenResult is DriveResult.Error) {
                 return@withContext tokenResult
@@ -343,11 +343,11 @@ object GoogleDriveHelper {
                 }
                 result
             } catch (e: Exception) {
-                Log.e(TAG, "Gagal mengunggah cadangan setelah penyeleksian ulang token: ${e.message}", e)
+                SecureLog.e(TAG, "Gagal mengunggah cadangan setelah penyeleksian ulang token: ${e.message}", e)
                 DriveResult.Error("Gagal mengunggah berkas ke Google Drive: ${e.localizedMessage ?: "Kesalahan tidak diketahui."}")
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Kesalahan saat mengunggah cadangan ke Google Drive: ${e.message}", e)
+            SecureLog.e(TAG, "Kesalahan saat mengunggah cadangan ke Google Drive: ${e.message}", e)
             DriveResult.Error("Gagal mengunggah berkas: ${e.localizedMessage ?: "Kesalahan Jaringan."}")
         }
     }
@@ -378,7 +378,7 @@ object GoogleDriveHelper {
         }
         if (!response.isSuccessful) {
             val errorBody = response.body?.string() ?: ""
-            Log.e(TAG, "Gagal mencantumkan berkas dari Drive: Code=${response.code}, Body=$errorBody")
+            SecureLog.e(TAG, "Gagal mencantumkan berkas dari Drive: Code=${response.code}, Body=$errorBody")
             val detailedMsg = extractErrorMessage(response.code, errorBody)
             throw Exception("Gagal membaca daftar cadangan dari Google Drive: $detailedMsg")
         }
@@ -409,7 +409,7 @@ object GoogleDriveHelper {
         try {
             DriveResult.Success(listBackupsFromDriveInternal(token))
         } catch (unauthorized: UnauthorizedException) {
-            Log.w(TAG, "Daftar Google Drive unauthorized (token expired). Menyegarkan token...")
+            SecureLog.w(TAG, "Daftar Google Drive unauthorized (token expired). Menyegarkan token...")
             tokenResult = fetchAccessToken(context, forceRefresh = true)
             if (tokenResult is DriveResult.Error) {
                 return@withContext tokenResult
@@ -418,11 +418,11 @@ object GoogleDriveHelper {
             try {
                 DriveResult.Success(listBackupsFromDriveInternal(token))
             } catch (e: Exception) {
-                Log.e(TAG, "Gagal memuat daftar dari Drive setelah penyegaran token: ${e.message}", e)
+                SecureLog.e(TAG, "Gagal memuat daftar dari Drive setelah penyegaran token: ${e.message}", e)
                 DriveResult.Error("Gagal memuat daftar Google Drive: ${e.localizedMessage ?: "Sesi terganggu."}")
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Kesalahan saat mencantumkan berkas Google Drive: ${e.message}", e)
+            SecureLog.e(TAG, "Kesalahan saat mencantumkan berkas Google Drive: ${e.message}", e)
             DriveResult.Error("Gagal memuat daftar Google Drive: ${e.localizedMessage ?: "Kesalahan Jaringan."}")
         }
     }
@@ -453,7 +453,7 @@ object GoogleDriveHelper {
         }
         if (!response.isSuccessful) {
             val errorBody = response.body?.string() ?: ""
-            Log.e(TAG, "Gagal mengunduh berkas dari Drive: Code=${response.code}, Body=$errorBody")
+            SecureLog.e(TAG, "Gagal mengunduh berkas dari Drive: Code=${response.code}, Body=$errorBody")
             val detailedMsg = extractErrorMessage(response.code, errorBody)
             throw Exception("Gagal mengunduh isi berkas dari Google Drive: $detailedMsg")
         }
@@ -466,7 +466,7 @@ object GoogleDriveHelper {
             }
         }
 
-        Log.d(TAG, "Berkas dari Google Drive berhasil disimpan lokal: ${targetFile.absolutePath}")
+        SecureLog.d(TAG, "Berkas dari Google Drive berhasil disimpan lokal: ${targetFile.absolutePath}")
     }
 
     suspend fun downloadBackupFromDrive(context: Context, fileId: String, targetFile: File): DriveResult<File> = withContext(Dispatchers.IO) {
@@ -480,7 +480,7 @@ object GoogleDriveHelper {
             downloadBackupFromDriveInternal(token, fileId, targetFile)
             DriveResult.Success(targetFile)
         } catch (unauthorized: UnauthorizedException) {
-            Log.w(TAG, "Unduhan Google Drive unauthorized (token expired). Menyegarkan token...")
+            SecureLog.w(TAG, "Unduhan Google Drive unauthorized (token expired). Menyegarkan token...")
             tokenResult = fetchAccessToken(context, forceRefresh = true)
             if (tokenResult is DriveResult.Error) {
                 return@withContext tokenResult
@@ -490,11 +490,11 @@ object GoogleDriveHelper {
                 downloadBackupFromDriveInternal(token, fileId, targetFile)
                 DriveResult.Success(targetFile)
             } catch (e: Exception) {
-                Log.e(TAG, "Gagal mengunduh berkas setelah penyegaran token: ${e.message}", e)
+                SecureLog.e(TAG, "Gagal mengunduh berkas setelah penyegaran token: ${e.message}", e)
                 DriveResult.Error("Gagal mengunduh berkas Google Drive: ${e.localizedMessage ?: "Sesi terganggu."}")
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Kesalahan saat mengunduh berkas dari Google Drive: ${e.message}", e)
+            SecureLog.e(TAG, "Kesalahan saat mengunduh berkas dari Google Drive: ${e.message}", e)
             DriveResult.Error("Gagal mengunduh berkas: ${e.localizedMessage ?: "Kesalahan Jaringan."}")
         }
     }
@@ -515,12 +515,12 @@ object GoogleDriveHelper {
         }
         if (!response.isSuccessful) {
             val errorBody = response.body?.string() ?: ""
-            Log.e(TAG, "Gagal menghapus berkas di Drive: Code=${response.code}, Body=$errorBody")
+            SecureLog.e(TAG, "Gagal menghapus berkas di Drive: Code=${response.code}, Body=$errorBody")
             val detailedMsg = extractErrorMessage(response.code, errorBody)
             throw Exception("Gagal menghapus berkas di Google Drive: $detailedMsg")
         }
 
-        Log.d(TAG, "Berkas di Google Drive berhasil dihapus: $fileId")
+        SecureLog.d(TAG, "Berkas di Google Drive berhasil dihapus: $fileId")
     }
 
     suspend fun deleteBackupFromDrive(context: Context, fileId: String): DriveResult<Boolean> = withContext(Dispatchers.IO) {
@@ -534,7 +534,7 @@ object GoogleDriveHelper {
             deleteBackupFromDriveInternal(token, fileId)
             DriveResult.Success(true)
         } catch (unauthorized: UnauthorizedException) {
-            Log.w(TAG, "Penghapusan Google Drive unauthorized (token expired). Menyegarkan token...")
+            SecureLog.w(TAG, "Penghapusan Google Drive unauthorized (token expired). Menyegarkan token...")
             tokenResult = fetchAccessToken(context, forceRefresh = true)
             if (tokenResult is DriveResult.Error) {
                 return@withContext tokenResult
@@ -544,11 +544,11 @@ object GoogleDriveHelper {
                 deleteBackupFromDriveInternal(token, fileId)
                 DriveResult.Success(true)
             } catch (e: Exception) {
-                Log.e(TAG, "Gagal menghapus berkas setelah penyegaran token: ${e.message}", e)
+                SecureLog.e(TAG, "Gagal menghapus berkas setelah penyegaran token: ${e.message}", e)
                 DriveResult.Error("Gagal menghapus berkas di Google Drive: ${e.localizedMessage ?: "Sesi terganggu."}")
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Kesalahan saat menghapus berkas Google Drive: ${e.message}", e)
+            SecureLog.e(TAG, "Kesalahan saat menghapus berkas Google Drive: ${e.message}", e)
             DriveResult.Error("Gagal menghapus berkas: ${e.localizedMessage ?: "Kesalahan Jaringan."}")
         }
     }
@@ -565,7 +565,7 @@ object GoogleDriveHelper {
                 .build()
             httpClient.newCall(request).execute()
         } catch (e: Exception) {
-            Log.w(TAG, "Gagal membersinkan metadata yang terlanjur terbuat: ${e.message}")
+            SecureLog.w(TAG, "Gagal membersinkan metadata yang terlanjur terbuat: ${e.message}")
         }
     }
 

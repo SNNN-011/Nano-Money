@@ -15,6 +15,17 @@ interface FinancialRecordDao {
     @Query("SELECT * FROM financial_records ORDER BY date DESC")
     fun getAllRecordsWithDeleted(): Flow<List<FinancialRecord>>
 
+    // Sampah: record yang sudah dihapus tapi masih bisa dipulihkan.
+    @Query("SELECT * FROM financial_records WHERE isDeleted = 1 ORDER BY date DESC")
+    fun getDeletedRecords(): Flow<List<FinancialRecord>>
+
+    // Kembalikan record dari sampah ke daftar utama.
+    @Query("UPDATE financial_records SET isDeleted = 0 WHERE id IN (:ids)")
+    suspend fun restoreRecords(ids: List<Int>)
+
+    @Query("DELETE FROM financial_records WHERE isDeleted = 1")
+    suspend fun purgeDeletedRecords()
+
     @Query("SELECT * FROM financial_records WHERE date >= :startMs AND date <= :endMs AND isDeleted = 0 ORDER BY date DESC")
     fun getTransactionsInTimeRange(startMs: Long, endMs: Long): Flow<List<FinancialRecord>>
 

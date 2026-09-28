@@ -1,13 +1,13 @@
 package com.example.domain
 
-import com.example.ui.ExtractionResult
-import com.example.ui.GeminiClient
-import com.example.ui.GeminiContent
-import com.example.ui.GeminiGenerationConfig
-import com.example.ui.GeminiPart
-import com.example.ui.GeminiRequest
-import com.example.ui.GeminiSchemaOptions
-import com.example.ui.GeminiSchemaItem
+import com.example.data.remote.ExtractionResult
+import com.example.data.remote.GeminiClient
+import com.example.data.remote.GeminiContent
+import com.example.data.remote.GeminiGenerationConfig
+import com.example.data.remote.GeminiPart
+import com.example.data.remote.GeminiRequest
+import com.example.data.remote.GeminiSchemaOptions
+import com.example.data.remote.GeminiSchemaItem
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -153,7 +153,7 @@ class TransactionParserUseCase {
             var rawResponseText: String? = null
             var lastException: Throwable? = null
 
-            val modelsToTry = listOf(modelName, "gemini-2.0-flash-lite", "gemini-1.5-flash")
+            val modelsToTry = listOf(modelName, "gemini-3.5-flash-lite").distinct()
 
             for (model in modelsToTry) {
                 try {
@@ -185,17 +185,41 @@ class TransactionParserUseCase {
                 return@withContext RequestResult.Success(ExtractionResult(error = error, pertanyaan = p))
             }
 
+            val rawDescription = json.optString("description", "Transaksi").trim()
+            val rawAmount = json.optLong("amount", 0L)
+            val rawType = json.optString("type", "PENGELUARAN").trim()
+            val rawCategory = json.optString("category", "Lainnya").trim()
+            val rawDate = json.optLong("date", System.currentTimeMillis())
+            val rawNotes = json.optString("notes", "").trim()
+            val rawEmoji = json.optString("emoji", "📦").trim()
+
+            // Validate AI response fields
+            if (rawAmount <= 0L || rawAmount > 999_999_999_999L) {
+                return@withContext RequestResult.Error("Jumlah transaksi tidak valid (harus antara Rp 1 s/d Rp 999 Miliar)", null)
+            }
+            if (rawDescription.length > 500) {
+                return@withContext RequestResult.Error("Deskripsi terlalu panjang", null)
+            }
+            if (rawCategory.length > 100) {
+                return@withContext RequestResult.Error("Kategori terlalu panjang", null)
+            }
+            val validType = if (rawType.uppercase() in setOf("PENGELUARAN", "PEMASUKAN", "EXPENSE", "INCOME")) rawType.uppercase() else "PENGELUARAN"
+            val safeEmoji = if (rawEmoji.length <= 4) rawEmoji else "📦"
+            val safeDate = if (rawDate > 0L) rawDate else System.currentTimeMillis()
+
             val result = ExtractionResult(
-                description = json.optString("description", "Transaksi"),
-                amount = json.optDouble("amount", 0.0),
-                type = json.optString("type", "PENGELUARAN"),
-                category = json.optString("category", "Lainnya"),
-                date = json.optLong("date", System.currentTimeMillis()),
-                notes = json.optString("notes", ""),
-                emoji = json.optString("emoji", "📦").trim()
+                description = rawDescription,
+                amount = rawAmount,
+                type = validType,
+                category = rawCategory,
+                date = safeDate,
+                notes = rawNotes,
+                emoji = safeEmoji
             )
 
             RequestResult.Success(result)
+        } catch (e: org.json.JSONException) {
+            RequestResult.Error("Respon AI tidak sesuai format JSON yang diharapkan", e)
         } catch (e: Exception) {
             RequestResult.Error(e.message ?: "Kesalahan pemrosesan data", e)
         }

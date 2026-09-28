@@ -8,7 +8,7 @@ import java.io.Serializable
 data class RecurringTransaction(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
     val description: String,
-    val amount: Double,
+    val amount: Long,
     val type: String, // "income" or "expense"
     val category: String,
     val dayOfMonth: Int, // 1 to 31

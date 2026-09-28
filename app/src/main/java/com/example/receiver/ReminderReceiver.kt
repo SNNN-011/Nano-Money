@@ -46,7 +46,7 @@ class ReminderReceiver : BroadcastReceiver() {
             .setAutoCancel(true)
             .build()
             
-        notificationManager.notify(1001, notification)
+        notificationManager.notify(1003, notification)
         
         // Reschedule for tomorrow
         NotificationScheduler.scheduleDailyAlarm(context)

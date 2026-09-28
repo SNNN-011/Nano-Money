@@ -18,22 +18,16 @@ async function verifyFirebaseToken(idToken, projectId) {
     });
     return payload;
   } catch (e) {
-    console.error('Token verification failed:', e);
+    console.error('Token verification failed:', e?.code || e?.message || 'invalid token');
     return null;
   }
 }
 
 export default {
   async fetch(request, env, ctx) {
-    // 1. Tangani CORS Preflight Request
+    // 1. Tolak CORS Preflight — backend mobile-only, browser tidak perlu akses
     if (request.method === 'OPTIONS') {
-      return new Response(null, {
-        headers: {
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-          'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-        }
-      });
+      return new Response(null, { status: 403 });
     }
 
     const projectId = env.FIREBASE_PROJECT_ID;
@@ -65,9 +59,23 @@ export default {
 
     const uid = decodedToken.sub; // Ini adalah UID user dari Firebase
 
+    // 2b. Validasi email_verified — tolak akun dengan email belum diverifikasi
+    if (decodedToken.email_verified !== true) {
+      return new Response(JSON.stringify({ error: "Unauthorized: Email belum diverifikasi" }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+
     // 3. Rate Limiting dengan Cloudflare KV
     // env.RATE_LIMIT_KV adalah binding name yang Anda set di Cloudflare (bisa via wrangler.toml)
-    if (env.RATE_LIMIT_KV) {
+    if (!env.RATE_LIMIT_KV) {
+      return new Response(JSON.stringify({ error: "Server error: Rate limiting tidak tersedia" }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+    {
       // Buat key yang unik per user (UID) dan per hari
       const today = new Date().toISOString().split('T')[0];
       const kvKey = `ratelimit:${uid}:${today}`;
@@ -86,8 +94,18 @@ export default {
       await env.RATE_LIMIT_KV.put(kvKey, (currentUsage + 1).toString(), { expirationTtl: 86400 });
     }
 
-    // 4. Lanjutkan request ke Gemini API
+    // 4. Lanjutkan request ke Gemini API (dengan whitelist path yang diizinkan)
     const url = new URL(request.url);
+    const allowedPathPrefixes = [
+      '/v1beta/models/gemini-',
+      '/v1/models/gemini-'
+    ];
+    if (!allowedPathPrefixes.some(prefix => url.pathname.startsWith(prefix))) {
+      return new Response(JSON.stringify({ error: "Forbidden: Endpoint API tidak diizinkan" }), {
+        status: 403,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
     
     // Ganti host dari request Worker ke host Gemini API
     const geminiUrl = new URL(`https://generativelanguage.googleapis.com${url.pathname}${url.search}`);
@@ -116,8 +134,8 @@ export default {
 
     // 5. Kembalikan response Gemini ke klien Android
     const responseHeaders = new Headers(geminiResponse.headers);
-    responseHeaders.set('Access-Control-Allow-Origin', '*'); // Pastikan CORS tetap diizinkan
-    
+    // CORS header sengaja tidak ditambah — backend mobile-only, Android OkHttp tidak pakai CORS
+
     // Karena Gemini kadang mengembalikan transfer-encoding: chunked yang bisa bermasalah jika proxy
     // menghapus content-encoding, lebih baik teruskan body as is.
     return new Response(geminiResponse.body, {

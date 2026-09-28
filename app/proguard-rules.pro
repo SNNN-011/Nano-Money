@@ -8,8 +8,13 @@
 # Preserve annotations, signatures, and line numbers of stack traces for debugging
 -keepattributes *Annotation*,Signature,InnerClasses,EnclosingMethod,SourceFile,LineNumberTable
 
-# Keep our BuildConfig so that our dynamic endpoint URLs and secret keys are available
--keep class com.example.BuildConfig { *; }
+# Keep only standard non-sensitive BuildConfig fields needed at runtime
+-keep class com.example.BuildConfig {
+    public static final boolean DEBUG;
+    public static final java.lang.String APPLICATION_ID;
+    public static final int VERSION_CODE;
+    public static final java.lang.String VERSION_NAME;
+}
 
 # Keep only Retrofit API service interfaces so that Retrofit dynamic proxying is not broken by name obfuscation, while allowing all other UI/ViewModel/Security classes to be fully obfuscated and optimized
 -keep interface com.example.ui.GeminiApiService { *; }

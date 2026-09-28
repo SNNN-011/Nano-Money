@@ -2,7 +2,7 @@ package com.example.util
 
 import android.content.Context
 import android.content.SharedPreferences
-import android.util.Log
+import com.example.util.SecureLog
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 
@@ -24,27 +24,38 @@ object SecurePrefsHelper {
             prefs.all // paksa baca sekarang, supaya error Keystore ketahuan di sini, bukan nanti
             return prefs
         } catch (e: Exception) {
-            Log.e(TAG, "EncryptedSharedPreferences '$name' corrupt (${e.javaClass.simpleName}), melakukan reset paksa.", e)
+            SecureLog.e(TAG, "EncryptedSharedPreferences '$name' corrupt (${e.javaClass.simpleName}), melakukan reset paksa.", e)
+            // Cleanup: hapus file corrupt, Keystore alias, dan plain prefs sisa migrasi
+            // Tidak backup PIN dari XML — nilai di encrypted XML sudah terenkripsi,
+            // restore ke encrypted baru = double-encryption = verify gagal.
+            // User perlu set ulang PIN setelah recovery.
             try {
                 context.applicationContext.getSharedPreferences(name, Context.MODE_PRIVATE)
                     .edit().clear().commit()
                 val prefsFile = java.io.File(context.applicationContext.filesDir.parentFile, "shared_prefs/$name.xml")
                 if (prefsFile.exists()) prefsFile.delete()
             } catch (cleanupError: Exception) {
-                Log.e(TAG, "Gagal cleanup file corrupt: ${cleanupError.message}", cleanupError)
+                SecureLog.e(TAG, "Gagal cleanup file corrupt: ${cleanupError.message}", cleanupError)
             }
             try {
                 val keyStore = java.security.KeyStore.getInstance("AndroidKeyStore")
                 keyStore.load(null)
                 keyStore.deleteEntry(MasterKey.DEFAULT_MASTER_KEY_ALIAS)
             } catch (ksError: Exception) {
-                Log.e(TAG, "Gagal hapus Keystore alias: ${ksError.message}", ksError)
+                SecureLog.e(TAG, "Gagal hapus Keystore alias: ${ksError.message}", ksError)
             }
-            return try {
-                buildEncryptedPrefs(context, name)
-            } catch (e2: Exception) {
-                Log.e(TAG, "Gagal total membuat ulang, fallback plain SEMENTARA (bukan permanen).", e2)
+            // Hapus plain prefs sisa migrasi lama — hindari window plaintext
+            try {
                 context.applicationContext.getSharedPreferences(name, Context.MODE_PRIVATE)
+                    .edit().clear().commit()
+            } catch (_: Exception) {}
+            return try {
+                val newPrefs = buildEncryptedPrefs(context, name)
+                SecureLog.w(TAG, "EncryptedPrefs '$name' berhasil di-rebuild. PIN perlu di-set ulang.")
+                newPrefs
+            } catch (e2: Exception) {
+                SecureLog.e(TAG, "Gagal total membuat ulang encrypted prefs '$name'.", e2)
+                throw IllegalStateException("Cannot create encrypted prefs '$name' after recovery", e2)
             }
         }
     }
