@@ -874,8 +874,8 @@ class FinancialTrackerViewModel(
             canvas.drawText("Perbandingan Pemasukan vs Pengeluaran:", 55f, y + 18f, paint)
 
             val totalFlow = totalIn + totalOut
-            val inRatio = if (totalFlow > 0) (totalIn / totalFlow).toFloat() else 0.5f
-            val outRatio = if (totalFlow > 0) (totalOut / totalFlow).toFloat() else 0.5f
+            val inRatio = if (totalFlow > 0) (totalIn.toDouble() / totalFlow).toFloat() else 0.5f
+            val outRatio = if (totalFlow > 0) (totalOut.toDouble() / totalFlow).toFloat() else 0.5f
 
             val barY = y + 25f
             paint.color = android.graphics.Color.parseColor("#10B981") // Income
@@ -999,7 +999,7 @@ class FinancialTrackerViewModel(
                 // Legend
                 var legendY = y + 34f
                 topSlices.forEachIndexed { sIdx, slice ->
-                    val ratio = slice.second / totalExpense
+                    val ratio = slice.second.toDouble() / totalExpense
                     val colorHex = if (slice.first == "Lainnya") "#64748B" else sliceColors[sIdx % sliceColors.size]
 
                     paint.color = android.graphics.Color.parseColor(colorHex)

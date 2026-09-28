@@ -142,10 +142,11 @@ object BackupHelper {
         val backupDir = getBackupDirectory(context)
         return backupDir.listFiles { file -> 
             file.name.endsWith(".db") && (
-                file.name.startsWith("auto_backup_") || 
+                file.name.startsWith("auto_backup_") ||
                 file.name.startsWith("manual_backup_") ||
                 file.name.startsWith("auto_DataNanoMoney_") ||
-                file.name.startsWith("manual_DataNanoMoney_")
+                file.name.startsWith("manual_DataNanoMoney_") ||
+                file.name.startsWith("prerestore_DataNanoMoney_")
             )
         }?.sortedByDescending { it.lastModified() }?.toList() ?: emptyList()
     }
@@ -213,40 +214,33 @@ object BackupHelper {
 
             net.sqlcipher.database.SQLiteDatabase.loadLibs(context)
             val passphraseBytes = DatabaseKeyManager.getOrCreatePassphrase(context)
+            var restoredVersion = 0
             var isValid = false
 
+            // Buka langsung lewat SQLCipher, bukan lewat SupportSQLiteOpenHelper.
+            // Helper memaksa cocokkan user_version dengan versi Callback, sehingga
+            // backup versi 5 selalu ditolak oleh Callback(1) padahal file-nya sehat.
             try {
+                val probe = net.sqlcipher.database.SQLiteDatabase.openDatabase(
+                    tempDbFile.absolutePath,
+                    passphraseBytes,
+                    null,
+                    net.sqlcipher.database.SQLiteDatabase.OPEN_READWRITE,
+                    null,
+                    null
+                )
                 try {
-                    val factory = net.sqlcipher.database.SupportFactory(passphraseBytes)
-                    val configuration = androidx.sqlite.db.SupportSQLiteOpenHelper.Configuration.builder(context)
-                        .name(tempDbFile.absolutePath)
-                        .callback(object : androidx.sqlite.db.SupportSQLiteOpenHelper.Callback(1) {
-                            override fun onCreate(db: androidx.sqlite.db.SupportSQLiteDatabase) {}
-                            override fun onUpgrade(db: androidx.sqlite.db.SupportSQLiteDatabase, oldVersion: Int, newVersion: Int) {}
-                        })
-                        .build()
-                    val helper = factory.create(configuration)
-                    val db = helper.readableDatabase
-                    db.close()
-                    isValid = true
-                } catch (e: Exception) {
-                    try {
-                        val factory = androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory()
-                        val configuration = androidx.sqlite.db.SupportSQLiteOpenHelper.Configuration.builder(context)
-                            .name(tempDbFile.absolutePath)
-                            .callback(object : androidx.sqlite.db.SupportSQLiteOpenHelper.Callback(1) {
-                                override fun onCreate(db: androidx.sqlite.db.SupportSQLiteDatabase) {}
-                                override fun onUpgrade(db: androidx.sqlite.db.SupportSQLiteDatabase, oldVersion: Int, newVersion: Int) {}
-                            })
-                            .build()
-                        val helper = factory.create(configuration)
-                        val db = helper.readableDatabase
-                        db.close()
-                        isValid = true
-                    } catch (e2: Exception) {
-                        SecureLog.e("BackupHelper", "Database validasi gagal: ${e2.message}", e2)
+                    restoredVersion = probe.version
+                    // Pastikan tabel benar-benar ada & bisa dibaca, bukan sekadar file valid.
+                    probe.rawQuery("SELECT COUNT(*) FROM financial_records", null).use { c ->
+                        if (c.moveToFirst()) c.getInt(0)
                     }
+                    isValid = true
+                } finally {
+                    probe.close()
                 }
+            } catch (e: Exception) {
+                SecureLog.e("BackupHelper", "Database validasi gagal: ${e.message}", e)
             } finally {
                 java.util.Arrays.fill(passphraseBytes, 0.toByte())
             }
@@ -255,7 +249,7 @@ object BackupHelper {
                 if (tempDbFile.exists()) {
                     tempDbFile.delete()
                 }
-                throw IllegalStateException("Format database rusak atau kata sandi enkripsi salah")
+                throw IllegalStateException("Format database rusak atau kata sandi enkripsi salah (v$restoredVersion)")
             }
 
             AppDatabase.resetDatabaseInstance()
@@ -267,6 +261,17 @@ object BackupHelper {
             if (shmFile.exists()) shmFile.delete()
 
             if (dbFile.exists()) {
+                // Jaring pengaman: simpan DB lama sebelum ditimpa, supaya data asli
+                // masih bisa dipulihkan kalau ternyata hasil restore tidak bisa dibuka.
+                try {
+                    val safetyDir = getBackupDirectory(context)
+                    val stamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
+                    val safety = File(safetyDir, "prerestore_DataNanoMoney_$stamp.db")
+                    dbFile.inputStream().use { input -> safety.outputStream().use { output -> input.copyTo(output) } }
+                    SecureLog.w("BackupHelper", "DB lama disimpan sebelum restore: ${safety.name}")
+                } catch (e: Exception) {
+                    SecureLog.e("BackupHelper", "Gagal menyimpan salinan pengaman sebelum restore", e)
+                }
                 dbFile.delete()
             }
             dbFile.parentFile?.mkdirs()

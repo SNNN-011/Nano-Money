@@ -14,6 +14,9 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -178,18 +181,32 @@ fun FinancialTrackerScreen(
     }
 
     var monthsToExport by remember { mutableStateOf<List<java.time.YearMonth>>(emptyList()) }
+    val exportScope = rememberCoroutineScope()
 
     val exportPdfLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("application/pdf")
     ) { uri ->
         if (uri != null) {
-            try {
-                context.contentResolver.openOutputStream(uri)?.use { outputStream ->
-                    viewModel.generatePdfReport(context, outputStream, monthsToExport)
+            val monthsSnapshot = monthsToExport
+            exportScope.launch {
+                try {
+                    // openOutputStream bisa null untuk sebagian provider — jangan
+                    // sampai tetap menampilkan toast sukses padahal tidak ada file.
+                    val outputStream: java.io.OutputStream? = withContext(Dispatchers.IO) {
+                        context.contentResolver.openOutputStream(uri)
+                    }
+                    if (outputStream == null) {
+                        Toast.makeText(context, "Gagal membuat PDF: lokasi penyimpanan tidak dapat dibuka.", Toast.LENGTH_LONG).show()
+                        return@launch
+                    }
+                    // Gambar PDF bisa berat (canvas + banyak halaman) -> jangan di main thread
+                    withContext(Dispatchers.IO) {
+                        outputStream.use { stream -> viewModel.generatePdfReport(context, stream, monthsSnapshot) }
+                    }
+                    Toast.makeText(context, "Laporan PDF berhasil disimpan!", Toast.LENGTH_SHORT).show()
+                } catch (e: Exception) {
+                    Toast.makeText(context, "Gagal membuat PDF: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
                 }
-                Toast.makeText(context, "Laporan PDF berhasil disimpan!", Toast.LENGTH_SHORT).show()
-            } catch (e: Exception) {
-                Toast.makeText(context, "Gagal membuat PDF: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
             }
         }
     }

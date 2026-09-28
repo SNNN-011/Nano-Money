@@ -37,6 +37,7 @@ import androidx.compose.material.icons.filled.LockReset
 import androidx.compose.animation.AnimatedVisibility
 import java.io.File
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -496,11 +497,17 @@ fun EksporImporTabContent(
                                             val backupToRestore = selectedBackupToRestore
                                             selectedBackupToRestore = null
                                             if (backupToRestore != null) {
-                                                val success = BackupHelper.restoreBackup(context, backupToRestore)
-                                                if (success) {
-                                                    Toast.makeText(context, "Database berhasil dipulihkan!", Toast.LENGTH_LONG).show()
-                                                } else {
-                                                    Toast.makeText(context, "Gagal memulihkan database", Toast.LENGTH_LONG).show()
+                                                // Restore memblokir I/O + load libsqlcipher + killProcess,
+                                                // harus jalan di luar main thread agar tidak ANR.
+                                                coroutineScope.launch {
+                                                    val success = withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                                        BackupHelper.restoreBackup(context, backupToRestore)
+                                                    }
+                                                    if (success) {
+                                                        Toast.makeText(context, "Database berhasil dipulihkan!", Toast.LENGTH_LONG).show()
+                                                    } else {
+                                                        Toast.makeText(context, "Gagal memulihkan database", Toast.LENGTH_LONG).show()
+                                                    }
                                                 }
                                             }
                                         },
@@ -661,7 +668,9 @@ fun EksporImporTabContent(
                                                     
                                                     when (val downloadRes = GoogleDriveHelper.downloadBackupFromDrive(context, driveFile.id, localTempFile)) {
                                                         is GoogleDriveHelper.DriveResult.Success -> {
-                                                            val successRestore = BackupHelper.restoreBackup(context, localTempFile)
+                                                            val successRestore = withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                                                BackupHelper.restoreBackup(context, localTempFile)
+                                                            }
                                                             localTempFile.delete()
                                                             if (successRestore) {
                                                                 Toast.makeText(context, "Database berhasil dipulihkan dari Cloud!", Toast.LENGTH_LONG).show()
