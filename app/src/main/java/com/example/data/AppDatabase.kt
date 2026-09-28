@@ -131,7 +131,9 @@ abstract class AppDatabase : RoomDatabase() {
                 )
                 .openHelperFactory(factory)
                 .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
-                .fallbackToDestructiveMigration()
+                // Sengaja TIDAK memakai fallbackToDestructiveMigration(): kalau ada
+                // versi DB tanpa migrasi, aplikasi harus error dengan jelas, bukan
+                // diam-diam menghapus seluruh data keuangan pengguna.
                 .build()
                 INSTANCE = instance
                 instance
