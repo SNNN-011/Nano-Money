@@ -86,11 +86,25 @@ object BackupHelper {
                 )
             }
 
-            // 4. Force WAL checkpoint to dump current journals into .db file safely
+            // 4. Buat salinan konsisten dengan VACUUM INTO.
+            // Database memakai journal WAL, jadi transaksi terbaru bisa masih ada di
+            // file -wal dan TIDAK ikut kalau file .db disalin apa adanya.
+            // PRAGMA wal_checkpoint tidak cukup: ia gagal diam-diam kalau ada
+            // pembaca aktif, sehingga backup terlihat benar padahal kurang data.
+            // VACUUM INTO menulis snapshot lengkap tanpa harus menutup database.
+            val snapshotFile = File(context.cacheDir, "backup_snapshot.db")
+            if (snapshotFile.exists()) snapshotFile.delete()
             try {
-                db.openHelper.writableDatabase.execSQL("PRAGMA wal_checkpoint(FULL)")
+                val escaped = snapshotFile.absolutePath.replace("'", "''")
+                db.openHelper.writableDatabase.execSQL("VACUUM INTO '$escaped'")
             } catch (e: Exception) {
-                SecureLog.w("BackupHelper", "Failed on PRAGMA wal_checkpoint, continuing backup: ${e.message}")
+                SecureLog.e("BackupHelper", "VACUUM INTO gagal, backup dibatalkan agar tidak kehilangan data", e)
+                TelemetryHelper.trackBackupAction("backup", false, "VACUUM INTO failed: ${e.message}")
+                return@withContext BackupResult.Error("Gagal menyiapkan database untuk dicadangkan: ${e.localizedMessage}")
+            }
+            if (!snapshotFile.exists() || snapshotFile.length() == 0L) {
+                SecureLog.e("BackupHelper", "Snapshot hasil VACUUM INTO kosong")
+                return@withContext BackupResult.Error("Gagal menyiapkan database untuk dicadangkan: snapshot kosong.")
             }
 
             val prefix = if (isAuto) "auto_DataNanoMoney_" else "manual_DataNanoMoney_"
@@ -99,9 +113,9 @@ object BackupHelper {
 
             // Pack both database file and shared preferences XMLs into a single ZIP-formatted archive
             ZipOutputStream(backupFile.outputStream()).use { zos ->
-                // A. Add database file entry
+                // A. Add the consistent snapshot (VACUUM INTO), not the live .db file
                 zos.putNextEntry(ZipEntry("database/financial_tracker_database"))
-                dbFile.inputStream().use { input ->
+                snapshotFile.inputStream().use { input ->
                     input.copyTo(zos)
                 }
                 zos.closeEntry()
@@ -125,6 +139,7 @@ object BackupHelper {
             }
 
             cleanOldBackups(context)
+            if (snapshotFile.exists()) snapshotFile.delete()
 
             SecureLog.d("BackupHelper", "Settings and database successfully backed up to ${backupFile.absolutePath}")
             TelemetryHelper.trackBackupAction("backup", true)
@@ -257,9 +272,10 @@ object BackupHelper {
             val dbFile = context.getDatabasePath("financial_tracker_database")
             val walFile = File(dbFile.path + "-wal")
             val shmFile = File(dbFile.path + "-shm")
-            if (walFile.exists()) walFile.delete()
-            if (shmFile.exists()) shmFile.delete()
 
+            // -wal/-shm milik database LAMA. Hapus setelah file utama diganti,
+            // kalau tidak SQLite akan memutar ulang log transaksi lama ke file
+            // hasil restore sehingga data yang dikembalikan berubah lagi.
             if (dbFile.exists()) {
                 // Jaring pengaman: simpan DB lama sebelum ditimpa, supaya data asli
                 // masih bisa dipulihkan kalau ternyata hasil restore tidak bisa dibuka.
@@ -284,6 +300,8 @@ object BackupHelper {
                 }
                 tempDbFile.delete()
             }
+            if (walFile.exists()) walFile.delete()
+            if (shmFile.exists()) shmFile.delete()
 
             // Whitelist: only restore known app settings prefs, never security-critical ones
             val allowedPrefsFiles = setOf(
