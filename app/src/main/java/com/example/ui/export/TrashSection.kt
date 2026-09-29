@@ -22,8 +22,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import com.example.data.FinancialRecord
 import com.example.ui.config.FormatUtils
 import com.example.ui.theme.*
@@ -45,6 +47,7 @@ fun TrashSection(
 ) {
     val context = LocalContext.current
     var showEmptyConfirm by remember { mutableStateOf(false) }
+    var showRestoreAllConfirm by remember { mutableStateOf(false) }
 
     Card(
         modifier = modifier
@@ -141,30 +144,64 @@ fun TrashSection(
                     }
                 }
             } else {
+                // Dua tombol ini selalu bertumpuk. PremiumButton memakai maxLines = 1
+                // tanpa overflow, jadi teks panjang seperti "PULIHKAN SEMUA" terpotong
+                // di layar sempit. OutlinedButton membolehkan teks wrap ke dua baris.
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    PremiumButton(
-                        text = "PULIHKAN SEMUA",
-                        onClick = onRestoreAll,
-                        isActive = true,
-                        icon = Icons.Default.Restore,
-                        fillMaxWidth = false,
-                        horizontalPadding = 12.dp,
-                        verticalPadding = 8.dp,
-                        modifier = Modifier.weight(1f)
-                    )
-                    PremiumButton(
-                        text = "KOSONGKAN",
+                    OutlinedButton(
+                        onClick = { showRestoreAllConfirm = true },
+                        modifier = Modifier
+                            .weight(1f)
+                            .heightIn(min = 44.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        border = BorderStroke(1.dp, SteelBlue.copy(alpha = 0.7f)),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = SteelBlue),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Restore,
+                            contentDescription = null,
+                            modifier = Modifier.size(15.dp)
+                        )
+                        Spacer(modifier = Modifier.width(5.dp))
+                        Text(
+                            text = "Pulihkan Semua",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            lineHeight = 13.sp,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+
+                    OutlinedButton(
                         onClick = { showEmptyConfirm = true },
-                        isActive = false,
-                        icon = Icons.Default.DeleteForever,
-                        fillMaxWidth = false,
-                        horizontalPadding = 12.dp,
-                        verticalPadding = 8.dp,
-                        modifier = Modifier.weight(1f)
-                    )
+                        modifier = Modifier
+                            .weight(1f)
+                            .heightIn(min = 44.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        border = BorderStroke(1.dp, Color.Red.copy(alpha = 0.5f)),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Red.copy(alpha = 0.85f)),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.DeleteForever,
+                            contentDescription = null,
+                            modifier = Modifier.size(15.dp)
+                        )
+                        Spacer(modifier = Modifier.width(5.dp))
+                        Text(
+                            text = "Kosongkan",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            lineHeight = 13.sp,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
                 }
 
                 HorizontalDivider(color = GhostWhite.copy(alpha = 0.08f))
@@ -186,36 +223,141 @@ fun TrashSection(
         }
     }
 
-    if (showEmptyConfirm) {
-        AlertDialog(
-            onDismissRequest = { showEmptyConfirm = false },
-            containerColor = MidnightAbyss,
-            title = {
-                Text(text = "Kosongkan Sampah?", color = GhostWhite, fontWeight = FontWeight.Bold)
-            },
-            text = {
-                Text(
-                    text = "${deletedRecords.size} transaksi akan dihapus permanen dan tidak bisa dipulihkan lagi. Tindakan ini tidak bisa dibatalkan.",
-                    color = GhostWhite.copy(alpha = 0.8f)
-                )
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        showEmptyConfirm = false
-                        onEmptyTrash()
-                        Toast.makeText(context, "Sampah dikosongkan", Toast.LENGTH_SHORT).show()
+    if (showRestoreAllConfirm) {
+        // Gaya dialog mengikuti dialog konfirmasi lain di tab ini (MidnightAbyss +
+        // TranslucentGlass + border gradient + PremiumButton).
+        Dialog(onDismissRequest = { showRestoreAllConfirm = false }) {
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(containerColor = MidnightAbyss),
+                border = BorderStroke(
+                    width = 1.dp,
+                    brush = Brush.verticalGradient(
+                        colors = listOf(
+                            GhostWhite.copy(alpha = 0.2f),
+                            GhostWhite.copy(alpha = 0.02f)
+                        )
+                    )
+                ),
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+            ) {
+                Box(modifier = Modifier.background(TranslucentGlass)) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(24.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        Text(
+                            text = "Pulihkan Semua Transaksi?",
+                            color = GhostWhite,
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "${deletedRecords.size} transaksi akan dikembalikan ke daftar utama. Transaksi ini akan ikut tersinkron ke cloud.",
+                            color = GhostWhite.copy(alpha = 0.8f),
+                            style = MaterialTheme.typography.bodyMedium,
+                            lineHeight = 20.sp
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            PremiumButton(
+                                text = "Batal",
+                                onClick = { showRestoreAllConfirm = false },
+                                isActive = false,
+                                modifier = Modifier.weight(1f),
+                                testTag = "cancel_restore_all_button"
+                            )
+                            PremiumButton(
+                                text = "Pulihkan",
+                                onClick = {
+                                    showRestoreAllConfirm = false
+                                    onRestoreAll()
+                                },
+                                isActive = true,
+                                modifier = Modifier.weight(1.2f),
+                                testTag = "confirm_restore_all_button"
+                            )
+                        }
                     }
-                ) {
-                    Text(text = "Hapus Permanen", color = Color.Red, fontWeight = FontWeight.Bold)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showEmptyConfirm = false }) {
-                    Text(text = "Batal", color = GhostWhite.copy(alpha = 0.7f))
                 }
             }
-        )
+        }
+    }
+
+    if (showEmptyConfirm) {
+        Dialog(onDismissRequest = { showEmptyConfirm = false }) {
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(containerColor = MidnightAbyss),
+                border = BorderStroke(
+                    width = 1.dp,
+                    brush = Brush.verticalGradient(
+                        colors = listOf(
+                            GhostWhite.copy(alpha = 0.2f),
+                            GhostWhite.copy(alpha = 0.02f)
+                        )
+                    )
+                ),
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+            ) {
+                Box(modifier = Modifier.background(TranslucentGlass)) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(24.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        Text(
+                            text = "Kosongkan Sampah?",
+                            color = GhostWhite,
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "${deletedRecords.size} transaksi akan dihapus permanen dan tidak bisa dipulihkan lagi. Tindakan ini tidak bisa dibatalkan.",
+                            color = GhostWhite.copy(alpha = 0.8f),
+                            style = MaterialTheme.typography.bodyMedium,
+                            lineHeight = 20.sp
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            PremiumButton(
+                                text = "Batal",
+                                onClick = { showEmptyConfirm = false },
+                                isActive = false,
+                                modifier = Modifier.weight(1f),
+                                testTag = "cancel_empty_trash_button"
+                            )
+                            PremiumButton(
+                                text = "Hapus",
+                                onClick = {
+                                    showEmptyConfirm = false
+                                    onEmptyTrash()
+                                    Toast.makeText(context, "Sampah dikosongkan", Toast.LENGTH_SHORT).show()
+                                },
+                                isActive = false,
+                                gradientColors = listOf(
+                                    Color.Red.copy(alpha = 0.85f),
+                                    Color.Red.copy(alpha = 0.5f)
+                                ),
+                                modifier = Modifier.weight(1.2f),
+                                testTag = "confirm_empty_trash_button"
+                            )
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -264,19 +406,24 @@ private fun TrashItem(
 
         TextButton(
             onClick = onRestore,
+            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
             modifier = Modifier.testTag("restore_record_button_${record.id}")
         ) {
             Icon(
                 imageVector = Icons.Default.Restore,
-                contentDescription = "Pulihkan",
+                contentDescription = null,
                 tint = SteelBlue,
-                modifier = Modifier.size(16.dp)
+                modifier = Modifier.size(15.dp)
             )
             Spacer(modifier = Modifier.width(4.dp))
             Text(
-                text = "PULIHKAN",
-                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, fontSize = 10.sp),
-                color = SteelBlue
+                text = "Pulihkan",
+                style = MaterialTheme.typography.labelSmall.copy(
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 10.sp
+                ),
+                color = SteelBlue,
+                maxLines = 1
             )
         }
     }
