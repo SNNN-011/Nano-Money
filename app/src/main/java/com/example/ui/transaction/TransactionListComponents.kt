@@ -90,7 +90,7 @@ fun FilterAndSortHeader(
                 ) {
                     Icon(
                         imageVector = Icons.Outlined.DeleteOutline,
-                        contentDescription = "Buka Sampah",
+                        contentDescription = "Hapus Semua Transaksi",
                         modifier = Modifier.size(17.dp)
                     )
                 }

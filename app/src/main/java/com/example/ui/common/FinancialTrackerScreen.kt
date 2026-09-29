@@ -134,6 +134,9 @@ fun FinancialTrackerScreen(
     var showCategoryDialog by remember { mutableStateOf(false) }
     var recordToDelete by remember { mutableStateOf<FinancialRecord?>(null) }
 
+    // Dialog Hapus Semua Transaksi, dipicu dari ikon sampah di tab Beranda.
+    var showDeleteAllDialog by remember { mutableStateOf(false) }
+
     // Handle alert states
     var alertTitle by remember { mutableStateOf<String?>(null) }
     var alertMessage by remember { mutableStateOf<String?>(null) }
@@ -274,6 +277,14 @@ fun FinancialTrackerScreen(
                 recordToDelete = null
             },
             onDismiss = { recordToDelete = null }
+        )
+    }
+
+    if (showDeleteAllDialog) {
+        com.example.ui.export.DeleteAllRecordsDialog(
+            activeCount = viewModel.allRecords.collectAsState().value.size,
+            onConfirm = { viewModel.deleteAllRecords() },
+            onDismiss = { showDeleteAllDialog = false }
         )
     }
 
@@ -554,12 +565,7 @@ fun FinancialTrackerScreen(
                             onDeleteRecord = { record ->
                                 recordToDelete = record
                             },
-                            onOpenTrash = {
-                                navController.navigate(TrackerTab.EKSPOR_IMPOR.name) {
-                                    popUpTo(TrackerTab.BERANDA.name) { inclusive = false }
-                                    launchSingleTop = true
-                                }
-                            },
+                            onOpenTrash = { showDeleteAllDialog = true },
                             onSeedSampleData = { viewModel.seedSampleData() },
                             recurringTransactions = recurringTransactions,
                             incomeCategories = incomeCategoriesState,
