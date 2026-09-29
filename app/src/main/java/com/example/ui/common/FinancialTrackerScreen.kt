@@ -565,7 +565,7 @@ fun FinancialTrackerScreen(
                             onDeleteRecord = { record ->
                                 recordToDelete = record
                             },
-                            onOpenTrash = { showDeleteAllDialog = true },
+                            onDeleteAllClick = { showDeleteAllDialog = true },
                             onSeedSampleData = { viewModel.seedSampleData() },
                             recurringTransactions = recurringTransactions,
                             incomeCategories = incomeCategoriesState,

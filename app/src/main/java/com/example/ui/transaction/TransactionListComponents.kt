@@ -34,8 +34,7 @@ fun FilterAndSortHeader(
     currentFilter: String,
     isNewest: Boolean,
     onFilterSelected: (String) -> Unit,
-    onSortToggled: () -> Unit,
-    onOpenTrash: (() -> Unit)? = null
+    onSortToggled: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -44,8 +43,6 @@ fun FilterAndSortHeader(
     ) {
         Spacer(modifier = Modifier.height(Spacing.md))
 
-        // Ikon sampah: akses cepat ke Sampah di tab Simpan.
-        // Taruh di baris judul, sebelah kanan, supaya baris filter tetap penuh.
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -76,24 +73,6 @@ fun FilterAndSortHeader(
                     ),
                     color = GhostWhite
                 )
-            }
-
-            if (onOpenTrash != null) {
-                IconButton(
-                    onClick = { onOpenTrash() },
-                    modifier = Modifier
-                        .size(28.dp)
-                        .testTag("open_trash_button"),
-                    colors = IconButtonDefaults.iconButtonColors(
-                        contentColor = GhostWhite.copy(alpha = 0.45f)
-                    )
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.DeleteOutline,
-                        contentDescription = "Hapus Semua Transaksi",
-                        modifier = Modifier.size(17.dp)
-                    )
-                }
             }
         }
 
