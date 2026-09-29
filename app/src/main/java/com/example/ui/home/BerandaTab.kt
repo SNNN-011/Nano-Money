@@ -214,8 +214,10 @@ fun BerandaTabContent(
                             }
                         }
 
-                        // Tombol hapus semua transaksi. Merah karena aksi berbahaya;
-                        // detail konfirmasinya ada di DeleteAllRecordsDialog.
+                        // Tombol hapus semua transaksi. Ikon saja supaya tidak
+                        // memakan lebar baris search; areanya tetap 48.dp agar
+                        // mudah ditekan. Merah karena aksi berbahaya, detail
+                        // konfirmasinya ada di DeleteAllRecordsDialog.
                         Box(
                             modifier = Modifier
                                 .fillMaxHeight()
@@ -227,26 +229,16 @@ fun BerandaTabContent(
                                 .clip(RoundedCornerShape(12.dp))
                                 .background(NeonRed.copy(alpha = 0.10f))
                                 .clickable { onDeleteAllClick() }
-                                .padding(horizontal = 14.dp)
+                                .width(48.dp)
                                 .testTag("delete_all_button"),
                             contentAlignment = Alignment.Center
                         ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Outlined.DeleteOutline,
-                                    contentDescription = "Hapus Semua Transaksi",
-                                    tint = NeonRed.copy(alpha = 0.85f),
-                                    modifier = Modifier.size(17.dp)
-                                )
-                                Text(
-                                    text = "Hapus Semua",
-                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                                    color = NeonRed.copy(alpha = 0.9f)
-                                )
-                            }
+                            Icon(
+                                imageVector = Icons.Outlined.DeleteOutline,
+                                contentDescription = "Hapus Semua Transaksi",
+                                tint = NeonRed.copy(alpha = 0.85f),
+                                modifier = Modifier.size(19.dp)
+                            )
                         }
                     }
 
@@ -379,8 +371,10 @@ fun BerandaTabContent(
                     }
                 }
 
-                // Tombol hapus semua transaksi. Merah karena aksi berbahaya;
-                // detail konfirmasinya ada di DeleteAllRecordsDialog.
+                // Tombol hapus semua transaksi. Ikon saja supaya tidak
+                // memakan lebar baris search; areanya tetap 48.dp agar
+                // mudah ditekan. Merah karena aksi berbahaya, detail
+                // konfirmasinya ada di DeleteAllRecordsDialog.
                 Box(
                     modifier = Modifier
                         .fillMaxHeight()
@@ -392,26 +386,16 @@ fun BerandaTabContent(
                         .clip(RoundedCornerShape(12.dp))
                         .background(NeonRed.copy(alpha = 0.10f))
                         .clickable { onDeleteAllClick() }
-                        .padding(horizontal = 14.dp)
+                        .width(48.dp)
                         .testTag("delete_all_button"),
                     contentAlignment = Alignment.Center
                 ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.DeleteOutline,
-                            contentDescription = "Hapus Semua Transaksi",
-                            tint = NeonRed.copy(alpha = 0.85f),
-                            modifier = Modifier.size(17.dp)
-                        )
-                        Text(
-                            text = "Hapus Semua",
-                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                            color = NeonRed.copy(alpha = 0.9f)
-                        )
-                    }
+                    Icon(
+                        imageVector = Icons.Outlined.DeleteOutline,
+                        contentDescription = "Hapus Semua Transaksi",
+                        tint = NeonRed.copy(alpha = 0.85f),
+                        modifier = Modifier.size(19.dp)
+                    )
                 }
             }
 

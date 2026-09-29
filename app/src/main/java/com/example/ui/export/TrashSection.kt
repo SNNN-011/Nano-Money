@@ -250,17 +250,14 @@ fun AppConfirmDialog(
 @Composable
 fun TrashSection(
     deletedRecords: List<FinancialRecord>,
-    activeCount: Int = 0,
     onRestore: (FinancialRecord) -> Unit,
     onRestoreAll: () -> Unit,
     onEmptyTrash: () -> Unit,
-    onDeleteAll: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
     var showEmptyConfirm by remember { mutableStateOf(false) }
     var showRestoreAllConfirm by remember { mutableStateOf(false) }
-    var showDeleteAllConfirm by remember { mutableStateOf(false) }
     
 
     Card(
@@ -434,74 +431,7 @@ fun TrashSection(
                     }
                 }
             }
-
-            // Zona bahaya: hapus seluruh transaksi aktif. Bukan bagian dari Sampah,
-            // tapi diletakkan di card yang sama karena ini soal keamanan data.
-            if (activeCount > 0) {
-                HorizontalDivider(color = GhostWhite.copy(alpha = 0.08f))
-
-                OutlinedButton(
-                    onClick = { showDeleteAllConfirm = true },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = 44.dp)
-                        .testTag("delete_all_records_button"),
-                    shape = RoundedCornerShape(12.dp),
-                    border = BorderStroke(1.dp, Color.Red.copy(alpha = 0.45f)),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Red.copy(alpha = 0.8f)),
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.DeleteForever,
-                        contentDescription = null,
-                        modifier = Modifier.size(15.dp)
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        text = "Hapus Semua Transaksi ($activeCount)",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        lineHeight = 13.sp,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-
-                Text(
-                    text = "Semua transaksi akan dipindahkan ke Sampah dan masih bisa dipulihkan.",
-                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp, lineHeight = 14.sp),
-                    color = GhostWhite.copy(alpha = 0.4f)
-                )
-            }
         }
-    }
-
-    if (showRestoreAllConfirm) {
-        AppConfirmDialog(
-            title = "Pulihkan Semua Transaksi?",
-            message = "${
-                deletedRecords.size
-            } transaksi akan dikembalikan ke daftar utama. Transaksi ini akan ikut tersinkron ke cloud.",
-            confirmText = "Pulihkan",
-            onConfirm = {
-                showRestoreAllConfirm = false
-                onRestoreAll()
-            },
-            onDismiss = { showRestoreAllConfirm = false },
-            confirmTestTag = "confirm_restore_all_button",
-            dismissTestTag = "cancel_restore_all_button"
-        )
-    }
-
-    if (showDeleteAllConfirm) {
-        DeleteAllRecordsDialog(
-            activeCount = activeCount,
-            onConfirm = {
-                onDeleteAll()
-                Toast.makeText(context, "Semua transaksi dipindahkan ke Sampah", Toast.LENGTH_SHORT).show()
-            },
-            onDismiss = { showDeleteAllConfirm = false }
-        )
     }
 
     if (showEmptyConfirm) {

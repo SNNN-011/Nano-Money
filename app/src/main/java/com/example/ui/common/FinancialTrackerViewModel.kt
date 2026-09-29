@@ -575,7 +575,18 @@ class FinancialTrackerViewModel(
     fun emptyTrash() {
         viewModelScope.launch {
             try {
+                // ID harus dikumpulkan sebelum baris dihapus, karena setelah purge
+                // tidak ada lagi yang bisa ditanyakan ke database.
+                val trashed = repository.getDeletedRecords().first()
+                if (trashed.isEmpty()) {
+                    uiEvent.emit(UiEvent.ShowToast("Sampah sudah kosong."))
+                    return@launch
+                }
                 repository.emptyTrash()
+                // Cloud harus ikut dihapus permanen. Kalau tidak, dokumennya
+                // masih tertinggal di Firestore dan sync saat aplikasi dibuka
+                // menariknya kembali, sehingga Sampah terisi lagi.
+                com.example.util.FirebaseSyncHelper.purgeRecordsFromFirestore(trashed.map { it.id })
                 uiEvent.emit(UiEvent.ShowToast("Sampah dikosongkan."))
             } catch (e: Exception) {
                 uiEvent.emit(UiEvent.ShowAlert("Gagal Mengosongkan", "Gagal mengosongkan sampah: ${e.localizedMessage ?: "kesalahan database"}"))

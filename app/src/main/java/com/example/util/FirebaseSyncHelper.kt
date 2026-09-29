@@ -103,6 +103,33 @@ object FirebaseSyncHelper {
         }
     }
 
+    /**
+     * Hapus permanen dari Firestore, bukan hanya menandai isDeleted.
+     *
+     * Dipakai saat Sampah dikosongkan. Kalau hanya isDeleted yang diubah,
+     * dokumennya masih tertinggal di cloud dan sync saat aplikasi dibuka
+     * akan menariknya kembali, sehingga Sampah terisi lagi.
+     */
+    suspend fun purgeRecordsFromFirestore(recordIds: List<Int>) {
+        if (recordIds.isEmpty()) return
+        val uid = getCurrentUid() ?: return
+        val db = FirebaseFirestore.getInstance()
+
+        suspendCancellableCoroutine<Unit> { continuation ->
+            val batch = db.batch()
+            recordIds.forEach { id ->
+                batch.delete(
+                    db.collection("users").document(uid)
+                        .collection("financial_records")
+                        .document(id.toString())
+                )
+            }
+            batch.commit().addOnCompleteListener {
+                continuation.resume(Unit)
+            }
+        }
+    }
+
     /** Upload category settings to Firestore immediately when user adds/deletes a category */
     suspend fun uploadCategoriesToFirestore(context: Context) {
         val uid = getCurrentUid() ?: return

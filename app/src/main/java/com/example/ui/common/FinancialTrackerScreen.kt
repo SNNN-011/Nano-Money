@@ -689,11 +689,9 @@ fun FinancialTrackerScreen(
                                 }
                             },
                             deletedRecords = viewModel.deletedRecords.collectAsState().value,
-                            activeCount = viewModel.allRecords.collectAsState().value.size,
                             onRestoreRecord = { viewModel.restoreFromTrash(it) },
                             onRestoreAllRecords = { viewModel.restoreAllFromTrash() },
-                            onEmptyTrash = { viewModel.emptyTrash() },
-                            onDeleteAllRecords = { viewModel.deleteAllRecords() }
+                            onEmptyTrash = { viewModel.emptyTrash() }
                         )
                     }
                 }
