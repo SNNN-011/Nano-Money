@@ -182,6 +182,11 @@ fun FinancialTrackerScreen(
 
     LaunchedEffect(currentRoute) {
         com.example.util.TelemetryHelper.trackScreenView(currentRoute)
+        // Beranda menampilkan filter, pencarian, dan urutan. Reset setiap kali
+        // tab lain dibuka supaya kembali ke Beranda selalu dalam kondisi default.
+        if (currentRoute != TrackerTab.BERANDA.name) {
+            viewModel.resetFilters()
+        }
     }
 
     var monthsToExport by remember { mutableStateOf<List<java.time.YearMonth>>(emptyList()) }

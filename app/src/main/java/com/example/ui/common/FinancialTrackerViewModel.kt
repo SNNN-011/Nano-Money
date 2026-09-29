@@ -48,6 +48,16 @@ class FinancialTrackerViewModel(
         _sortByNewest.value = !_sortByNewest.value
     }
 
+    /**
+     * Reset filter, pencarian, dan urutan. Dipanggil saat berpindah tab supaya
+     * Beranda tidak dibuka dengan tampilan sisa tab sebelumnya.
+     */
+    fun resetFilters() {
+        _filterType.value = "Semua"
+        _sortByNewest.value = true
+        _searchQuery.value = ""
+    }
+
     fun updateSearchQuery(query: String) {
         _searchQuery.value = query
     }
@@ -76,10 +86,14 @@ class FinancialTrackerViewModel(
             "Pengeluaran" -> searched.filter { it.type == "expense" }
             else -> searched
         }
+        // Tanggal dari date picker dinormalkan ke jam 12:00:00, jadi semua transaksi
+        // di hari yang sama punya timestamp identik. Tanpa pemutus seri, sortedBy
+        // hanya membalik urutan asli dan toggle Latest/Terlama kelihatan tidak
+        // mengubah apa pun. Tie-break lewat id membuat urutannya benar-benar berubah.
         if (isNewest) {
-            filtered.sortedByDescending { it.date }
+            filtered.sortedWith(compareByDescending<FinancialRecord> { it.date }.thenByDescending { it.id })
         } else {
-            filtered.sortedBy { it.date }
+            filtered.sortedWith(compareBy<FinancialRecord> { it.date }.thenBy { it.id })
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
