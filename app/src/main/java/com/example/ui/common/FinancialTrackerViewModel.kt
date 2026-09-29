@@ -30,36 +30,52 @@ class FinancialTrackerViewModel(
     private val repository: FinancialRecordRepository
 ) : AndroidViewModel(application) {
 
-    // Filter states
-    private val _filterType = MutableStateFlow("Semua") // "Semua", "Pendapatan", "Pengeluaran"
-    val filterType: StateFlow<String> = _filterType.asStateFlow()
+    // ---------------------------------------------------------------
+    // Filter. Satu objek FilterState adalah satu-satunya sumber
+    // kebenaran, supaya menambah dimensi filter di kemudian hari tidak
+    // membuat cabang kondisi baru di banyak tempat.
+    // ---------------------------------------------------------------
+    data class FilterState(
+        val type: String = "Semua",           // "Semua", "Pendapatan", "Pengeluaran"
+        val searchQuery: String = "",
+        val sortByNewest: Boolean = true
+    ) {
+        val isDefault: Boolean
+            get() = type == "Semua" && searchQuery.isEmpty() && sortByNewest
+    }
 
-    private val _sortByNewest = MutableStateFlow(true) // true = newest, false = oldest
-    val sortByNewest: StateFlow<Boolean> = _sortByNewest.asStateFlow()
+    private val _filterState = MutableStateFlow(FilterState())
+    val filterState: StateFlow<FilterState> = _filterState.asStateFlow()
 
-    private val _searchQuery = MutableStateFlow("")
-    val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
+    // Dibaca UI yang hanya butuh satu bagian saja.
+    val filterType: StateFlow<String> = _filterState
+        .map { it.type }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "Semua")
+    val sortByNewest: StateFlow<Boolean> = _filterState
+        .map { it.sortByNewest }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+    val searchQuery: StateFlow<String> = _filterState
+        .map { it.searchQuery }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "")
 
     fun updateFilterType(type: String) {
-        _filterType.value = type
+        _filterState.value = _filterState.value.copy(type = type)
     }
 
     fun toggleSortByNewest() {
-        _sortByNewest.value = !_sortByNewest.value
+        _filterState.value = _filterState.value.copy(sortByNewest = !_filterState.value.sortByNewest)
     }
 
     /**
-     * Reset filter, pencarian, dan urutan. Dipanggil saat berpindah tab supaya
-     * Beranda tidak dibuka dengan tampilan sisa tab sebelumnya.
+     * Reset semua filter. Dipanggil saat berpindah tab supaya Beranda tidak
+     * dibuka dengan tampilan sisa tab sebelumnya.
      */
     fun resetFilters() {
-        _filterType.value = "Semua"
-        _sortByNewest.value = true
-        _searchQuery.value = ""
+        _filterState.value = FilterState()
     }
 
     fun updateSearchQuery(query: String) {
-        _searchQuery.value = query
+        _filterState.value = _filterState.value.copy(searchQuery = query)
     }
 
     // Raw records from database
@@ -73,15 +89,15 @@ class FinancialTrackerViewModel(
 
     // Combined filtered & sorted records
     val filteredRecords: StateFlow<List<FinancialRecord>> = combine(
-        allRecords, filterType, sortByNewest, searchQuery
-    ) { records, filter, isNewest, query ->
-        val queryLower = query.trim().lowercase()
+        allRecords, _filterState
+    ) { records, f ->
+        val queryLower = f.searchQuery.trim().lowercase()
         val searched = if (queryLower.isEmpty()) records else records.filter {
             it.description.lowercase().contains(queryLower) ||
             it.category.lowercase().contains(queryLower) ||
             it.notes.lowercase().contains(queryLower)
         }
-        val filtered = when (filter) {
+        val byType = when (f.type) {
             "Pendapatan" -> searched.filter { it.type == "income" }
             "Pengeluaran" -> searched.filter { it.type == "expense" }
             else -> searched
@@ -90,10 +106,10 @@ class FinancialTrackerViewModel(
         // di hari yang sama punya timestamp identik. Tanpa pemutus seri, sortedBy
         // hanya membalik urutan asli dan toggle Latest/Terlama kelihatan tidak
         // mengubah apa pun. Tie-break lewat id membuat urutannya benar-benar berubah.
-        if (isNewest) {
-            filtered.sortedWith(compareByDescending<FinancialRecord> { it.date }.thenByDescending { it.id })
+        if (f.sortByNewest) {
+            byType.sortedWith(compareByDescending<FinancialRecord> { it.date }.thenByDescending { it.id })
         } else {
-            filtered.sortedWith(compareBy<FinancialRecord> { it.date }.thenBy { it.id })
+            byType.sortedWith(compareBy<FinancialRecord> { it.date }.thenBy { it.id })
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 

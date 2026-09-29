@@ -100,6 +100,7 @@ fun FinancialTrackerScreen(
     val filterType by viewModel.filterType.collectAsState()
     val sortByNewest by viewModel.sortByNewest.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
+    val filterState by viewModel.filterState.collectAsState()
 
     val recurringTransactions by viewModel.recurringTransactions.collectAsState()
 
@@ -563,6 +564,8 @@ fun FinancialTrackerScreen(
                             onSearchQueryChange = { viewModel.updateSearchQuery(it) },
                             onFilterSelected = { viewModel.updateFilterType(it) },
                             onSortToggled = { viewModel.toggleSortByNewest() },
+                            isFilterActive = !filterState.isDefault,
+                            onClearFilters = { viewModel.resetFilters() },
                             onEditRecord = { record ->
                                 viewModel.setEditingRecord(record)
                                 navController.navigate(TrackerTab.TRANSAKSI_BARU.name)

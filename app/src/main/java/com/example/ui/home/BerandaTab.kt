@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -35,6 +36,7 @@ import com.example.ui.transaction.TransactionListItem
 import com.example.ui.transaction.FilterAndSortHeader
 import com.example.ui.transaction.EmptyStatePlaceholder
 import com.example.ui.transaction.TransactionList
+import com.example.ui.transaction.TransactionEmptyState
 
 @Composable
 fun BerandaTabContent(
@@ -56,6 +58,8 @@ fun BerandaTabContent(
     onSearchQueryChange: (String) -> Unit,
     onFilterSelected: (String) -> Unit,
     onSortToggled: () -> Unit,
+    isFilterActive: Boolean = false,
+    onClearFilters: () -> Unit = {},
     onEditRecord: (FinancialRecord) -> Unit,
     onDeleteRecord: (FinancialRecord) -> Unit,
     onDeleteAllClick: () -> Unit = {},
@@ -257,18 +261,15 @@ fun BerandaTabContent(
 
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    if (filteredRecords.isEmpty()) {
-                        Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                            EmptyStatePlaceholder(onSeedData = onSeedSampleData)
-                        }
-                    } else {
-                        TransactionList(
-                            records = filteredRecords,
-                            onEdit = onEditRecord,
-                            onDelete = onDeleteRecord,
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
+                    TransactionList(
+                        records = filteredRecords,
+                        onEdit = onEditRecord,
+                        onDelete = onDeleteRecord,
+                        isFilterActive = isFilterActive,
+                        onClearFilters = onClearFilters,
+                        onSeedData = onSeedSampleData,
+                        modifier = Modifier.weight(1f)
+                    )
                 }
             }
         }
@@ -415,16 +416,23 @@ fun BerandaTabContent(
             }
 
             if (filteredRecords.isEmpty()) {
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    EmptyStatePlaceholder(onSeedData = onSeedSampleData)
+                Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    TransactionEmptyState(
+                        isFiltered = isFilterActive,
+                        onSeedData = onSeedSampleData,
+                        onClearFilters = onClearFilters
+                    )
                 }
             } else {
+                // State eksplisit + scrollToItem(0): tanpa ini, mengubah filter
+                // atau urutan membuat LazyColumn mempertahankan key yang terlihat
+                // dan daftar justru terlempar ke bawah.
+                val listState = rememberLazyListState()
+                LaunchedEffect(filteredRecords) {
+                    if (filteredRecords.isNotEmpty()) listState.scrollToItem(0)
+                }
                 LazyColumn(
+                    state = listState,
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxWidth(),

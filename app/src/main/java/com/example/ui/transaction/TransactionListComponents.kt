@@ -6,6 +6,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -16,6 +17,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -127,6 +129,69 @@ fun FilterAndSortHeader(
                 }
             }
         }
+
+
+    }
+}
+
+@Composable
+fun TransactionEmptyState(
+    isFiltered: Boolean,
+    onSeedData: () -> Unit = {},
+    onClearFilters: () -> Unit = {}
+) {
+    Box(
+        modifier = Modifier.fillMaxSize(),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.padding(32.dp)
+        ) {
+            Icon(
+                imageVector = if (isFiltered) Icons.Default.Search else Icons.Default.AddCircleOutline,
+                contentDescription = null,
+                tint = GhostWhite.copy(alpha = 0.3f),
+                modifier = Modifier.size(40.dp)
+            )
+            Spacer(modifier = Modifier.height(Spacing.md))
+            Text(
+                text = if (isFiltered) "Tidak ada yang cocok" else "Belum ada transaksi",
+                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                color = GhostWhite.copy(alpha = 0.7f)
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                text = if (isFiltered) {
+                    "Coba ganti atau kosongkan filter di atas."
+                } else {
+                    "Mulai catat pengeluaran pertamamu, atau isi dengan data contoh."
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = GhostWhite.copy(alpha = 0.35f)
+            )
+            if (isFiltered) {
+                Spacer(modifier = Modifier.height(Spacing.md))
+                PremiumButton(
+                    text = "Hapus Filter",
+                    onClick = onClearFilters,
+                    isActive = true,
+                    fillMaxWidth = false,
+                    horizontalPadding = 20.dp,
+                    testTag = "clear_filters_button"
+                )
+            } else {
+                Spacer(modifier = Modifier.height(Spacing.md))
+                PremiumButton(
+                    text = "Isi Data Contoh",
+                    onClick = onSeedData,
+                    isActive = true,
+                    fillMaxWidth = false,
+                    horizontalPadding = 20.dp,
+                    testTag = "seed_data_button"
+                )
+            }
+        }
     }
 }
 
@@ -135,17 +200,30 @@ fun TransactionList(
     records: List<FinancialRecord>,
     onEdit: (FinancialRecord) -> Unit,
     onDelete: (FinancialRecord) -> Unit,
+    isFilterActive: Boolean = false,
+    onClearFilters: () -> Unit = {},
+    onSeedData: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    // LazyColumn tanpa state eksplisit memakai rememberLazyListState internal.
+    // Saat daftar di-reorder, Compose mempertahankan key yang sedang terlihat agar
+    // tetap terlihat, sehingga memilih filter atau urutan lain melempar daftar
+    // ke bawah. Memakai state sendiri plus scrollToItem(0) setiap kali isi
+    // berubah membuat daftar selalu mulai dari atas.
+    val listState = rememberLazyListState()
+    LaunchedEffect(records) {
+        if (records.isNotEmpty()) listState.scrollToItem(0)
+    }
+
     if (records.isEmpty()) {
-        Box(
-            modifier = modifier.fillMaxSize(),
-            contentAlignment = Alignment.Center
-        ) {
-            EmptyStatePlaceholder()
-        }
+        TransactionEmptyState(
+            isFiltered = isFilterActive,
+            onSeedData = onSeedData,
+            onClearFilters = onClearFilters
+        )
     } else {
         LazyColumn(
+            state = listState,
             modifier = modifier.fillMaxSize(),
             verticalArrangement = Arrangement.spacedBy(0.dp)
         ) {
