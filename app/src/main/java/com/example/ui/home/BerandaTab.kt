@@ -377,6 +377,41 @@ fun BerandaTabContent(
                         )
                     }
                 }
+
+                // Tombol hapus semua transaksi. Merah karena aksi berbahaya;
+                // detail konfirmasinya ada di DeleteAllRecordsDialog.
+                Box(
+                    modifier = Modifier
+                        .fillMaxHeight()
+                        .border(
+                            width = 1.dp,
+                            color = NeonRed.copy(alpha = 0.45f),
+                            shape = RoundedCornerShape(12.dp)
+                        )
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(NeonRed.copy(alpha = 0.10f))
+                        .clickable { onDeleteAllClick() }
+                        .padding(horizontal = 14.dp)
+                        .testTag("delete_all_button"),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.DeleteOutline,
+                            contentDescription = "Hapus Semua Transaksi",
+                            tint = NeonRed.copy(alpha = 0.85f),
+                            modifier = Modifier.size(17.dp)
+                        )
+                        Text(
+                            text = "Hapus Semua",
+                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
+                            color = NeonRed.copy(alpha = 0.9f)
+                        )
+                    }
+                }
             }
 
             if (filteredRecords.isEmpty()) {
