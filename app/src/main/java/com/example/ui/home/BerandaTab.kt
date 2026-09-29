@@ -57,6 +57,7 @@ fun BerandaTabContent(
     onSortToggled: () -> Unit,
     onEditRecord: (FinancialRecord) -> Unit,
     onDeleteRecord: (FinancialRecord) -> Unit,
+    onOpenTrash: () -> Unit = {},
     onSeedSampleData: () -> Unit = {},
     recurringTransactions: List<RecurringTransaction> = emptyList(),
     incomeCategories: List<String> = emptyList(),
@@ -215,7 +216,8 @@ fun BerandaTabContent(
                         currentFilter = filterType,
                         isNewest = sortByNewest,
                         onFilterSelected = onFilterSelected,
-                        onSortToggled = onSortToggled
+                        onSortToggled = onSortToggled,
+                        onOpenTrash = onOpenTrash
                     )
 
                     Spacer(modifier = Modifier.height(8.dp))
@@ -264,7 +266,8 @@ fun BerandaTabContent(
                 currentFilter = filterType,
                 isNewest = sortByNewest,
                 onFilterSelected = onFilterSelected,
-                onSortToggled = onSortToggled
+                onSortToggled = onSortToggled,
+                onOpenTrash = onOpenTrash
             )
 
             Row(

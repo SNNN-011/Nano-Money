@@ -123,9 +123,11 @@ fun EksporImporTabContent(
     onExportCsvFile: (List<YearMonth>) -> Unit,
     onExportPdfFile: (List<YearMonth>) -> Unit,
     deletedRecords: List<FinancialRecord> = emptyList(),
+    activeCount: Int = 0,
     onRestoreRecord: (FinancialRecord) -> Unit = {},
     onRestoreAllRecords: () -> Unit = {},
     onEmptyTrash: () -> Unit = {},
+    onDeleteAllRecords: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -309,9 +311,11 @@ fun EksporImporTabContent(
             // Sampah: transaksi yang dihapus masih bisa dipulihkan.
             TrashSection(
                 deletedRecords = deletedRecords,
+                activeCount = activeCount,
                 onRestore = onRestoreRecord,
                 onRestoreAll = onRestoreAllRecords,
-                onEmptyTrash = onEmptyTrash
+                onEmptyTrash = onEmptyTrash,
+                onDeleteAll = onDeleteAllRecords
             )
 
             // DIALOGS & OVERLAYS

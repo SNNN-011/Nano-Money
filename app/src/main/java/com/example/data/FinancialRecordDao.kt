@@ -59,6 +59,10 @@ interface FinancialRecordDao {
     @Query("DELETE FROM financial_records")
     suspend fun deleteAllRecords()
 
+    // Hapus semua transaksi yang masih aktif (tidak termasuk isi Sampah).
+    @Query("UPDATE financial_records SET isDeleted = 1 WHERE isDeleted = 0")
+    suspend fun softDeleteAllActiveRecords()
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(records: List<FinancialRecord>)
 

@@ -52,6 +52,12 @@ class FinancialRecordRepository(private val dao: FinancialRecordDao) {
 
     suspend fun emptyTrash() = dao.purgeDeletedRecords()
 
+    /**
+     * Pindahkan semua transaksi aktif ke Sampah (bukan hapus permanen),
+     * supaya masih bisa dipulihkan. Isi Sampah tidak ikut terpengaruh.
+     */
+    suspend fun moveAllActiveToTrash() = dao.softDeleteAllActiveRecords()
+
     suspend fun replaceAll(records: List<FinancialRecord>) {
         records.forEach { validateRecord(it) }
         dao.replaceAllRecords(records)

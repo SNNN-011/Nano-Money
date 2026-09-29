@@ -37,17 +37,111 @@ import java.util.Locale
  * Penghapusan di app ini bersifat soft delete (isDeleted = 1), jadi transaksi
  * yang "dihapus" tidak benar-benar hilang dan masih bisa dipulihkan dari sini.
  */
+
+/**
+ * Dialog konfirmasi dua tombol dengan gaya yang sama dipakai di tab Simpan
+ * (MidnightAbyss + TranslucentGlass + border gradient + PremiumButton).
+ *
+ * Untuk aksi yang tidak bisa dibatalkan, gunakan isDestructive = true supaya
+ * tombol konfirmasi tampil merah. Bila aksi sangat berisiko, tambahkan lagi
+ * langkah kedua yang meminta pengguna mengetik kata kunci.
+ */
+@Composable
+fun AppConfirmDialog(
+    title: String,
+    message: String,
+    confirmText: String,
+    dismissText: String = "Batal",
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+    isDestructive: Boolean = false,
+    confirmTestTag: String = "",
+    dismissTestTag: String = ""
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = MidnightAbyss),
+            border = BorderStroke(
+                width = 1.dp,
+                brush = Brush.verticalGradient(
+                    colors = if (isDestructive) {
+                        listOf(Color.Red.copy(alpha = 0.3f), Color.Red.copy(alpha = 0.05f))
+                    } else {
+                        listOf(GhostWhite.copy(alpha = 0.2f), GhostWhite.copy(alpha = 0.02f))
+                    }
+                )
+            ),
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+        ) {
+            Box(modifier = Modifier.background(TranslucentGlass)) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(24.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Text(
+                        text = title,
+                        color = GhostWhite,
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = message,
+                        color = GhostWhite.copy(alpha = 0.8f),
+                        style = MaterialTheme.typography.bodyMedium,
+                        lineHeight = 20.sp
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        PremiumButton(
+                            text = dismissText,
+                            onClick = onDismiss,
+                            isActive = false,
+                            modifier = Modifier.weight(1f),
+                            testTag = dismissTestTag
+                        )
+                        PremiumButton(
+                            text = confirmText,
+                            onClick = onConfirm,
+                            isActive = !isDestructive,
+                            gradientColors = if (isDestructive) {
+                                listOf(Color.Red.copy(alpha = 0.85f), Color.Red.copy(alpha = 0.5f))
+                            } else {
+                                listOf(SteelBlue, SteelBlue.copy(alpha = 0.7f))
+                            },
+                            modifier = Modifier.weight(1.2f),
+                            testTag = confirmTestTag
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
 @Composable
 fun TrashSection(
     deletedRecords: List<FinancialRecord>,
+    activeCount: Int = 0,
     onRestore: (FinancialRecord) -> Unit,
     onRestoreAll: () -> Unit,
     onEmptyTrash: () -> Unit,
+    onDeleteAll: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
     var showEmptyConfirm by remember { mutableStateOf(false) }
     var showRestoreAllConfirm by remember { mutableStateOf(false) }
+    // Dua tahap: peringatan dulu, baru konfirmasi akhir dengan ketik konfirmasi.
+    var showDeleteAllStep1 by remember { mutableStateOf(false) }
+    var showDeleteAllStep2 by remember { mutableStateOf(false) }
+    var confirmText by remember { mutableStateOf("") }
 
     Card(
         modifier = modifier
@@ -220,13 +314,84 @@ fun TrashSection(
                     }
                 }
             }
+
+            // Zona bahaya: hapus seluruh transaksi aktif. Bukan bagian dari Sampah,
+            // tapi diletakkan di card yang sama karena ini soal keamanan data.
+            if (activeCount > 0) {
+                HorizontalDivider(color = GhostWhite.copy(alpha = 0.08f))
+
+                OutlinedButton(
+                    onClick = { showDeleteAllStep1 = true },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 44.dp)
+                        .testTag("delete_all_records_button"),
+                    shape = RoundedCornerShape(12.dp),
+                    border = BorderStroke(1.dp, Color.Red.copy(alpha = 0.45f)),
+                    colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Red.copy(alpha = 0.8f)),
+                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.DeleteForever,
+                        contentDescription = null,
+                        modifier = Modifier.size(15.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "Hapus Semua Transaksi ($activeCount)",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        lineHeight = 13.sp,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+
+                Text(
+                    text = "Semua transaksi akan dipindahkan ke Sampah dan masih bisa dipulihkan.",
+                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp, lineHeight = 14.sp),
+                    color = GhostWhite.copy(alpha = 0.4f)
+                )
+            }
         }
     }
 
     if (showRestoreAllConfirm) {
-        // Gaya dialog mengikuti dialog konfirmasi lain di tab ini (MidnightAbyss +
-        // TranslucentGlass + border gradient + PremiumButton).
-        Dialog(onDismissRequest = { showRestoreAllConfirm = false }) {
+        AppConfirmDialog(
+            title = "Pulihkan Semua Transaksi?",
+            message = "${
+                deletedRecords.size
+            } transaksi akan dikembalikan ke daftar utama. Transaksi ini akan ikut tersinkron ke cloud.",
+            confirmText = "Pulihkan",
+            onConfirm = {
+                showRestoreAllConfirm = false
+                onRestoreAll()
+            },
+            onDismiss = { showRestoreAllConfirm = false },
+            confirmTestTag = "confirm_restore_all_button",
+            dismissTestTag = "cancel_restore_all_button"
+        )
+    }
+
+    if (showDeleteAllStep1) {
+        // Tahap 1: peringatan biasa.
+        AppConfirmDialog(
+            title = "Hapus Semua Transaksi?",
+            message = "$activeCount transaksi akan dihapus dari daftar utama dan dipindahkan ke Sampah. Saldo dan statistik ikut ter-reset.",
+            confirmText = "Lanjutkan",
+            dismissText = "Batal",
+            onConfirm = {
+                showDeleteAllStep1 = false
+                showDeleteAllStep2 = true
+            },
+            onDismiss = { showDeleteAllStep1 = false },
+            confirmTestTag = "delete_all_step1_confirm"
+        )
+    }
+
+    if (showDeleteAllStep2) {
+        // Tahap 2: konfirmasi akhir, harus mengetik kata kunci.
+        Dialog(onDismissRequest = { showDeleteAllStep2 = false }) {
             Card(
                 modifier = Modifier.fillMaxWidth().padding(16.dp),
                 shape = RoundedCornerShape(24.dp),
@@ -235,8 +400,8 @@ fun TrashSection(
                     width = 1.dp,
                     brush = Brush.verticalGradient(
                         colors = listOf(
-                            GhostWhite.copy(alpha = 0.2f),
-                            GhostWhite.copy(alpha = 0.02f)
+                            Color.Red.copy(alpha = 0.35f),
+                            Color.Red.copy(alpha = 0.05f)
                         )
                     )
                 ),
@@ -250,38 +415,67 @@ fun TrashSection(
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                         Text(
-                            text = "Pulihkan Semua Transaksi?",
+                            text = "Yakin Sekali lagi?",
                             color = GhostWhite,
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = "${deletedRecords.size} transaksi akan dikembalikan ke daftar utama. Transaksi ini akan ikut tersinkron ke cloud.",
+                            text = "Ketik HAPUS untuk mengonfirmasi. $activeCount transaksi akan dipindahkan ke Sampah.",
                             color = GhostWhite.copy(alpha = 0.8f),
                             style = MaterialTheme.typography.bodyMedium,
                             lineHeight = 20.sp
                         )
-                        Spacer(modifier = Modifier.height(8.dp))
+
+                        OutlinedTextField(
+                            value = confirmText,
+                            onValueChange = { confirmText = it.uppercase() },
+                            singleLine = true,
+                            placeholder = {
+                                Text("HAPUS", color = GhostWhite.copy(alpha = 0.3f), fontSize = 13.sp)
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("delete_all_confirm_input"),
+                            textStyle = MaterialTheme.typography.bodyMedium.copy(
+                                color = GhostWhite,
+                                fontWeight = FontWeight.Bold
+                            ),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = Color.Red.copy(alpha = 0.7f),
+                                unfocusedBorderColor = GhostWhite.copy(alpha = 0.15f),
+                                cursorColor = Color.Red
+                            )
+                        )
+
                         Row(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
                             PremiumButton(
                                 text = "Batal",
-                                onClick = { showRestoreAllConfirm = false },
+                                onClick = { showDeleteAllStep2 = false },
                                 isActive = false,
                                 modifier = Modifier.weight(1f),
-                                testTag = "cancel_restore_all_button"
+                                testTag = "delete_all_step2_cancel"
                             )
                             PremiumButton(
-                                text = "Pulihkan",
+                                text = "Hapus Semua",
                                 onClick = {
-                                    showRestoreAllConfirm = false
-                                    onRestoreAll()
+                                    showDeleteAllStep2 = false
+                                    onDeleteAll()
+                                    Toast.makeText(context, "Semua transaksi dipindahkan ke Sampah", Toast.LENGTH_SHORT).show()
                                 },
-                                isActive = true,
+                                // Nonaktif sampai kata kuncinya diketik benar.
+                                enabled = confirmText == "HAPUS",
+                                isActive = false,
+                                gradientColors = listOf(
+                                    Color.Red.copy(alpha = 0.85f),
+                                    Color.Red.copy(alpha = 0.5f)
+                                ),
                                 modifier = Modifier.weight(1.2f),
-                                testTag = "confirm_restore_all_button"
+                                testTag = "delete_all_step2_confirm"
                             )
                         }
                     }
@@ -291,73 +485,22 @@ fun TrashSection(
     }
 
     if (showEmptyConfirm) {
-        Dialog(onDismissRequest = { showEmptyConfirm = false }) {
-            Card(
-                modifier = Modifier.fillMaxWidth().padding(16.dp),
-                shape = RoundedCornerShape(24.dp),
-                colors = CardDefaults.cardColors(containerColor = MidnightAbyss),
-                border = BorderStroke(
-                    width = 1.dp,
-                    brush = Brush.verticalGradient(
-                        colors = listOf(
-                            GhostWhite.copy(alpha = 0.2f),
-                            GhostWhite.copy(alpha = 0.02f)
-                        )
-                    )
-                ),
-                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
-            ) {
-                Box(modifier = Modifier.background(TranslucentGlass)) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(24.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        Text(
-                            text = "Kosongkan Sampah?",
-                            color = GhostWhite,
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = "${deletedRecords.size} transaksi akan dihapus permanen dan tidak bisa dipulihkan lagi. Tindakan ini tidak bisa dibatalkan.",
-                            color = GhostWhite.copy(alpha = 0.8f),
-                            style = MaterialTheme.typography.bodyMedium,
-                            lineHeight = 20.sp
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            PremiumButton(
-                                text = "Batal",
-                                onClick = { showEmptyConfirm = false },
-                                isActive = false,
-                                modifier = Modifier.weight(1f),
-                                testTag = "cancel_empty_trash_button"
-                            )
-                            PremiumButton(
-                                text = "Hapus",
-                                onClick = {
-                                    showEmptyConfirm = false
-                                    onEmptyTrash()
-                                    Toast.makeText(context, "Sampah dikosongkan", Toast.LENGTH_SHORT).show()
-                                },
-                                isActive = false,
-                                gradientColors = listOf(
-                                    Color.Red.copy(alpha = 0.85f),
-                                    Color.Red.copy(alpha = 0.5f)
-                                ),
-                                modifier = Modifier.weight(1.2f),
-                                testTag = "confirm_empty_trash_button"
-                            )
-                        }
-                    }
-                }
-            }
-        }
+        AppConfirmDialog(
+            title = "Kosongkan Sampah?",
+            message = "${
+                deletedRecords.size
+            } transaksi akan dihapus permanen dan tidak bisa dipulihkan lagi. Tindakan ini tidak bisa dibatalkan.",
+            confirmText = "Hapus",
+            onConfirm = {
+                showEmptyConfirm = false
+                onEmptyTrash()
+                Toast.makeText(context, "Sampah dikosongkan", Toast.LENGTH_SHORT).show()
+            },
+            onDismiss = { showEmptyConfirm = false },
+            isDestructive = true,
+            confirmTestTag = "confirm_empty_trash_button",
+            dismissTestTag = "cancel_empty_trash_button"
+        )
     }
 }
 

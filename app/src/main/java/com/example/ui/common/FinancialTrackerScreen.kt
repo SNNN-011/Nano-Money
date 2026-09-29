@@ -554,6 +554,12 @@ fun FinancialTrackerScreen(
                             onDeleteRecord = { record ->
                                 recordToDelete = record
                             },
+                            onOpenTrash = {
+                                navController.navigate(TrackerTab.EKSPOR_IMPOR.name) {
+                                    popUpTo(TrackerTab.BERANDA.name) { inclusive = false }
+                                    launchSingleTop = true
+                                }
+                            },
                             onSeedSampleData = { viewModel.seedSampleData() },
                             recurringTransactions = recurringTransactions,
                             incomeCategories = incomeCategoriesState,
@@ -669,9 +675,11 @@ fun FinancialTrackerScreen(
                                 }
                             },
                             deletedRecords = viewModel.deletedRecords.collectAsState().value,
+                            activeCount = viewModel.allRecords.collectAsState().value.size,
                             onRestoreRecord = { viewModel.restoreFromTrash(it) },
                             onRestoreAllRecords = { viewModel.restoreAllFromTrash() },
-                            onEmptyTrash = { viewModel.emptyTrash() }
+                            onEmptyTrash = { viewModel.emptyTrash() },
+                            onDeleteAllRecords = { viewModel.deleteAllRecords() }
                         )
                     }
                 }

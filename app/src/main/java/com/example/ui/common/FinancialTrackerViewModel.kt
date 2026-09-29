@@ -553,6 +553,28 @@ class FinancialTrackerViewModel(
         }
     }
 
+    /**
+     * Hapus semua transaksi aktif: dipindahkan ke Sampah, bukan dihapus
+     * permanen, sehingga masih bisa dipulihkan dari tab Simpan.
+     */
+    fun deleteAllRecords() {
+        viewModelScope.launch {
+            try {
+                val items = repository.allRecords.first()
+                if (items.isEmpty()) {
+                    uiEvent.emit(UiEvent.ShowToast("Belum ada transaksi untuk dihapus."))
+                    return@launch
+                }
+                repository.moveAllActiveToTrash()
+                items.forEach { com.example.util.FirebaseSyncHelper.deleteRecordFromFirestoreDirectly(it.id) }
+                com.example.util.TelemetryHelper.trackBackupAction("delete_all", true, "${items.size} transaksi dipindahkan ke Sampah")
+                uiEvent.emit(UiEvent.ShowToast("${items.size} transaksi dipindahkan ke Sampah."))
+            } catch (e: Exception) {
+                uiEvent.emit(UiEvent.ShowAlert("Gagal Menghapus", "Gagal menghapus transaksi: ${e.localizedMessage ?: "kesalahan database"}"))
+            }
+        }
+    }
+
     // Export validation and logic
     fun getExportJsonString(): String {
         val array = JSONArray()

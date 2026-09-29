@@ -11,6 +11,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ReceiptLong
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -33,19 +34,29 @@ fun FilterAndSortHeader(
     currentFilter: String,
     isNewest: Boolean,
     onFilterSelected: (String) -> Unit,
-    onSortToggled: () -> Unit
+    onSortToggled: () -> Unit,
+    onOpenTrash: (() -> Unit)? = null
 ) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = Spacing.md)
     ) {
+        Spacer(modifier = Modifier.height(Spacing.md))
+
+        // Ikon sampah: akses cepat ke Sampah di tab Simpan.
+        // Taruh di baris judul, sebelah kanan, supaya baris filter tetap penuh.
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.weight(1f)
+            ) {
                 Box(
                     modifier = Modifier
                         .width(4.dp)
@@ -65,6 +76,24 @@ fun FilterAndSortHeader(
                     ),
                     color = GhostWhite
                 )
+            }
+
+            if (onOpenTrash != null) {
+                IconButton(
+                    onClick = { onOpenTrash() },
+                    modifier = Modifier
+                        .size(28.dp)
+                        .testTag("open_trash_button"),
+                    colors = IconButtonDefaults.iconButtonColors(
+                        contentColor = GhostWhite.copy(alpha = 0.45f)
+                    )
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.DeleteOutline,
+                        contentDescription = "Buka Sampah",
+                        modifier = Modifier.size(17.dp)
+                    )
+                }
             }
         }
 
