@@ -37,6 +37,7 @@ import androidx.compose.material.icons.filled.LockReset
 import androidx.compose.animation.AnimatedVisibility
 import java.io.File
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -130,6 +131,22 @@ fun EksporImporTabContent(
     var isMonthsExpanded by remember { mutableStateOf(false) }
 
     val securityPrefs = remember { com.example.util.SecurePrefsHelper.getEncryptedPrefs(context, "app_security_prefs") }
+
+    // Pilihan engine baca struk (Gemini / TypeLLM).
+    var receiptEngine by remember {
+        mutableStateOf(com.example.util.ReceiptEnginePrefs.get(context))
+    }
+    val isTypeLlmReady = remember {
+            val raw = try { com.example.BuildConfig.TYPELLM_API_KEY } catch (e: Throwable) { "" } ?: ""
+            val value = raw.trim()
+            value.isNotEmpty() &&
+                !value.startsWith("tl-sk-PLACEHOLDER") &&
+                value != "TYPELLM_KEY_NOT_CONFIGURED"
+        }
+    val onReceiptEngineChange: (com.example.util.ReceiptEngine) -> Unit = { engine ->
+        receiptEngine = engine
+        com.example.util.ReceiptEnginePrefs.set(context, engine)
+    }
 
     // Backup & Cloud sync states
     var isAutoBackupEnabled by remember { mutableStateOf(securityPrefs.getBoolean("auto_backup_enabled", false)) }
@@ -234,8 +251,15 @@ fun EksporImporTabContent(
                 )
             }
 
-            // Exporter Section Card
-            UnifiedExportCard(
+            // Mesin baca struk (Gemini / TypeLLM)
+                        com.example.ui.components.ReceiptEngineSection(
+                            selected = receiptEngine,
+                            onSelect = onReceiptEngineChange,
+                            isTypeLlmReady = isTypeLlmReady
+                        )
+
+                        // Exporter Section Card
+                        UnifiedExportCard(
                 isWideScreen = isWideScreen,
                 availableMonths = availableMonths,
                 selectedMonths = selectedMonths,
@@ -496,11 +520,17 @@ fun EksporImporTabContent(
                                             val backupToRestore = selectedBackupToRestore
                                             selectedBackupToRestore = null
                                             if (backupToRestore != null) {
-                                                val success = BackupHelper.restoreBackup(context, backupToRestore)
-                                                if (success) {
-                                                    Toast.makeText(context, "Database berhasil dipulihkan!", Toast.LENGTH_LONG).show()
-                                                } else {
-                                                    Toast.makeText(context, "Gagal memulihkan database", Toast.LENGTH_LONG).show()
+                                                // Restore memblokir I/O + load libsqlcipher + killProcess,
+                                                // harus jalan di luar main thread agar tidak ANR.
+                                                coroutineScope.launch {
+                                                    val success = withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                                        BackupHelper.restoreBackup(context, backupToRestore)
+                                                    }
+                                                    if (success) {
+                                                        Toast.makeText(context, "Database berhasil dipulihkan!", Toast.LENGTH_LONG).show()
+                                                    } else {
+                                                        Toast.makeText(context, "Gagal memulihkan database", Toast.LENGTH_LONG).show()
+                                                    }
                                                 }
                                             }
                                         },
@@ -661,7 +691,9 @@ fun EksporImporTabContent(
                                                     
                                                     when (val downloadRes = GoogleDriveHelper.downloadBackupFromDrive(context, driveFile.id, localTempFile)) {
                                                         is GoogleDriveHelper.DriveResult.Success -> {
-                                                            val successRestore = BackupHelper.restoreBackup(context, localTempFile)
+                                                            val successRestore = withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                                                BackupHelper.restoreBackup(context, localTempFile)
+                                                            }
                                                             localTempFile.delete()
                                                             if (successRestore) {
                                                                 Toast.makeText(context, "Database berhasil dipulihkan dari Cloud!", Toast.LENGTH_LONG).show()

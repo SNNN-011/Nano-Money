@@ -21,6 +21,13 @@ fun readLocalProp(key: String, default: String): String {
         ?: default
 }
 
+// Some API keys are optional: when absent from local.properties we must still emit
+// a *valid* Java string literal, otherwise javac fails on `String X = ;`.
+fun readLocalPropAsLiteral(key: String, default: String): String {
+    val value = readLocalProp(key, default)
+    return "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
+}
+
 android {
   namespace = "com.example"
   compileSdk { version = release(36) { minorApiLevel = 1 } }
@@ -35,8 +42,13 @@ android {
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
     buildConfigField("String", "GEMINI_API_KEY", "\"${readLocalProp("GEMINI_API_KEY", "MY_GEMINI_API_KEY")}\"")
-    buildConfigField("String", "GEMINI_BASE_URL", "\"${readLocalProp("GEMINI_BASE_URL", "https://your-cloudflare-worker-url.workers.dev/")}\"")
-  }
+        buildConfigField("String", "GEMINI_BASE_URL", "\"${readLocalProp("GEMINI_BASE_URL", "https://your-cloudflare-worker-url.workers.dev/")}\"")
+        // PENTING: default TIDAK boleh string kosong. AGP merender literal "" menjadi
+            // `String X = ;` yang tidak valid untuk javac, jadi pakai sentinel non-kosong
+            // lalu dideteksi di sisi Kotlin (lihat typeLlmKey()).
+            buildConfigField("String", "TYPELLM_API_KEY", readLocalPropAsLiteral("TYPELLM_API_KEY", "TYPELLM_KEY_NOT_CONFIGURED"))
+            buildConfigField("String", "TYPELLM_BASE_URL", readLocalPropAsLiteral("TYPELLM_BASE_URL", "https://api.typellm.ai"))
+      }
 
   ksp {
     arg("room.schemaLocation", "$projectDir/schemas")

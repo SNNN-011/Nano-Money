@@ -16,9 +16,13 @@ import java.io.IOException
 
 import android.graphics.Bitmap
 import com.example.domain.ParsedReceipt
+import com.example.domain.RequestResult
 import com.example.data.remote.ExtractionResult
 import com.example.ui.config.AiModelConfig
 import com.example.ui.config.FormatUtils
+import com.example.util.ReceiptEngine
+import com.example.util.ReceiptEnginePrefs
+import com.example.util.SecureLog
 
 sealed class ChatMessage {
     data class UserMessage(val text: String) : ChatMessage()
@@ -167,60 +171,129 @@ class ChatViewModel(
     val isAiProcessing: StateFlow<Boolean> = _isAiProcessing.asStateFlow()
 
     private val receiptUseCase = com.example.domain.ReceiptParserUseCase()
+        private val receiptTypeLlmUseCase = com.example.domain.ReceiptParserTypeLlmUseCase()
 
-    fun scanReceipt(bitmap: Bitmap) {
-        val now = System.currentTimeMillis()
-        if (now - lastRequestTime < 600L || _isAiProcessing.value) return
-        lastRequestTime = now
-        _isAiProcessing.value = true
+            /**
+                 * Kunci TypeLLM dari BuildConfig.
+                 *
+                 * Mengembalikan string kosong bila key belum diisi: `local.properties` tidak
+                 * punya TYPELLM_API_KEY, atau masih berisi sentinel default dari build script
+                 * (default kosong tidak bisa dipakai — AGP merender `String X = ;`).
+                 */
+                private fun typeLlmKey(): String {
+                    val raw = try { BuildConfig.TYPELLM_API_KEY } catch (e: Throwable) { "" } ?: ""
+                    val value = raw.trim()
+                    if (value.isEmpty()) return ""
+                    if (value.startsWith("tl-sk-PLACEHOLDER")) return ""
+                    if (value == "TYPELLM_KEY_NOT_CONFIGURED") return ""
+                    return value
+                }
 
-        // Tampilkan scanning receipt indicator
-        val currentList = _messages.value.toMutableList()
-        currentList.add(ChatMessage.UserImageMessage(bitmap))
-        _messages.value = currentList
+            private fun typeLlmBaseUrl(): String {
+                val raw = try { BuildConfig.TYPELLM_BASE_URL } catch (e: Throwable) { "" } ?: ""
+                return raw.trim().ifBlank { "https://api.typellm.ai" }
+            }
 
-        val listWithTyping = _messages.value.toMutableList()
-        listWithTyping.add(ChatMessage.ScanningReceiptIndicator)
-        _messages.value = listWithTyping
-
-        viewModelScope.launch {
-            try {
-                val apiKeyRaw = try { BuildConfig.GEMINI_API_KEY } catch (e: Throwable) { "" } ?: ""
-                val apiKey = if (apiKeyRaw.isEmpty() || apiKeyRaw == "MY_GEMINI_API_KEY" || apiKeyRaw == "GEMINI_API_KEY") {
+            private fun geminiApiKey(): String {
+                val raw = try { BuildConfig.GEMINI_API_KEY } catch (e: Throwable) { "" } ?: ""
+                return if (raw.isEmpty() || raw == "MY_GEMINI_API_KEY" || raw == "GEMINI_API_KEY") {
                     "CF_PROXY_KEY"
                 } else {
-                    apiKeyRaw
+                    raw
                 }
-
-                val resultStatus = receiptUseCase.parseReceipt(
-                    apiKey = apiKey,
-                    bitmap = bitmap,
-                    expenseCategories = _expenseCategories.value
-                )
-
-                removeTypingIndicator()
-
-                when (resultStatus) {
-                    is com.example.domain.RequestResult.Error -> {
-                        val msg = if (resultStatus.message == "Sesi login bermasalah, silakan coba lagi") {
-                            resultStatus.message
-                        } else {
-                            "Gagal memproses struk: ${resultStatus.message}"
-                        }
-                        addAiMessage(msg)
-                    }
-                    is com.example.domain.RequestResult.Success -> {
-                        val parsed = resultStatus.data
-                        if (parsed.error == "bukan_struk") {
-                            addAiMessage("Maaf, gambar yang dikirim sepertinya bukan struk belanjaan yang valid atau tidak dapat dibaca dengan jelas. Silakan coba unggah foto struk yang lebih terang dan jelas ya 😊")
-                        } else {
-                            showReceiptConfirmation(parsed)
-                        }
-                    }
-                }
-            } finally {
-                _isAiProcessing.value = false
             }
+
+            fun scanReceipt(bitmap: Bitmap) {
+                val now = System.currentTimeMillis()
+                if (now - lastRequestTime < 600L || _isAiProcessing.value) return
+                lastRequestTime = now
+                _isAiProcessing.value = true
+
+                // Tampilkan scanning receipt indicator
+                val currentList = _messages.value.toMutableList()
+                currentList.add(ChatMessage.UserImageMessage(bitmap))
+                _messages.value = currentList
+
+                val listWithTyping = _messages.value.toMutableList()
+                listWithTyping.add(ChatMessage.ScanningReceiptIndicator)
+                _messages.value = listWithTyping
+
+                viewModelScope.launch {
+                    try {
+                        // Engine dibaca fresh tiap scan supaya pilihan user di tab Ekspor/Impor
+                                        // langsung berlaku tanpa perlu restart.
+                                        val engine = ReceiptEnginePrefs.get(application)
+                                        val typeLlmKey = typeLlmKey()
+
+                                        val resultStatus = when {
+                                            // TypeLLM dipilih user tapi key belum ada di build.
+                                            engine == ReceiptEngine.TYPELLM && typeLlmKey.isBlank() -> {
+                                                addAiMessage(
+                                                    "Mesin baca struk disetel ke TypeLLM, tapi TYPELLM_API_KEY belum diisi di local.properties. Sementara ini dipakai Gemini."
+                                                )
+                                                receiptUseCase.parseReceipt(
+                                                    apiKey = geminiApiKey(),
+                                                    bitmap = bitmap,
+                                                    expenseCategories = _expenseCategories.value
+                                                )
+                                            }
+
+                                            engine == ReceiptEngine.TYPELLM -> {
+                                                val result = receiptTypeLlmUseCase.parseReceipt(
+                                                    apiKey = typeLlmKey,
+                                                    baseUrl = typeLlmBaseUrl(),
+                                                    bitmap = bitmap,
+                                                    expenseCategories = _expenseCategories.value
+                                                )
+
+                                // Error TypeLLM (auth / rate limit / jaringan) -> fallback ke
+                                // Gemini supaya fitur scan struk tidak mati total.
+                                if (result is RequestResult.Error) {
+                                    SecureLog.e(
+                                        "ChatViewModel",
+                                        "TypeLLM gagal, fallback ke Gemini: ${result.message}",
+                                        result.e
+                                    )
+                                    receiptUseCase.parseReceipt(
+                                        apiKey = geminiApiKey(),
+                                        bitmap = bitmap,
+                                        expenseCategories = _expenseCategories.value
+                                    )
+                                } else {
+                                    result
+                                }
+                            }
+
+                            else -> receiptUseCase.parseReceipt(
+                                apiKey = geminiApiKey(),
+                                bitmap = bitmap,
+                                expenseCategories = _expenseCategories.value
+                            )
+                        }
+
+                        removeTypingIndicator()
+
+                        when (resultStatus) {
+                            is RequestResult.Error -> {
+                                val msg = if (resultStatus.message == "Sesi login bermasalah, silakan coba lagi") {
+                                    resultStatus.message
+                                } else {
+                                    "Gagal memproses struk: ${resultStatus.message}"
+                                }
+                                addAiMessage(msg)
+                            }
+                            is RequestResult.Success -> {
+                                val parsed = resultStatus.data
+                                if (parsed.error == "bukan_struk") {
+                                    addAiMessage("Maaf, gambar yang dikirim sepertinya bukan struk belanjaan yang valid atau tidak dapat dibaca dengan jelas. Silakan coba unggah foto struk yang lebih terang dan jelas ya 😊")
+                                } else {
+                                    showReceiptConfirmation(parsed)
+                                }
+                            }
+                        }
+                    } finally {
+                        _isAiProcessing.value = false
+                    }
         }
     }
 
@@ -412,6 +485,9 @@ class ChatViewModel(
                     }
                 }
             }
+            } finally {
+                _isAiProcessing.value = false
+            }
         }
     }
 
@@ -479,9 +555,6 @@ class ChatViewModel(
         // Reset pending clarification context setelah transaksi sukses
         _pendingClarificationContext.value = null
         _clarificationAttempts.value = 0
-            } finally {
-                _isAiProcessing.value = false
-            }
     }
 
     private fun removeTypingIndicator() {
