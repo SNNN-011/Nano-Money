@@ -158,7 +158,7 @@ class TransactionParserUseCase {
             for (model in modelsToTry) {
                 try {
                     val url = GeminiClient.getFullUrl("v1beta/models/$model:generateContent")
-                    val response = kotlinx.coroutines.withTimeout(30_000L) {
+                    val response = kotlinx.coroutines.withTimeout(8_000L) {
                         GeminiClient.service.generateContent(url, apiKey, request)
                     }
                     rawResponseText = response.candidates?.firstOrNull()?.content?.parts?.firstOrNull()?.text
