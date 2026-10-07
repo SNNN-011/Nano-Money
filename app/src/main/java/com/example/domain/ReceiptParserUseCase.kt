@@ -105,7 +105,7 @@ class ReceiptParserUseCase {
                 )
             )
 
-            val modelName = "gemini-3.1-flash-lite"
+            val modelName = "gemini-3.5-flash-lite"
             val url = GeminiClient.getFullUrl("v1beta/models/$modelName:generateContent")
             
             val response = kotlinx.coroutines.withTimeout(30_000L) {

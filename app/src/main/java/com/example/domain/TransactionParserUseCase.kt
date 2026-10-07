@@ -153,7 +153,7 @@ class TransactionParserUseCase {
             var rawResponseText: String? = null
             var lastException: Throwable? = null
 
-            val modelsToTry = listOf(modelName, "gemini-2.0-flash-lite", "gemini-1.5-flash")
+            val modelsToTry = listOf(modelName, "gemini-3.1-flash-lite", "gemma-4-31b-it")
 
             for (model in modelsToTry) {
                 try {
