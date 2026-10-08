@@ -151,9 +151,9 @@ object GeminiClient {
         
         // If calling the direct standard Google Gemini API, map unsupported mockup models to standard ones
         if (BASE_URL.contains("googleapis.com")) {
-            if (cleanPath.contains("models/gemma-4-31b-it") || cleanPath.contains("models/gemini-3.5-flash-lite") || cleanPath.contains("models/gemini-3.1-flash-lite")) {
+            if (cleanPath.contains("models/gemma-4-26b-it") || cleanPath.contains("models/gemini-3.5-flash-lite") || cleanPath.contains("models/gemini-3.1-flash-lite")) {
                 cleanPath = cleanPath
-                    .replace("models/gemma-4-31b-it", "models/gemini-1.5-flash")
+                    .replace("models/gemma-4-26b-it", "models/gemini-1.5-flash")
                     .replace("models/gemini-3.5-flash-lite", "models/gemini-1.5-flash")
                     .replace("models/gemini-3.1-flash-lite", "models/gemini-1.5-flash")
             }
