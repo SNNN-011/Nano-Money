@@ -1,48 +1,42 @@
 package com.example.ui.config
 
 /**
- * Konfigurasi model AI.
+ * Model AI untuk chat.
  *
- * [GEMINI_MODEL] dan [GEMMA_MODEL] hanya LABEL yang ditampilkan dan dipilih user.
- * Keduanya bukan id model yang benar-benar ada di Google, jadi tidak boleh dikirim
- * apa adanya: Gemini akan membalas 404 "model not found", dan `gemma-*` justru
- * ditolak 403 oleh whitelist path di proxy Worker.
+ * Hanya satu model yang dipakai user, sisanya cadangan yang dicoba otomatis kalau
+ * model utama tidak menjawab. Urutannya dikelola di sini, bukan lewat pilihan di
+ * UI: tombol switch hanya menambah opsi yang bisa gagal, tanpa membuat alur lebih
+ * mudah ditebak.
  *
- * Yang dikirim ke API adalah pasangannya di [WIRE_MODEL_BY_LABEL].
+ * Nama model di sini adalah format yang dibaca proxy Worker (lihat `modelMapping` di
+ * `cloudflare-worker/src/worker.js`), yang juga sudah punya fallback sendiri. Jadi
+ * aplikasi cukup mengirim apa adanya, tanpa memetakan ulang ke id model lain.
  */
 object AiModelConfig {
 
-    /** Label di UI untuk pilihan cepat. */
-    const val GEMINI_MODEL = "gemini-3.5-flash-lite"
-    const val GEMMA_MODEL = "gemma-4-31b-it"
+    /** Model utama untuk chat. */
+    const val PRIMARY_MODEL = "gemma-4-31b-it"
 
-    /** Id model asli yang dipakai di request. */
-    const val GEMINI_WIRE_MODEL = "gemini-2.0-flash"
-    const val GEMMA_WIRE_MODEL = "gemini-1.5-flash"
+    /** Cadangan pertama, dipakai kalau model utama tidak menjawab. */
+    const val FALLBACK_MODEL_1 = "gemini-3.1-flash-lite"
+
+    /** Cadangan kedua. */
+    const val FALLBACK_MODEL_2 = "gemini-3.5-flash-lite"
 
     /**
      * Batas waktu satu percobaan.
      *
      * Dulu 30 detik per model. Dengan beberapa model dalam ladder, satu kegagalan
-     * bisa menahan layar hampir semenit sebelum errornya dilaporkan, padahal model
-     * berikutnya juga akan gagal. Model yang hidup biasanya menjawab dalam hitungan
-     * detik, jadi 10 detik sudah longgar.
+     * bisa menahan layar hampir semenit sebelum errornya dilaporkan. Model yang hidup
+     * biasanya menjawab dalam hitungan detik, jadi 10 detik sudah longgar.
      */
     const val ATTEMPT_TIMEOUT_MS = 10_000L
 
-    private val WIRE_MODEL_BY_LABEL = mapOf(
-        GEMINI_MODEL to GEMINI_WIRE_MODEL,
-        GEMMA_MODEL to GEMMA_WIRE_MODEL
-    )
+    /** Urutan percobaan: utama dulu, lalu cadangan. */
+    val CHAT_MODELS: List<String> = listOf(PRIMARY_MODEL, FALLBACK_MODEL_1, FALLBACK_MODEL_2)
 
-    /** Label UI -> id model yang dikirim. Label tak dikenal memakai default yang aman. */
-    fun wireModel(label: String): String = WIRE_MODEL_BY_LABEL[label] ?: GEMMA_WIRE_MODEL
+    /** Model untuk pembaca struk. */
+    val RECEIPT_MODELS: List<String> = listOf(FALLBACK_MODEL_2, PRIMARY_MODEL)
 
-    /**
-     * Urutan percobaan: model terpilih dulu, lalu model lain sebagai cadangan.
-     * Semua id di sini harus benar-benar ada, dan hanya berawalan `gemini-` supaya
-     * lolos whitelist path di Worker.
-     */
-    fun modelsToTry(label: String): List<String> =
-        listOf(wireModel(label), GEMMA_WIRE_MODEL, GEMINI_WIRE_MODEL).distinct()
+    fun modelsToTry(): List<String> = CHAT_MODELS.distinct()
 }

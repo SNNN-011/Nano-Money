@@ -112,7 +112,6 @@ class TransactionParserUseCase {
 
     suspend fun parseTransaction(
         apiKey: String,
-        modelName: String,
         userText: String,
         pendingContext: String?,
         incomeCategories: List<String>,
@@ -153,7 +152,7 @@ class TransactionParserUseCase {
             var rawResponseText: String? = null
             var lastException: Throwable? = null
 
-            for (model in com.example.ui.config.AiModelConfig.modelsToTry(modelName)) {
+            for (model in com.example.ui.config.AiModelConfig.modelsToTry()) {
                 try {
                     val url = GeminiClient.getFullUrl("v1beta/models/$model:generateContent")
                     val response = kotlinx.coroutines.withTimeout(

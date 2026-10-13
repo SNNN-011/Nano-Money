@@ -273,7 +273,9 @@ fun ChatScreen(
                         )
 
                         Text(
-                            text = "Jika Gemma mengalami error atau respons tidak akurat, coba ganti ke model Gemini untuk hasil yang lebih baik.",
+                            text = "Nano AI memakai satu model utama. Kalau model itu sedang tidak tersedia, " +
+                                "aplikasi otomatis mencoba dua model cadangan secara berurutan, jadi tidak perlu " +
+                                "memilih model secara manual.",
                             color = GhostWhite.copy(alpha = 0.8f),
                             style = MaterialTheme.typography.bodyMedium
                         )
@@ -465,103 +467,20 @@ fun ChatScreen(
                 }
 
                 Spacer(modifier = Modifier.weight(1f))
-                
-                val selectedModel by viewModel.selectedModel.collectAsState()
-                val isGemma = selectedModel == AiModelConfig.GEMMA_MODEL
-                val isGemini = selectedModel == AiModelConfig.GEMINI_MODEL
 
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                // Pilihan model dihapus: chat memakai satu model dengan cadangan
+                // otomatis (lihat AiModelConfig.modelsToTry). Tombol info tetap ada
+                // supaya user tahu model apa yang sedang dipakai.
+                IconButton(
+                    onClick = { showModelInfo = true },
+                    modifier = Modifier.size(24.dp)
                 ) {
-                    Card(
-                        shape = RoundedCornerShape(20.dp),
-                        colors = CardDefaults.cardColors(containerColor = TranslucentGlass),
-                        border = BorderStroke(
-                            width = 1.dp,
-                            brush = Brush.verticalGradient(
-                                colors = listOf(
-                                    GhostWhite.copy(alpha = 0.2f),
-                                    GhostWhite.copy(alpha = 0.02f)
-                                )
-                            )
-                        )
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(4.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            // Segment: Gemma
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(16.dp))
-                                    .then(
-                                        if (isGemma) {
-                                            Modifier.background(
-                                                brush = Brush.verticalGradient(
-                                                    colors = listOf(SteelBlue, SteelBlue.copy(alpha = 0.7f))
-                                                ),
-                                                shape = RoundedCornerShape(16.dp)
-                                            )
-                                        } else {
-                                            Modifier.background(Color.Transparent)
-                                        }
-                                    )
-                                    .clickable(enabled = !isAiProcessing) { viewModel.updateSelectedModel(AiModelConfig.GEMMA_MODEL) }
-                                    .padding(horizontal = 12.dp, vertical = 6.dp)
-                                    .testTag("model_switch_gemma"),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = "Gemma",
-                                    color = if (isGemma) MidnightAbyss else GhostWhite.copy(alpha = 0.5f),
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                            
-                            // Segment: Gemini
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(16.dp))
-                                    .then(
-                                        if (isGemini) {
-                                            Modifier.background(
-                                                brush = Brush.verticalGradient(
-                                                    colors = listOf(SteelBlue, SteelBlue.copy(alpha = 0.7f))
-                                                ),
-                                                shape = RoundedCornerShape(16.dp)
-                                            )
-                                        } else {
-                                            Modifier.background(Color.Transparent)
-                                        }
-                                    )
-                                    .clickable(enabled = !isAiProcessing) { viewModel.updateSelectedModel(AiModelConfig.GEMINI_MODEL) }
-                                    .padding(horizontal = 12.dp, vertical = 6.dp)
-                                    .testTag("model_switch_gemini"),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = "Gemini",
-                                    color = if (isGemini) MidnightAbyss else GhostWhite.copy(alpha = 0.5f),
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        }
-                    }
-
-                    IconButton(
-                        onClick = { showModelInfo = true },
-                        modifier = Modifier.size(24.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Info,
-                            contentDescription = "Info Model",
-                            tint = GhostWhite.copy(alpha = 0.5f),
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
+                    Icon(
+                        imageVector = Icons.Default.Info,
+                        contentDescription = "Info Model",
+                        tint = GhostWhite.copy(alpha = 0.5f),
+                        modifier = Modifier.size(18.dp)
+                    )
                 }
             }
 

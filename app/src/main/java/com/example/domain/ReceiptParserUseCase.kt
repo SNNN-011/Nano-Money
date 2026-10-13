@@ -110,9 +110,7 @@ class ReceiptParserUseCase {
             var rawResponseText: String? = null
             var lastException: Throwable? = null
 
-            for (model in com.example.ui.config.AiModelConfig.modelsToTry(
-                com.example.ui.config.AiModelConfig.GEMINI_MODEL
-            )) {
+            for (model in com.example.ui.config.AiModelConfig.RECEIPT_MODELS) {
                 try {
                     val url = GeminiClient.getFullUrl("v1beta/models/$model:generateContent")
                     val response = kotlinx.coroutines.withTimeout(

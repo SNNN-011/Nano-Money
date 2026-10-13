@@ -97,13 +97,6 @@ class ChatViewModel(
     private val _clarificationAttempts = MutableStateFlow(0)
     val clarificationAttempts: StateFlow<Int> = _clarificationAttempts.asStateFlow()
 
-    private val _selectedModel = MutableStateFlow(AiModelConfig.GEMMA_MODEL)
-    val selectedModel: StateFlow<String> = _selectedModel.asStateFlow()
-
-    fun updateSelectedModel(model: String) {
-        _selectedModel.value = model
-    }
-
     private val _pendingConfirmation = MutableStateFlow<ExtractionResult?>(null)
     val pendingConfirmation: StateFlow<ExtractionResult?> = _pendingConfirmation.asStateFlow()
 
@@ -332,8 +325,6 @@ class ChatViewModel(
 
         viewModelScope.launch {
             try {
-            val modelName = _selectedModel.value
-
             val apiKeyRaw = try { BuildConfig.GEMINI_API_KEY } catch (e: Throwable) { "" } ?: ""
             val apiKey = if (apiKeyRaw.isEmpty() || apiKeyRaw == "MY_GEMINI_API_KEY" || apiKeyRaw == "GEMINI_API_KEY") {
                 "CF_PROXY_KEY"
@@ -345,7 +336,6 @@ class ChatViewModel(
 
             val resultStatus = useCase.parseTransaction(
                 apiKey = apiKey,
-                modelName = modelName,
                 userText = userText,
                 pendingContext = pendingContext,
                 incomeCategories = incomeCategories.value,

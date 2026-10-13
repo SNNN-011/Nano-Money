@@ -5,67 +5,64 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Yang dikirim ke API harus id model yang benar-benar ada.
+ * Chat memakai satu model dengan cadangan berurutan.
  *
- * Label di UI (`gemini-3.5-flash-lite`, `gemma-4-31b-it`) bukan id model Google,
- * jadi kalau dikirim apa adanya Google membalas 404. Label `gemma-*` juga ditolak
- * 403 oleh whitelist path di proxy Worker yang hanya mengizinkan `/models/gemini-`.
+ * Nama model di sini dibaca apa adanya oleh proxy Worker (lihat `modelMapping` di
+ * `cloudflare-worker/src/worker.js`), jadi aplikasi tidak boleh memetakannya ulang ke
+ * id model lain. Worker juga sudah punya fallback sendiri; ladder di aplikasi
+ * ada sebagai jaring pengaman kedua.
+ *exists sebagai jaring pengaman kedua.
  */
 class AiModelConfigTest {
 
     @Test
-    fun `label_ui_dipetakan_ke_id_model_asli`() {
-        assertEquals(AiModelConfig.GEMMA_WIRE_MODEL, AiModelConfig.wireModel(AiModelConfig.GEMMA_MODEL))
-        assertEquals(AiModelConfig.GEMINI_WIRE_MODEL, AiModelConfig.wireModel(AiModelConfig.GEMINI_MODEL))
+    fun `urutan_pencobaan_sesuai_yang_diminta`() {
+        assertEquals(
+            listOf("gemma-4-31b-it", "gemini-3.1-flash-lite", "gemini-3.5-flash-lite"),
+            AiModelConfig.modelsToTry()
+        )
     }
 
     @Test
-    fun `tidak_pernah_mengirim_label_palsu_apa_adanya`() {
-        listOf(AiModelConfig.GEMINI_MODEL, AiModelConfig.GEMMA_MODEL).forEach { label ->
-            val wire = AiModelConfig.wireModel(label)
-            assertTrue("label '$label' tidak boleh jadi id wire", wire != label)
-        }
-    }
-
-    @Test
-    fun `semua_model_yang_dikirim_berawalan_gemini_supaya_lolos_whitelist_worker`() {
-        listOf(AiModelConfig.GEMINI_MODEL, AiModelConfig.GEMMA_MODEL).forEach { label ->
-            AiModelConfig.modelsToTry(label).forEach { model ->
-                assertTrue(
-                    "model '$model' akan ditolak 403 oleh Worker",
-                    model.startsWith("gemini-")
-                )
-            }
-        }
-    }
-
-    @Test
-    fun `model_terpilih_dipercoba_lebih_dulu`() {
-        val forGemma = AiModelConfig.modelsToTry(AiModelConfig.GEMMA_MODEL)
-        val forGemini = AiModelConfig.modelsToTry(AiModelConfig.GEMINI_MODEL)
-
-        assertEquals(AiModelConfig.GEMMA_WIRE_MODEL, forGemma.first())
-        assertEquals(AiModelConfig.GEMINI_WIRE_MODEL, forGemini.first())
+    fun `model_utama_dipakai_tidak_ada_pilihan_lain_di_ui`() {
+        // Tidak ada lagi GEMMA_MODEL/GEMINI_MODEL sebagai pilihan; ladder tetap satu jalur.
+        assertEquals(AiModelConfig.PRIMARY_MODEL, AiModelConfig.modelsToTry().first())
+        assertEquals(AiModelConfig.PRIMARY_MODEL, "gemma-4-31b-it")
+        assertEquals(AiModelConfig.FALLBACK_MODEL_1, "gemini-3.1-flash-lite")
+        assertEquals(AiModelConfig.FALLBACK_MODEL_2, "gemini-3.5-flash-lite")
     }
 
     @Test
     fun `tidak_mengulang_model_yang_sama`() {
-        AiModelConfig.modelsToTry(AiModelConfig.GEMMA_MODEL).forEach { model ->
-            assertEquals(
-                1,
-                AiModelConfig.modelsToTry(AiModelConfig.GEMMA_MODEL).count { it == model }
-            )
+        val models = AiModelConfig.modelsToTry()
+        assertEquals(models.distinct(), models)
+    }
+
+    @Test
+    fun `nama_model_tidak_kosong_dan_tanpa_spasi_aneh`() {
+        (AiModelConfig.modelsToTry() + AiModelConfig.RECEIPT_MODELS).forEach { model ->
+            assertTrue("nama model kosong", model.isNotBlank())
+            assertEquals("nama model tidak boleh punya spasi", model.trim(), model)
         }
     }
 
     @Test
-    fun `label_tidak_dikenal_pakai_default_yang_aman`() {
-        val models = AiModelConfig.modelsToTry("model-hantu")
+    fun `reader_struk_mulai_dari_model_yang_lebih_kuat_lalu_cadangan`() {
+        assertEquals(
+            listOf(AiModelConfig.FALLBACK_MODEL_2, AiModelConfig.PRIMARY_MODEL),
+            AiModelConfig.RECEIPT_MODELS
+        )
+    }
 
-        assertTrue(models.first().startsWith("gemini-"))
-        // Default ikut masuk daftar cadangan, lalu di-distinct supaya tidak dicoba dua kali.
-        assertEquals(models.distinct(), models)
-        assertEquals(AiModelConfig.GEMMA_WIRE_MODEL, models.first())
+    @Test
+    fun `semua_nama_model_lolos_ke_worker_sebagai_model_path`() {
+        // Worker mem-parsing /v1beta/models/<nama>:<action>; nama harus tidak kosong.
+        (AiModelConfig.modelsToTry() + AiModelConfig.RECEIPT_MODELS).forEach { model ->
+            assertTrue(
+                "path /v1beta/models/$model tidak valid",
+                model.matches(Regex("[A-Za-z0-9._-]+"))
+            )
+        }
     }
 
     @Test
