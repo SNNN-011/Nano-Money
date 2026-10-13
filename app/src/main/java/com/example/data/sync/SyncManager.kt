@@ -25,7 +25,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 
 /**
  * Otak sinkronisasi: push + pull tiap koleksi secara terpisah, plus adopsi sekali
@@ -48,6 +50,9 @@ object SyncManager {
 
     /** Penanda pembersihan dokumen duplikat, dipakai sekali seumur device. */
     const val CLEANUP_RENAMED_FLAG = "cleanup_renamed_v1"
+
+    /** Penanda impor dokumen preferensi lawas, dipakai sekali seumur device. */
+    const val LEGACY_SETTINGS_FLAG = "legacy_settings_v1"
 
     data class Report(
         val recordsPushed: Int = 0,
@@ -106,6 +111,27 @@ object SyncManager {
         val settingsRepo = AppSettingsRepository(db.appSettingDao())
         val errors = mutableListOf<String>()
 
+        // --- Bersihkan sisa duplikat versi 6 (HARUS sebelum pull) ---
+        // MIGRATION_6_7 sudah mengembalikan kunci lokal ke "<id>", jadi dokumen
+        // "t:legacy:<id>" tidak punya pasangan lokal lagi. Kalau dibiarkan sampai
+        // pull, dokumen itu akan ditarik dan membuat baris duplikat yang tidak ikut
+        // terhapus. Pengaman: hanya dihapus kalau baris lokal dengan kunci "<id>"
+        // benar-benar ada, jadi tidak mungkin menghapus satu-satunya salinan.
+        if (!SyncCursors.isAdopted(context, CLEANUP_RENAMED_FLAG)) {
+            runCatching {
+                val removedRecords = LegacyAdoption.deleteRenamedDuplicates(
+                    collectionRef = userCollection(COLLECTION_RECORDS),
+                    prefix = LEGACY_KEY_PREFIX
+                ) { key -> recordRepo.findBySyncKey(key) != null }
+                val removedRecurring = LegacyAdoption.deleteRenamedDuplicates(
+                    collectionRef = userCollection(COLLECTION_RECURRING),
+                    prefix = LEGACY_KEY_PREFIX
+                ) { key -> recurringRepo.findBySyncKey(key) != null }
+                Log.i(TAG, "Pembersihan duplikat: $removedRecords transaksi, $removedRecurring recurring")
+            }.onFailure { Log.w(TAG, "Pembersihan dokumen duplikat gagal: ${it.message}") }
+            SyncCursors.markAdopted(context, CLEANUP_RENAMED_FLAG)
+        }
+
         // --- Adopsi dokumen legacy (sekali per koleksi) ---
         // Flag "adopted" baru ditulis setelah push + verifikasi +
         // pembersihan selesai, supaya kegagalan tidak membuat data lama
@@ -157,9 +183,21 @@ object SyncManager {
             recurringApplied = result.applied
         }.onFailure { errors += "Transaksi berulang: ${it.localizedMessage ?: "gagal pull"}" }
 
+        // --- Impor sekali dari dokumen preferensi lawas ---
+        // Dilakukan sebelum push kategori/anggaran supaya hasil impor ikut terkirim.
+        // Dokumen lawas sendiri baru dihapus setelah push-nya benar-benar berhasil.
+        var legacySettingsDoc: com.google.firebase.firestore.DocumentReference? = null
+        if (!SyncCursors.isAdopted(context, LEGACY_SETTINGS_FLAG)) {
+            runCatching {
+                legacySettingsDoc = importLegacySettings(db, categoryRepo, budgetRepo)
+            }.onFailure { errors += "Impor pengaturan lama: ${it.localizedMessage ?: "gagal"}" }
+        }
+
         var categoriesPushed = 0
         var categoriesApplied = 0
+        var categoriesPushOk = false
         runCatching { categoriesPushed = categoriesSync(categoryRepo).push().pushed }
+            .onSuccess { categoriesPushOk = true }
             .onFailure { errors += "Kategori: ${it.localizedMessage ?: "gagal push"}" }
         runCatching {
             val result = categoriesSync(categoryRepo).pull(SyncCursors.get(context, COLLECTION_CATEGORIES))
@@ -169,7 +207,9 @@ object SyncManager {
 
         var budgetsPushed = 0
         var budgetsApplied = 0
+        var budgetsPushOk = false
         runCatching { budgetsPushed = budgetsSync(budgetRepo).push().pushed }
+            .onSuccess { budgetsPushOk = true }
             .onFailure { errors += "Anggaran: ${it.localizedMessage ?: "gagal push"}" }
         runCatching {
             val result = budgetsSync(budgetRepo).pull(SyncCursors.get(context, COLLECTION_CATEGORY_BUDGETS))
@@ -198,23 +238,18 @@ object SyncManager {
             Log.w(TAG, "Push transaksi gagal, adopsi legacy dicoba lagi nanti.")
         }
 
-        // Sisa dari versi 6: dokumen "t:legacy:<id>" yang tadinya duplikat dokumen
-        // "<id>". Setelah MIGRATION_6_7 kunci lokal kembali ke "<id>", dokumen sisa ini
-        // tidak punya pasangan lokal dan akan ditarik balik sebagai duplikat saat pull.
-        // Bersihkan sekali saja, dan hanya dokumen yang pasangannya terkonfirmasi ada.
-        if (!SyncCursors.isAdopted(context, CLEANUP_RENAMED_FLAG)) {
-            runCatching {
-                val removedRecords = LegacyAdoption.deleteRenamedDuplicates(
-                    collectionRef = userCollection(COLLECTION_RECORDS),
-                    prefix = LEGACY_KEY_PREFIX
-                ) { key -> recordRepo.findBySyncKey(key) != null }
-                val removedRecurring = LegacyAdoption.deleteRenamedDuplicates(
-                    collectionRef = userCollection(COLLECTION_RECURRING),
-                    prefix = LEGACY_KEY_PREFIX
-                ) { key -> recurringRepo.findBySyncKey(key) != null }
-                Log.i(TAG, "Pembersihan duplikat: $removedRecords transaksi, $removedRecurring recurring")
-            }.onFailure { Log.w(TAG, "Pembersihan dokumen duplikat gagal: ${it.message}") }
-            SyncCursors.markAdopted(context, CLEANUP_RENAMED_FLAG)
+        // Dokumen preferensi lawas dihapus setelah isi nyatanya sudah ada di Room dan
+        // sudah terkonfirmasi tersimpan di cloud. Kalau push kategori/anggaran gagal,
+        // dokumen dibiarkan supaya bisa dicoba lagi pada sync berikutnya.
+        val legacyDoc = legacySettingsDoc
+        if (legacyDoc != null) {
+            if (categoriesPushOk && budgetsPushOk) {
+                runCatching { withTimeout(CollectionSync.OP_TIMEOUT_MS) { legacyDoc.delete().await() } }
+                    .onSuccess { SyncCursors.markAdopted(context, LEGACY_SETTINGS_FLAG) }
+                    .onFailure { Log.w(TAG, "Hapus dokumen preferensi lama gagal: ${it.message}") }
+            } else {
+                Log.w(TAG, "Push kategori/anggaran gagal, dokumen preferensi lama belum dihapus.")
+            }
         }
 
         Report(
@@ -456,7 +491,47 @@ object SyncManager {
     }
 
     /**
-     * Dokumen lama (tanpa updatedAt/syncKey) diubah jadi entitas dengan kunci
+     * Membaca dokumen `settings/financial_tracker_prefs` versi lama lalu memindahkan
+     * daftar kategori dan anggaran ke tabel Room.
+     *
+     * Hanya field yang diizinkan yang dibaca; kunci keamanan yang kebetulan ada di
+     * dokumen itu tidak pernah disentuh. Mengembalikan referensi dokumen itu supaya
+     * pemanggil menghapusnya nanti, setelah push-nya terkonfirmasi berhasil.
+     */
+    private suspend fun importLegacySettings(
+        db: AppDatabase,
+        categoryRepo: CategoryRepository,
+        budgetRepo: CategoryBudgetRepository
+    ): com.google.firebase.firestore.DocumentReference? {
+        val docRef = userCollection(COLLECTION_SETTINGS).document(LegacySettingsImport.DOC_ID)
+        val snapshot = withTimeout(CollectionSync.OP_TIMEOUT_MS) { docRef.get().await() }
+        if (!snapshot.exists()) return null
+
+        val imported = LegacySettingsImport.parse(
+            docData = LegacySettingsImport.onlyAllowedFields(snapshot.data.orEmpty()),
+            existingCategoryIds = db.categoryDao().getAllIds().toSet(),
+            now = System.currentTimeMillis()
+        )
+
+        if (imported.categories.isNotEmpty()) db.categoryDao().upsertAll(imported.categories)
+        if (imported.budgets.isNotEmpty()) db.categoryBudgetDao().upsertAll(imported.budgets)
+
+        Log.i(
+            TAG,
+            "Impor pengaturan lama: ${imported.categories.size} kategori, " +
+                "${imported.budgets.size} anggaran, ${imported.orphanBudgets.size} anggaran yatim"
+        )
+
+        // Tidak ada yang perlu dipindahkan: dokumennya tidak berisi data yang kita pakai.
+        if (imported.categories.isEmpty() && imported.budgets.isEmpty()) {
+            withTimeout(CollectionSync.OP_TIMEOUT_MS) { docRef.delete().await() }
+            return null
+        }
+        return docRef
+    }
+
+    /**
+     * Dokumen legacy (tanpa updatedAt/syncKey) diubah jadi entitas dengan kunci
      * "legacy:<docId>". updatedAt memakai waktu adopsi supaya record ini tetap
      * ikut mengalir ke perangkat lain.
      */
