@@ -47,11 +47,30 @@ class AiModelConfigTest {
     }
 
     @Test
-    fun `reader_struk_mulai_dari_model_yang_lebih_kuat_lalu_cadangan`() {
+    fun `reader_struk_mulai_dari_model_yang_paling_andal`() {
+        // gemini-3.5-flash-lite sempat membalas 503, jadi tidak boleh di posisi pertama.
         assertEquals(
-            listOf(AiModelConfig.FALLBACK_MODEL_2, AiModelConfig.PRIMARY_MODEL),
+            listOf(
+                AiModelConfig.FALLBACK_MODEL_1,
+                AiModelConfig.PRIMARY_MODEL,
+                AiModelConfig.FALLBACK_MODEL_2
+            ),
             AiModelConfig.RECEIPT_MODELS
         )
+    }
+
+    @Test
+    fun `nama_model_semuanya_ada_di_daftar_model_google_yang_diketahui`() {
+        // Divalidasi terhadap respons /v1beta/models milik kunci API. Kalau nama
+        // salah ketik, Gemini membalas 404 dan seluruh request gagal.
+        val dikenal = setOf(
+            "gemma-4-31b-it",
+            "gemini-3.1-flash-lite",
+            "gemini-3.5-flash-lite"
+        )
+        (AiModelConfig.CHAT_MODELS + AiModelConfig.RECEIPT_MODELS).forEach { model ->
+            assertTrue("model '$model' tidak ada di daftar model Google", model in dikenal)
+        }
     }
 
     @Test

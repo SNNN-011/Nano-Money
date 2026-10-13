@@ -1,16 +1,11 @@
-name = "gemini-firebase-proxy"
+name = "nano-money"
 main = "src/worker.js"
 compatibility_date = "2024-03-20"
 
-# Binding untuk Rate Limiting
-# Langkah: buat KV namespace di Cloudflare Dashboard > Workers > KV > Create
-# Jalankan: wrangler kv namespace create RATE_LIMIT_KV
-# Ganti id di bawah dengan ID KV namespace lingkungan Anda
-kv_namespaces = [
-  { binding = "RATE_LIMIT_KV", id = "257ad118314d4dd2b626ff0b79d0f99d" } # Ganti dengan KV Namespace ID milik Anda saat deploy
-]
-
-# Environment variables (Bisa di-set di sini untuk non-sensitive data)
+# Environment variables.
+# FIREBASE_PROJECT_ID diisi di sini karena bukan rahasia.
+# GEMINI_API_KEY JANGAN ditulis di file ini, tapi diset lewat:
+#   wrangler secret put GEMINI_API_KEY
+# atau lewat Dashboard > Settings > Variables and Secrets.
 [vars]
-FIREBASE_PROJECT_ID = "nano-money-a44b0" # Ganti dengan Firebase Project ID milik Anda
-
+FIREBASE_PROJECT_ID = "nano-money-a44b0"
