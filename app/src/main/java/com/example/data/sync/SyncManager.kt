@@ -3,11 +3,19 @@ package com.example.data.sync
 import android.content.Context
 import android.util.Log
 import com.example.data.AppDatabase
+import com.example.data.AppSetting
+import com.example.data.AppSettingsRepository
+import com.example.data.Category
+import com.example.data.CategoryBudget
+import com.example.data.CategoryBudgetRepository
+import com.example.data.CategoryRepository
 import com.example.data.FinancialRecord
 import com.example.data.FinancialRecordRepository
 import com.example.data.RecurringTransaction
 import com.example.data.RecurringTransactionRepository
 import com.example.data.SyncStatus
+import com.example.data.SyncableSettings
+import com.example.util.SecurePrefsHelper
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
@@ -31,49 +39,75 @@ object SyncManager {
     private const val TAG = "SyncManager"
     const val COLLECTION_RECORDS = "financial_records"
     const val COLLECTION_RECURRING = "recurring_transactions"
+    const val COLLECTION_CATEGORIES = "categories"
+    const val COLLECTION_CATEGORY_BUDGETS = "category_budgets"
+    const val COLLECTION_SETTINGS = "settings"
 
     data class Report(
         val recordsPushed: Int = 0,
         val recordsApplied: Int = 0,
         val recurringPushed: Int = 0,
         val recurringApplied: Int = 0,
+        val categoriesPushed: Int = 0,
+        val categoriesApplied: Int = 0,
+        val budgetsPushed: Int = 0,
+        val budgetsApplied: Int = 0,
+        val settingsPushed: Int = 0,
+        val settingsApplied: Int = 0,
         val legacyAdopted: Int = 0,
         val errors: List<String> = emptyList()
     ) {
         val isFailure: Boolean get() = errors.isNotEmpty()
     }
 
+    private fun trackerPrefs(context: Context) =
+        SecurePrefsHelper.getEncryptedPrefs(context, "financial_tracker_prefs")
+
     /**
-     * Dipanggil setelah setiap tulis lokal (tambah/edit/hapus transaksi atau recurring).
-     * Kegagalan diamkan karena baris tetap PENDING dan akan dikirim pada sinkron penuh.
+     * Dipanggil setelah setiap tulis lokal (tambah/edit/hapus transaksi, recurring,
+     * kategori, anggaran, atau pengaturan). Kegagalan diamkan karena baris tetap PENDING.
      */
     suspend fun pushPending(context: Context) = withContext(Dispatchers.IO) {
         val db = AppDatabase.getDatabase(context)
-        val recordRepo = FinancialRecordRepository(db.financialRecordDao())
-        val recurringRepo = RecurringTransactionRepository(db.recurringTransactionDao())
+        val prefs = trackerPrefs(context)
+        val syncs = allSyncs(
+            db,
+            FinancialRecordRepository(db.financialRecordDao()),
+            RecurringTransactionRepository(db.recurringTransactionDao()),
+            CategoryRepository(db.categoryDao(), prefs),
+            CategoryBudgetRepository(db.categoryBudgetDao()),
+            AppSettingsRepository(db.appSettingDao())
+        )
 
-        runCatching { recordsSync(recordRepo).push() }
-            .onFailure { Log.w(TAG, "Push transaksi gagal: ${it.message}") }
-
-        runCatching { recurringSync(recurringRepo).push() }
-            .onFailure { Log.w(TAG, "Push transaksi berulang gagal: ${it.message}") }
+        syncs.forEach { sync ->
+            runCatching { sync.push() }
+                .onFailure { Log.w(TAG, "Push ${sync.name} gagal: ${it.message}") }
+        }
     }
 
-    /** Sinkron penuh: push + pull (dan sekali saja adopsi dokumen lama). */
+    /** Sinkron penuh: push + pull tiap koleksi, plus sekali saja adopsi dokumen lama. */
     suspend fun syncAll(context: Context): Report = withContext(Dispatchers.IO) {
         if (FirebaseAuth.getInstance().currentUser == null) {
             return@withContext Report(errors = listOf("Belum terhubung akun Google."))
         }
 
         val db = AppDatabase.getDatabase(context)
+        val prefs = trackerPrefs(context)
         val recordRepo = FinancialRecordRepository(db.financialRecordDao())
         val recurringRepo = RecurringTransactionRepository(db.recurringTransactionDao())
+        val categoryRepo = CategoryRepository(db.categoryDao(), prefs)
+        val budgetRepo = CategoryBudgetRepository(db.categoryBudgetDao())
+        val settingsRepo = AppSettingsRepository(db.appSettingDao())
         val errors = mutableListOf<String>()
 
         // --- Adopsi dokumen legacy (sekali per koleksi) ---
+        // Flag "adopted" baru ditulis setelah push + verifikasi +
+        // pembersihan selesai, supaya kegagalan tidak membuat data lama
+        // terlewat selamanya.
         var adopted = 0
-        val legacyRefs = mutableListOf<com.google.firebase.firestore.DocumentReference>()
-        if (!SyncCursors.isAdopted(context, COLLECTION_RECORDS)) {
+        val legacyRefs = mutableListOf<LegacyAdoption.Adopted>()
+        var legacyPending = !SyncCursors.isAdopted(context, COLLECTION_RECORDS)
+        if (legacyPending) {
             runCatching {
                 legacyRefs += LegacyAdoption.adopt(
                     collectionRef = userCollection(COLLECTION_RECORDS),
@@ -81,16 +115,17 @@ object SyncManager {
                     onAdopt = { entity ->
                         recordRepo.applyRemote(entity)
                         adopted++
-                    }
+                    },
+                    newDocIdOf = { it.syncKey }
                 )
-                SyncCursors.markAdopted(context, COLLECTION_RECORDS)
             }.onFailure { errors += "Adopsi data lama: ${it.localizedMessage ?: "gagal"}" }
         }
 
-        // --- Transaksi ---
         var recordsPushed = 0
         var recordsApplied = 0
+        var recordsPushOk = false
         runCatching { recordsPushed = recordsSync(recordRepo).push().pushed }
+            .onSuccess { recordsPushOk = true }
             .onFailure { errors += "Transaksi: ${it.localizedMessage ?: "gagal push"}" }
         runCatching {
             val result = recordsSync(recordRepo).pull(SyncCursors.get(context, COLLECTION_RECORDS))
@@ -98,7 +133,6 @@ object SyncManager {
             recordsApplied = result.applied
         }.onFailure { errors += "Transaksi: ${it.localizedMessage ?: "gagal pull"}" }
 
-        // --- Transaksi berulang ---
         var recurringPushed = 0
         var recurringApplied = 0
         runCatching { recurringPushed = recurringSync(recurringRepo).push().pushed }
@@ -109,10 +143,45 @@ object SyncManager {
             recurringApplied = result.applied
         }.onFailure { errors += "Transaksi berulang: ${it.localizedMessage ?: "gagal pull"}" }
 
-        // Dokumen legacy dihapus setelah versi barunya sudah aman di cloud.
-        if (legacyRefs.isNotEmpty()) {
-            runCatching { LegacyAdoption.deleteDocs(legacyRefs) }
-                .onFailure { Log.w(TAG, "Bersihkan dokumen legacy gagal: ${it.message}") }
+        var categoriesPushed = 0
+        var categoriesApplied = 0
+        runCatching { categoriesPushed = categoriesSync(categoryRepo).push().pushed }
+            .onFailure { errors += "Kategori: ${it.localizedMessage ?: "gagal push"}" }
+        runCatching {
+            val result = categoriesSync(categoryRepo).pull(SyncCursors.get(context, COLLECTION_CATEGORIES))
+            SyncCursors.set(context, COLLECTION_CATEGORIES, result.newestUpdatedAt)
+            categoriesApplied = result.applied
+        }.onFailure { errors += "Kategori: ${it.localizedMessage ?: "gagal pull"}" }
+
+        var budgetsPushed = 0
+        var budgetsApplied = 0
+        runCatching { budgetsPushed = budgetsSync(budgetRepo).push().pushed }
+            .onFailure { errors += "Anggaran: ${it.localizedMessage ?: "gagal push"}" }
+        runCatching {
+            val result = budgetsSync(budgetRepo).pull(SyncCursors.get(context, COLLECTION_CATEGORY_BUDGETS))
+            SyncCursors.set(context, COLLECTION_CATEGORY_BUDGETS, result.newestUpdatedAt)
+            budgetsApplied = result.applied
+        }.onFailure { errors += "Anggaran: ${it.localizedMessage ?: "gagal pull"}" }
+
+        var settingsPushed = 0
+        var settingsApplied = 0
+        runCatching { settingsPushed = settingsSync(settingsRepo).push().pushed }
+            .onFailure { errors += "Pengaturan: ${it.localizedMessage ?: "gagal push"}" }
+        runCatching {
+            val result = settingsSync(settingsRepo).pull(SyncCursors.get(context, COLLECTION_SETTINGS))
+            SyncCursors.set(context, COLLECTION_SETTINGS, result.newestUpdatedAt)
+            settingsApplied = result.applied
+        }.onFailure { errors += "Pengaturan: ${it.localizedMessage ?: "gagal pull"}" }
+
+        // Dokumen legacy baru boleh dihapus setelah versi barunya terbukti ada di
+        // cloud. Kalau push gagal, dokumen lama tetap dibiarkan sebagai cadangan.
+        if (legacyPending && recordsPushOk) {
+            runCatching {
+                LegacyAdoption.deleteVerified(legacyRefs, userCollection(COLLECTION_RECORDS))
+            }.onFailure { Log.w(TAG, "Bersihkan dokumen legacy gagal: ${it.message}") }
+            SyncCursors.markAdopted(context, COLLECTION_RECORDS)
+        } else if (legacyPending) {
+            Log.w(TAG, "Push transaksi gagal, adopsi legacy dicoba lagi nanti.")
         }
 
         Report(
@@ -120,10 +189,31 @@ object SyncManager {
             recordsApplied = recordsApplied,
             recurringPushed = recurringPushed,
             recurringApplied = recurringApplied,
+            categoriesPushed = categoriesPushed,
+            categoriesApplied = categoriesApplied,
+            budgetsPushed = budgetsPushed,
+            budgetsApplied = budgetsApplied,
+            settingsPushed = settingsPushed,
+            settingsApplied = settingsApplied,
             legacyAdopted = adopted,
             errors = errors
         )
     }
+
+    private fun allSyncs(
+        db: AppDatabase,
+        recordRepo: FinancialRecordRepository,
+        recurringRepo: RecurringTransactionRepository,
+        categoryRepo: CategoryRepository,
+        budgetRepo: CategoryBudgetRepository,
+        settingsRepo: AppSettingsRepository
+    ) = listOf(
+        recordsSync(recordRepo),
+        recurringSync(recurringRepo),
+        categoriesSync(categoryRepo),
+        budgetsSync(budgetRepo),
+        settingsSync(settingsRepo)
+    )
 
     private fun userCollection(name: String) =
         FirebaseFirestore.getInstance()
@@ -185,6 +275,113 @@ object SyncManager {
                 )
             },
             fromDocument = ::mapRemoteRecurring
+        )
+    }
+
+    private fun categoriesSync(repo: CategoryRepository): CollectionSync<Category> {
+        val ref = userCollection(COLLECTION_CATEGORIES)
+
+        return CollectionSync(
+            name = COLLECTION_CATEGORIES,
+            collectionRef = ref,
+            pendingItems = { repo.getPendingSync() },
+            findLocal = { repo.findById(it) },
+            applyRemote = { repo.applyRemote(it) },
+            markSynced = { repo.markSynced(it) },
+            toDocument = { category ->
+                mapOf(
+                    CollectionSync.FIELD_SYNC_KEY to category.syncKey,
+                    "name" to category.name,
+                    "type" to category.type,
+                    CollectionSync.FIELD_UPDATED_AT to category.updatedAt,
+                    CollectionSync.FIELD_IS_DELETED to category.isDeleted
+                )
+            },
+            fromDocument = { doc ->
+                val updatedAt = (doc.get(CollectionSync.FIELD_UPDATED_AT) as? Number)?.toLong()
+                    ?: return@CollectionSync null
+                Category(
+                    id = doc.id,
+                    name = doc.getString("name").orEmpty(),
+                    type = doc.getString("type").orEmpty(),
+                    isDeleted = doc.getBoolean(CollectionSync.FIELD_IS_DELETED) ?: false,
+                    updatedAt = updatedAt,
+                    syncKey = doc.getString(CollectionSync.FIELD_SYNC_KEY) ?: doc.id,
+                    syncStatus = SyncStatus.SYNCED
+                )
+            }
+        )
+    }
+
+    private fun budgetsSync(repo: CategoryBudgetRepository): CollectionSync<CategoryBudget> {
+        val ref = userCollection(COLLECTION_CATEGORY_BUDGETS)
+
+        return CollectionSync(
+            name = COLLECTION_CATEGORY_BUDGETS,
+            collectionRef = ref,
+            pendingItems = { repo.getPendingSync() },
+            findLocal = { repo.findByCategoryId(it) },
+            applyRemote = { repo.applyRemote(it) },
+            markSynced = { repo.markSynced(it) },
+            toDocument = { budget ->
+                mapOf(
+                    CollectionSync.FIELD_SYNC_KEY to budget.syncKey,
+                    "budgetLimit" to budget.budgetLimit,
+                    CollectionSync.FIELD_UPDATED_AT to budget.updatedAt,
+                    CollectionSync.FIELD_IS_DELETED to budget.isDeleted
+                )
+            },
+            fromDocument = { doc ->
+                val updatedAt = (doc.get(CollectionSync.FIELD_UPDATED_AT) as? Number)?.toLong()
+                    ?: return@CollectionSync null
+                CategoryBudget(
+                    categoryId = doc.id,
+                    budgetLimit = (doc.get("budgetLimit") as? Number)?.toLong() ?: 0L,
+                    isDeleted = doc.getBoolean(CollectionSync.FIELD_IS_DELETED) ?: false,
+                    updatedAt = updatedAt,
+                    syncKey = doc.getString(CollectionSync.FIELD_SYNC_KEY) ?: doc.id,
+                    syncStatus = SyncStatus.SYNCED
+                )
+            }
+        )
+    }
+
+    /** Satu dokumen per key yang ada di allow-list; kunci keamanan tidak pernah ikut. */
+    private fun settingsSync(repo: AppSettingsRepository): CollectionSync<AppSetting> {
+        val ref = userCollection(COLLECTION_SETTINGS)
+
+        return CollectionSync(
+            name = COLLECTION_SETTINGS,
+            collectionRef = ref,
+            pendingItems = { repo.getPendingSync() },
+            findLocal = { repo.find(it) },
+            applyRemote = { repo.applyRemote(it) },
+            markSynced = { repo.markSynced(it) },
+            toDocument = { setting ->
+                mapOf(
+                    CollectionSync.FIELD_SYNC_KEY to setting.syncKey,
+                    "key" to setting.key,
+                    "valueText" to setting.valueText,
+                    "valueLong" to setting.valueLong,
+                    "valueBool" to setting.valueBool,
+                    CollectionSync.FIELD_UPDATED_AT to setting.updatedAt
+                )
+            },
+            fromDocument = { doc ->
+                val key = doc.getString("key") ?: return@CollectionSync null
+                if (!SyncableSettings.isSyncable(key)) return@CollectionSync null
+                val updatedAt = (doc.get(CollectionSync.FIELD_UPDATED_AT) as? Number)?.toLong()
+                    ?: return@CollectionSync null
+                AppSetting(
+                    key = key,
+                    valueText = doc.getString("valueText"),
+                    valueLong = (doc.get("valueLong") as? Number)?.toLong(),
+                    valueBool = doc.getBoolean("valueBool"),
+                    updatedAt = updatedAt,
+                    syncKey = doc.getString(CollectionSync.FIELD_SYNC_KEY) ?: doc.id,
+                    syncStatus = SyncStatus.SYNCED
+                )
+            }
         )
     }
 
@@ -265,9 +462,14 @@ object SyncManager {
 
         val appContext = context.applicationContext
         val db = AppDatabase.getDatabase(appContext)
-        val syncs = listOf(
-            recordsSync(FinancialRecordRepository(db.financialRecordDao())),
-            recurringSync(RecurringTransactionRepository(db.recurringTransactionDao()))
+        val prefs = trackerPrefs(appContext)
+        val syncs = allSyncs(
+            db,
+            FinancialRecordRepository(db.financialRecordDao()),
+            RecurringTransactionRepository(db.recurringTransactionDao()),
+            CategoryRepository(db.categoryDao(), prefs),
+            CategoryBudgetRepository(db.categoryBudgetDao()),
+            AppSettingsRepository(db.appSettingDao())
         )
 
         syncs.forEach { sync ->

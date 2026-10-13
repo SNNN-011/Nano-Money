@@ -147,107 +147,352 @@ abstract class AppDatabase : RoomDatabase() {
          * soft delete untuk recurring, referensi kategori, dan tabel pendukung
          * (categories, category_budgets, app_settings).
          *
-         * Semua baris lama diberi syncKey unik ('t:legacy:'||id / 'r:legacy:'||id),
-         * updatedAt = sekarang, dan syncStatus = PENDING supaya terkirim sekali
-         * pada sinkronisasi pertama setelah upgrade. Nilai kolom lama tidak diubah.
+         * PENTING: ada dua lineage DB berbeda yang sama-sama versi 5. Yang di branch
+         * main nominalnya sudah INTEGER (Long), sedangkan DB dari percobaan lama masih
+         * REAL (Double) dan sudah punya sebagian kolom sync. Karena itu migrasi ini
+         * bukan sekadar ALTER: bentuk tabelnya dibaca dulu lewat PRAGMA table_info,
+         * lalu tabel dibangun ulang ke bentuk v6 dengan pemetaan kolom terbaik.
+         * Nilai nominal dikonversi dengan CAST (1 sen, bukan pembulatan bebas), dan
+         * baris lama diberi syncKey unik ('t:legacy:'||id), updatedAt = sekarang,
+         * syncStatus = PENDING supaya terkirim sekali saat sinkronisasi pertama.
          */
         val MIGRATION_5_6 = object : androidx.room.migration.Migration(5, 6) {
             override fun migrate(database: androidx.sqlite.db.SupportSQLiteDatabase) {
                 val now = System.currentTimeMillis()
 
-                // --- financial_records ---
-                database.execSQL(
-                    "ALTER TABLE `financial_records` ADD COLUMN `categoryId` TEXT NOT NULL DEFAULT ''"
-                )
-                database.execSQL(
-                    "ALTER TABLE `financial_records` ADD COLUMN `updatedAt` INTEGER NOT NULL DEFAULT 0"
-                )
-                database.execSQL(
-                    "ALTER TABLE `financial_records` ADD COLUMN `syncKey` TEXT NOT NULL DEFAULT ''"
-                )
-                database.execSQL(
-                    "ALTER TABLE `financial_records` ADD COLUMN `syncStatus` INTEGER NOT NULL DEFAULT 0"
-                )
-                database.execSQL(
-                    "UPDATE `financial_records` SET `syncKey` = 't:legacy:' || `id`, `updatedAt` = ?, `syncStatus` = 1",
-                    arrayOf<Any>(now)
-                )
-                database.execSQL(
-                    "CREATE UNIQUE INDEX IF NOT EXISTS `index_financial_records_syncKey` ON `financial_records` (`syncKey`)"
-                )
-
-                // --- recurring_transactions ---
-                database.execSQL(
-                    "ALTER TABLE `recurring_transactions` ADD COLUMN `isDeleted` INTEGER NOT NULL DEFAULT 0"
-                )
-                database.execSQL(
-                    "ALTER TABLE `recurring_transactions` ADD COLUMN `updatedAt` INTEGER NOT NULL DEFAULT 0"
-                )
-                database.execSQL(
-                    "ALTER TABLE `recurring_transactions` ADD COLUMN `syncKey` TEXT NOT NULL DEFAULT ''"
-                )
-                database.execSQL(
-                    "ALTER TABLE `recurring_transactions` ADD COLUMN `syncStatus` INTEGER NOT NULL DEFAULT 0"
-                )
-                database.execSQL(
-                    "UPDATE `recurring_transactions` SET `syncKey` = 'r:legacy:' || `id`, `updatedAt` = ?, `syncStatus` = 1",
-                    arrayOf<Any>(now)
-                )
-                database.execSQL(
-                    "CREATE UNIQUE INDEX IF NOT EXISTS `index_recurring_transactions_syncKey` ON `recurring_transactions` (`syncKey`)"
-                )
-
-                // --- categories ---
-                database.execSQL(
-                    """
-                    CREATE TABLE IF NOT EXISTS `categories` (
-                        `id` TEXT NOT NULL,
-                        `name` TEXT NOT NULL,
-                        `type` TEXT NOT NULL,
-                        `isDeleted` INTEGER NOT NULL DEFAULT 0,
-                        `updatedAt` INTEGER NOT NULL DEFAULT 0,
-                        `syncKey` TEXT NOT NULL DEFAULT '',
-                        `syncStatus` INTEGER NOT NULL DEFAULT 0,
-                        PRIMARY KEY(`id`)
-                    )
-                    """.trimIndent()
-                )
-                database.execSQL(
-                    "CREATE INDEX IF NOT EXISTS `index_categories_type` ON `categories` (`type`)"
-                )
-
-                // --- category_budgets ---
-                database.execSQL(
-                    """
-                    CREATE TABLE IF NOT EXISTS `category_budgets` (
-                        `categoryId` TEXT NOT NULL,
-                        `budgetLimit` INTEGER NOT NULL DEFAULT 0,
-                        `isDeleted` INTEGER NOT NULL DEFAULT 0,
-                        `updatedAt` INTEGER NOT NULL DEFAULT 0,
-                        `syncKey` TEXT NOT NULL DEFAULT '',
-                        `syncStatus` INTEGER NOT NULL DEFAULT 0,
-                        PRIMARY KEY(`categoryId`)
-                    )
-                    """.trimIndent()
-                )
-
-                // --- app_settings ---
-                database.execSQL(
-                    """
-                    CREATE TABLE IF NOT EXISTS `app_settings` (
-                        `key` TEXT NOT NULL,
-                        `valueText` TEXT,
-                        `valueLong` INTEGER,
-                        `valueBool` INTEGER,
-                        `updatedAt` INTEGER NOT NULL DEFAULT 0,
-                        `syncKey` TEXT NOT NULL DEFAULT '',
-                        `syncStatus` INTEGER NOT NULL DEFAULT 0,
-                        PRIMARY KEY(`key`)
-                    )
-                    """.trimIndent()
-                )
+                rebuildRecords(database, now)
+                rebuildRecurring(database, now)
+                rebuildCategories(database, now)
+                rebuildBudgets(database, now)
+                rebuildSettings(database, now)
             }
         }
+
+        /** Nama kolom yang ada di sebuah tabel. */
+        private fun columnsOf(db: androidx.sqlite.db.SupportSQLiteDatabase, table: String): Set<String> {
+            val names = mutableSetOf<String>()
+            db.query("PRAGMA table_info(`$table`)").use { c ->
+                val nameIndex = c.getColumnIndex("name")
+                if (nameIndex >= 0) {
+                    while (c.moveToNext()) names += c.getString(nameIndex)
+                }
+            }
+            return names
+        }
+
+        private fun tableExists(db: androidx.sqlite.db.SupportSQLiteDatabase, table: String): Boolean {
+            var exists = false
+            db.query(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
+                arrayOf(table)
+            ).use { c -> exists = c.moveToFirst() }
+            return exists
+        }
+
+        private fun rebuildRecords(db: androidx.sqlite.db.SupportSQLiteDatabase, now: Long) {
+            if (!tableExists(db, "financial_records")) return
+            val cols = columnsOf(db, "financial_records")
+
+            db.execSQL("DROP TABLE IF EXISTS `financial_records_new`")
+            db.execSQL(
+                """
+                CREATE TABLE `financial_records_new` (
+                    `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                    `description` TEXT NOT NULL,
+                    `amount` INTEGER NOT NULL,
+                    `type` TEXT NOT NULL,
+                    `category` TEXT NOT NULL,
+                    `date` INTEGER NOT NULL,
+                    `notes` TEXT NOT NULL,
+                    `isDeleted` INTEGER NOT NULL,
+                    `categoryId` TEXT NOT NULL DEFAULT '',
+                    `updatedAt` INTEGER NOT NULL DEFAULT 0,
+                    `syncKey` TEXT NOT NULL DEFAULT '',
+                    `syncStatus` INTEGER NOT NULL DEFAULT 0
+                )
+                """.trimIndent()
+            )
+
+            val notes = if ("notes" in cols) "COALESCE(`notes`, '')" else "''"
+            val isDeleted = if ("isDeleted" in cols) "COALESCE(`isDeleted`, 0)" else "0"
+            val categoryId = if ("categoryId" in cols) "COALESCE(`categoryId`, '')" else "''"
+            val updatedAt = if ("updatedAt" in cols) "CASE WHEN `updatedAt` > 0 THEN `updatedAt` ELSE $now END" else "$now"
+            // syncKey yang sudah ada (dari lineage percobaan lama) dipertahankan agar
+            // dokumen cloud-nya tidak orphan; yang kosong diisi dari id baris.
+            val syncKey = if ("syncKey" in cols) {
+                "CASE WHEN `syncKey` <> '' THEN `syncKey` ELSE 't:legacy:' || `id` END"
+            } else {
+                "'t:legacy:' || `id`"
+            }
+            val syncStatus = if ("syncStatus" in cols) "CASE WHEN `syncStatus` IS NULL THEN 1 ELSE `syncStatus` END" else "1"
+
+            db.execSQL(
+                """
+                INSERT INTO `financial_records_new`
+                    (`id`, `description`, `amount`, `type`, `category`, `date`, `notes`, `isDeleted`, `categoryId`, `updatedAt`, `syncKey`, `syncStatus`)
+                SELECT `id`,
+                       COALESCE(`description`, ''),
+                       CAST(`amount` AS INTEGER),
+                       COALESCE(`type`, ''),
+                       COALESCE(`category`, ''),
+                       CAST(`date` AS INTEGER),
+                       $notes,
+                       $isDeleted,
+                       $categoryId,
+                       $updatedAt,
+                       $syncKey,
+                       $syncStatus
+                FROM `financial_records`
+                """.trimIndent()
+            )
+
+            db.execSQL("DROP TABLE `financial_records`")
+            db.execSQL("ALTER TABLE `financial_records_new` RENAME TO `financial_records`")
+            db.execSQL(
+                "CREATE UNIQUE INDEX IF NOT EXISTS `index_financial_records_syncKey` ON `financial_records` (`syncKey`)"
+            )
+        }
+
+        private fun rebuildRecurring(db: androidx.sqlite.db.SupportSQLiteDatabase, now: Long) {
+            if (!tableExists(db, "recurring_transactions")) return
+            val cols = columnsOf(db, "recurring_transactions")
+
+            db.execSQL("DROP TABLE IF EXISTS `recurring_transactions_new`")
+            db.execSQL(
+                """
+                CREATE TABLE `recurring_transactions_new` (
+                    `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                    `description` TEXT NOT NULL,
+                    `amount` INTEGER NOT NULL,
+                    `type` TEXT NOT NULL,
+                    `category` TEXT NOT NULL,
+                    `dayOfMonth` INTEGER NOT NULL,
+                    `notes` TEXT NOT NULL,
+                    `isDeleted` INTEGER NOT NULL DEFAULT 0,
+                    `lastRunDate` INTEGER,
+                    `isActive` INTEGER NOT NULL,
+                    `updatedAt` INTEGER NOT NULL DEFAULT 0,
+                    `syncKey` TEXT NOT NULL DEFAULT '',
+                    `syncStatus` INTEGER NOT NULL DEFAULT 0
+                )
+                """.trimIndent()
+            )
+
+            val notes = if ("notes" in cols) "COALESCE(`notes`, '')" else "''"
+            val isDeleted = if ("isDeleted" in cols) "COALESCE(`isDeleted`, 0)" else "0"
+            val lastRunDate = if ("lastRunDate" in cols) "`lastRunDate`" else "NULL"
+            val isActive = if ("isActive" in cols) "COALESCE(`isActive`, 1)" else "1"
+            val updatedAt = if ("updatedAt" in cols) "CASE WHEN `updatedAt` > 0 THEN `updatedAt` ELSE $now END" else "$now"
+            val syncKey = if ("syncKey" in cols) {
+                "CASE WHEN `syncKey` <> '' THEN `syncKey` ELSE 'r:legacy:' || `id` END"
+            } else {
+                "'r:legacy:' || `id`"
+            }
+            val syncStatus = if ("syncStatus" in cols) "CASE WHEN `syncStatus` IS NULL THEN 1 ELSE `syncStatus` END" else "1"
+
+            db.execSQL(
+                """
+                INSERT INTO `recurring_transactions_new`
+                    (`id`, `description`, `amount`, `type`, `category`, `dayOfMonth`, `notes`, `isDeleted`, `lastRunDate`, `isActive`, `updatedAt`, `syncKey`, `syncStatus`)
+                SELECT `id`,
+                       COALESCE(`description`, ''),
+                       CAST(`amount` AS INTEGER),
+                       COALESCE(`type`, ''),
+                       COALESCE(`category`, ''),
+                       COALESCE(`dayOfMonth`, 1),
+                       $notes,
+                       $isDeleted,
+                       $lastRunDate,
+                       $isActive,
+                       $updatedAt,
+                       $syncKey,
+                       $syncStatus
+                FROM `recurring_transactions`
+                """.trimIndent()
+            )
+
+            db.execSQL("DROP TABLE `recurring_transactions`")
+            db.execSQL("ALTER TABLE `recurring_transactions_new` RENAME TO `recurring_transactions`")
+            db.execSQL(
+                "CREATE UNIQUE INDEX IF NOT EXISTS `index_recurring_transactions_syncKey` ON `recurring_transactions` (`syncKey`)"
+            )
+        }
+
+        /**
+         * Tabel categories. Kalau sudah ada dari lineage lama, tetap dibangun ulang:
+         * baris dengan syncKey kosong akan ditolak Firestore karena documentId kosong.
+         */
+        private fun rebuildCategories(db: androidx.sqlite.db.SupportSQLiteDatabase, now: Long) {
+            if (!tableExists(db, "categories")) {
+                db.execSQL(CREATE_CATEGORIES)
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_categories_type` ON `categories` (`type`)")
+                return
+            }
+            val cols = columnsOf(db, "categories")
+
+            db.execSQL("DROP TABLE IF EXISTS `categories_new`")
+            db.execSQL(CREATE_CATEGORIES_NEW)
+            val name = if ("name" in cols) "COALESCE(`name`, '')" else "''"
+            val type = if ("type" in cols) "COALESCE(`type`, '')" else "''"
+            val isDeleted = if ("isDeleted" in cols) "COALESCE(`isDeleted`, 0)" else "0"
+            val updatedAt = if ("updatedAt" in cols) "CASE WHEN `updatedAt` > 0 THEN `updatedAt` ELSE $now END" else "$now"
+            val syncKey = if ("syncKey" in cols) "CASE WHEN `syncKey` <> '' THEN `syncKey` ELSE `id` END" else "`id`"
+            val syncStatus = if ("syncStatus" in cols) "COALESCE(`syncStatus`, 1)" else "1"
+
+            db.execSQL(
+                """
+                INSERT INTO `categories_new` (`id`, `name`, `type`, `isDeleted`, `updatedAt`, `syncKey`, `syncStatus`)
+                SELECT `id`, $name, $type, $isDeleted, $updatedAt, $syncKey, $syncStatus FROM `categories`
+                """.trimIndent()
+            )
+            db.execSQL("DROP TABLE `categories`")
+            db.execSQL("ALTER TABLE `categories_new` RENAME TO `categories`")
+            db.execSQL("CREATE INDEX IF NOT EXISTS `index_categories_type` ON `categories` (`type`)")
+        }
+
+        private fun rebuildBudgets(db: androidx.sqlite.db.SupportSQLiteDatabase, now: Long) {
+            if (!tableExists(db, "category_budgets")) {
+                db.execSQL(CREATE_BUDGETS)
+                return
+            }
+            val cols = columnsOf(db, "category_budgets")
+
+            db.execSQL("DROP TABLE IF EXISTS `category_budgets_new`")
+            db.execSQL(CREATE_BUDGETS_NEW)
+            val limit = if ("budgetLimit" in cols) "CAST(COALESCE(`budgetLimit`, 0) AS INTEGER)" else "0"
+            val isDeleted = if ("isDeleted" in cols) "COALESCE(`isDeleted`, 0)" else "0"
+            val updatedAt = if ("updatedAt" in cols) "CASE WHEN `updatedAt` > 0 THEN `updatedAt` ELSE $now END" else "$now"
+            val syncKey = if ("syncKey" in cols) "CASE WHEN `syncKey` <> '' THEN `syncKey` ELSE `categoryId` END" else "`categoryId`"
+            val syncStatus = if ("syncStatus" in cols) "COALESCE(`syncStatus`, 1)" else "1"
+
+            db.execSQL(
+                """
+                INSERT INTO `category_budgets_new` (`categoryId`, `budgetLimit`, `isDeleted`, `updatedAt`, `syncKey`, `syncStatus`)
+                SELECT `categoryId`, $limit, $isDeleted, $updatedAt, $syncKey, $syncStatus FROM `category_budgets`
+                """.trimIndent()
+            )
+            db.execSQL("DROP TABLE `category_budgets`")
+            db.execSQL("ALTER TABLE `category_budgets_new` RENAME TO `category_budgets`")
+        }
+
+        private fun rebuildSettings(db: androidx.sqlite.db.SupportSQLiteDatabase, now: Long) {
+            if (!tableExists(db, "app_settings")) {
+                db.execSQL(CREATE_SETTINGS)
+                return
+            }
+            val cols = columnsOf(db, "app_settings")
+
+            db.execSQL("DROP TABLE IF EXISTS `app_settings_new`")
+            db.execSQL(CREATE_SETTINGS_NEW)
+            val valueText = if ("valueText" in cols) "`valueText`" else "NULL"
+            // Lineage lama menyimpan angka Long di kolom bernama valueReal.
+            val valueLong = when {
+                "valueLong" in cols -> "`valueLong`"
+                "valueReal" in cols -> "CAST(`valueReal` AS INTEGER)"
+                else -> "NULL"
+            }
+            val valueBool = if ("valueBool" in cols) "`valueBool`" else "NULL"
+            val updatedAt = if ("updatedAt" in cols) "CASE WHEN `updatedAt` > 0 THEN `updatedAt` ELSE $now END" else "$now"
+            val syncKey = if ("syncKey" in cols) "CASE WHEN `syncKey` <> '' THEN `syncKey` ELSE `key` END" else "`key`"
+            val syncStatus = if ("syncStatus" in cols) "COALESCE(`syncStatus`, 1)" else "1"
+
+            db.execSQL(
+                """
+                INSERT INTO `app_settings_new` (`key`, `valueText`, `valueLong`, `valueBool`, `updatedAt`, `syncKey`, `syncStatus`)
+                SELECT `key`, $valueText, $valueLong, $valueBool, $updatedAt, $syncKey, $syncStatus FROM `app_settings`
+                """.trimIndent()
+            )
+            db.execSQL("DROP TABLE `app_settings`")
+            db.execSQL("ALTER TABLE `app_settings_new` RENAME TO `app_settings`")
+
+            // Baris di luar allow-list dibuang di sini: kolom ini ikut dikirim apa adanya
+            // ke Firestore, dan versi lama pernah menyimpan nilai non-angka di sini.
+            SyncableSettings.LOCAL_ONLY_KEYS.forEach { key ->
+                runCatching { db.execSQL("DELETE FROM `app_settings` WHERE `key` = ?", arrayOf<Any>(key)) }
+            }
+        }
+
+        private const val CREATE_CATEGORIES =
+            """
+            CREATE TABLE IF NOT EXISTS `categories` (
+                `id` TEXT NOT NULL,
+                `name` TEXT NOT NULL,
+                `type` TEXT NOT NULL,
+                `isDeleted` INTEGER NOT NULL DEFAULT 0,
+                `updatedAt` INTEGER NOT NULL DEFAULT 0,
+                `syncKey` TEXT NOT NULL DEFAULT '',
+                `syncStatus` INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY(`id`)
+            )
+            """
+
+        private const val CREATE_CATEGORIES_NEW =
+            """
+            CREATE TABLE `categories_new` (
+                `id` TEXT NOT NULL,
+                `name` TEXT NOT NULL,
+                `type` TEXT NOT NULL,
+                `isDeleted` INTEGER NOT NULL DEFAULT 0,
+                `updatedAt` INTEGER NOT NULL DEFAULT 0,
+                `syncKey` TEXT NOT NULL DEFAULT '',
+                `syncStatus` INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY(`id`)
+            )
+            """
+
+        private const val CREATE_BUDGETS =
+            """
+            CREATE TABLE IF NOT EXISTS `category_budgets` (
+                `categoryId` TEXT NOT NULL,
+                `budgetLimit` INTEGER NOT NULL DEFAULT 0,
+                `isDeleted` INTEGER NOT NULL DEFAULT 0,
+                `updatedAt` INTEGER NOT NULL DEFAULT 0,
+                `syncKey` TEXT NOT NULL DEFAULT '',
+                `syncStatus` INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY(`categoryId`)
+            )
+            """
+
+        private const val CREATE_BUDGETS_NEW =
+            """
+            CREATE TABLE `category_budgets_new` (
+                `categoryId` TEXT NOT NULL,
+                `budgetLimit` INTEGER NOT NULL DEFAULT 0,
+                `isDeleted` INTEGER NOT NULL DEFAULT 0,
+                `updatedAt` INTEGER NOT NULL DEFAULT 0,
+                `syncKey` TEXT NOT NULL DEFAULT '',
+                `syncStatus` INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY(`categoryId`)
+            )
+            """
+
+        private const val CREATE_SETTINGS =
+            """
+            CREATE TABLE IF NOT EXISTS `app_settings` (
+                `key` TEXT NOT NULL,
+                `valueText` TEXT,
+                `valueLong` INTEGER,
+                `valueBool` INTEGER,
+                `updatedAt` INTEGER NOT NULL DEFAULT 0,
+                `syncKey` TEXT NOT NULL DEFAULT '',
+                `syncStatus` INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY(`key`)
+            )
+            """
+
+        private const val CREATE_SETTINGS_NEW =
+            """
+            CREATE TABLE `app_settings_new` (
+                `key` TEXT NOT NULL,
+                `valueText` TEXT,
+                `valueLong` INTEGER,
+                `valueBool` INTEGER,
+                `updatedAt` INTEGER NOT NULL DEFAULT 0,
+                `syncKey` TEXT NOT NULL DEFAULT '',
+                `syncStatus` INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY(`key`)
+            )
+            """
 
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {

@@ -2,6 +2,7 @@ package com.example.util
 
 import android.content.Context
 import com.example.data.FinancialRecord
+import com.example.data.sync.CollectionSync
 import com.example.data.sync.SyncManager
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount
 import com.google.firebase.auth.FirebaseAuth
@@ -9,6 +10,7 @@ import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withTimeout
 import kotlin.coroutines.resume
 
 /**
@@ -79,78 +81,41 @@ object FirebaseSyncHelper {
         val db = FirebaseFirestore.getInstance()
         val collection = db.collection("users").document(uid).collection(SyncManager.COLLECTION_RECORDS)
 
-        suspendCancellableCoroutine<Unit> { continuation ->
+        records.chunked(CollectionSync.BATCH_LIMIT).forEach { chunk ->
             val batch = db.batch()
-            records.forEach { record ->
+            chunk.forEach { record ->
                 // Dokumen versi lama memakai id numerik sebagai id dokumen.
                 batch.delete(collection.document(record.syncKey.ifBlank { record.id.toString() }))
                 if (record.syncKey.isNotBlank()) {
                     batch.delete(collection.document(record.id.toString()))
                 }
             }
-            batch.commit().addOnCompleteListener { continuation.resume(Unit) }
+            withTimeout(CollectionSync.OP_TIMEOUT_MS) { batch.commit().await() }
         }
     }
 
     /**
-     * Sinkron penuh: transaksi + transaksi berulang lewat engine, lalu sinkron
-     * kategori & preferensi lawas (akan digantikan tabel categories/app_settings).
+     * Sinkron penuh: transaksi, transaksi berulang, kategori, anggaran, dan pengaturan
+     * lewat engine. Kunci keamanan (PIN, biometrik) tidak pernah ikut karena SyncManager
+     * hanya memakai allow-list SyncableSettings.
      */
     suspend fun syncFinancialRecordsWithFirestore(context: Context): Result<String> {
         val report = SyncManager.syncAll(context)
-        runCatching { syncCategoriesAndPreferences(context) }
 
         return if (report.isFailure) {
             Result.failure(Exception(report.errors.joinToString("; ")))
         } else {
+            val totalApplied =
+                report.recordsApplied + report.recurringApplied + report.categoriesApplied +
+                    report.budgetsApplied + report.settingsApplied
+            val totalPushed =
+                report.recordsPushed + report.recurringPushed + report.categoriesPushed +
+                    report.budgetsPushed + report.settingsPushed
             Result.success(
-                "Penyelarasan berhasil! ${report.recordsPushed} transaksi & " +
-                    "${report.recurringPushed} transaksi berulang terkirim, " +
-                    "${report.recordsApplied + report.recurringApplied} pembaruan diterima" +
+                "Penyelarasan berhasil! $totalPushed data terkirim, $totalApplied pembaruan diterima" +
                     (if (report.legacyAdopted > 0) ", ${report.legacyAdopted} data lama dipulihkan" else "") +
                     "."
             )
         }
-    }
-
-    /**
-     * Sinkron kategori & preferensi versi lama (masih berbasis SharedPreferences).
-     * Bertahan sampai digantikan tabel categories dan app_settings.
-     */
-    private suspend fun syncCategoriesAndPreferences(context: Context) {
-        val uid = getCurrentUid() ?: return
-        val db = FirebaseFirestore.getInstance()
-        val settingsRef = db.collection("users").document(uid)
-            .collection("settings").document("financial_tracker_prefs")
-        val prefs = SecurePrefsHelper.getEncryptedPrefs(context, "financial_tracker_prefs")
-
-        val remote = runCatching { settingsRef.get().await().data ?: emptyMap() }.getOrDefault(emptyMap())
-
-        val categoryKeys = listOf("income_categories_list", "expense_categories_list")
-        val defaultCategories = mapOf(
-            "income_categories_list" to "Gaji,Investasi,Freelance,Lainnya",
-            "expense_categories_list" to "Makanan,Transportasi,Tagihan,Hiburan,Belanja,Lainnya"
-        )
-        val skipKeys = categoryKeys + setOf("pin_hash", "pin_salt", "pin_enabled", "saved_pin")
-
-        val merged = mutableMapOf<String, Any>()
-        // Kategori: kalau user sudah pernah mengubahnya di perangkat ini, lokal yang menang.
-        categoryKeys.forEach { key ->
-            val localValue = prefs.getString(key, null)
-            val remoteValue = remote[key] as? String
-            val isLocalDefault = localValue.isNullOrBlank() || localValue == defaultCategories[key]
-            when {
-                !isLocalDefault -> merged[key] = localValue!!
-                !remoteValue.isNullOrBlank() -> {
-                    merged[key] = remoteValue
-                    prefs.edit().putString(key, remoteValue).apply()
-                }
-                !localValue.isNullOrBlank() -> merged[key] = localValue
-            }
-        }
-        remote.forEach { (k, v) -> if (k !in skipKeys) merged[k] = v }
-        prefs.all.forEach { (k, v) -> if (v != null && k !in skipKeys) merged[k] = v }
-
-        runCatching { settingsRef.set(merged).await() }
     }
 }

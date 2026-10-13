@@ -1,0 +1,5 @@
+{
+  "//": "Dik-pull saat sync. Query memakai where + orderBy pada field yang sama (updatedAt), jadi index single-field bawaan sudah cukup.",
+  "indexes": [],
+  "fieldOverrides": []
+}

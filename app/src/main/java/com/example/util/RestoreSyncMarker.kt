@@ -38,6 +38,9 @@ object RestoreSyncMarker {
                 val db = AppDatabase.getDatabase(context)
                 db.financialRecordDao().markAllPendingForRestore(now)
                 db.recurringTransactionDao().markAllPendingForRestore(now)
+                db.categoryDao().markAllPendingForRestore(now)
+                db.categoryBudgetDao().markAllPendingForRestore(now)
+                db.appSettingDao().markAllPendingForRestore(now)
             } finally {
                 prefs.edit().remove(KEY_RESTORE_PENDING).apply()
             }

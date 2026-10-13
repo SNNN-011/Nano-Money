@@ -10,6 +10,7 @@ import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -102,6 +103,133 @@ class Migration5To6Test {
         }
     }
 
+    /**
+     * Skema lineage percobaan lama: nominal masih REAL (Double), kolom sync sudah ada,
+     * dan tabel pendukung sudah dibuat dengan kolom angka REAL.
+     * Versi DB-nya sama-sama 5, jadi Room tidak bisa membedakannya dari nomor versi.
+     */
+    private fun createDivergentV5() {
+        val config = SupportSQLiteOpenHelper.Configuration
+            .builder(ApplicationProvider.getApplicationContext())
+            .name(dbName)
+            .callback(object : SupportSQLiteOpenHelper.Callback(5) {
+                override fun onCreate(db: SupportSQLiteDatabase) {
+                    db.execSQL(
+                        """
+                        CREATE TABLE `financial_records` (
+                            `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                            `description` TEXT NOT NULL,
+                            `amount` REAL NOT NULL,
+                            `type` TEXT NOT NULL,
+                            `category` TEXT NOT NULL,
+                            `date` INTEGER NOT NULL,
+                            `notes` TEXT NOT NULL,
+                            `isDeleted` INTEGER NOT NULL,
+                            `categoryId` TEXT NOT NULL DEFAULT '',
+                            `updatedAt` INTEGER NOT NULL DEFAULT 0,
+                            `syncKey` TEXT NOT NULL DEFAULT '',
+                            `syncStatus` INTEGER NOT NULL DEFAULT 0
+                        )
+                        """.trimIndent()
+                    )
+                    db.execSQL(
+                        """
+                        CREATE TABLE `recurring_transactions` (
+                            `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                            `description` TEXT NOT NULL,
+                            `amount` REAL NOT NULL,
+                            `type` TEXT NOT NULL,
+                            `category` TEXT NOT NULL,
+                            `dayOfMonth` INTEGER NOT NULL,
+                            `notes` TEXT NOT NULL,
+                            `isDeleted` INTEGER NOT NULL DEFAULT 0,
+                            `lastRunDate` INTEGER,
+                            `isActive` INTEGER NOT NULL,
+                            `updatedAt` INTEGER NOT NULL DEFAULT 0,
+                            `syncKey` TEXT NOT NULL DEFAULT '',
+                            `syncStatus` INTEGER NOT NULL DEFAULT 0
+                        )
+                        """.trimIndent()
+                    )
+                    db.execSQL(
+                        """
+                        CREATE TABLE `categories` (
+                            `id` TEXT NOT NULL,
+                            `name` TEXT NOT NULL,
+                            `type` TEXT NOT NULL,
+                            `isDeleted` INTEGER NOT NULL DEFAULT 0,
+                            `updatedAt` INTEGER NOT NULL DEFAULT 0,
+                            `syncKey` TEXT NOT NULL DEFAULT '',
+                            `syncStatus` INTEGER NOT NULL DEFAULT 0,
+                            PRIMARY KEY(`id`)
+                        )
+                        """.trimIndent()
+                    )
+                    db.execSQL(
+                        """
+                        CREATE TABLE `category_budgets` (
+                            `categoryId` TEXT NOT NULL,
+                            `budgetLimit` REAL NOT NULL DEFAULT 0,
+                            `isDeleted` INTEGER NOT NULL DEFAULT 0,
+                            `updatedAt` INTEGER NOT NULL DEFAULT 0,
+                            `syncKey` TEXT NOT NULL DEFAULT '',
+                            `syncStatus` INTEGER NOT NULL DEFAULT 0,
+                            PRIMARY KEY(`categoryId`)
+                        )
+                        """.trimIndent()
+                    )
+                    db.execSQL(
+                        """
+                        CREATE TABLE `app_settings` (
+                            `key` TEXT NOT NULL,
+                            `valueText` TEXT,
+                            `valueReal` REAL,
+                            `updatedAt` INTEGER NOT NULL DEFAULT 0,
+                            `syncKey` TEXT NOT NULL DEFAULT '',
+                            `syncStatus` INTEGER NOT NULL DEFAULT 0,
+                            PRIMARY KEY(`key`)
+                        )
+                        """.trimIndent()
+                    )
+                }
+
+                override fun onUpgrade(db: SupportSQLiteDatabase, oldVersion: Int, newVersion: Int) = Unit
+            })
+            .build()
+
+        FrameworkSQLiteOpenHelperFactory().create(config).use { helper ->
+            val db = helper.writableDatabase
+            db.execSQL(
+                "INSERT INTO financial_records (description, amount, type, category, date, notes, isDeleted, categoryId, updatedAt, syncKey, syncStatus) " +
+                    "VALUES ('Kopi', 15000.75, 'expense', 'Makanan', 1700000000000, '', 0, 'cat:expense:makanan', 1700000000500, 't:ada', 0)"
+            )
+            db.execSQL(
+                "INSERT INTO financial_records (description, amount, type, category, date, notes, isDeleted, categoryId, updatedAt, syncKey, syncStatus) " +
+                    "VALUES ('Pulsa', 25000.0, 'expense', 'Tagihan', 1700000001000, '', 1, '', 0, '', 1)"
+            )
+            db.execSQL(
+                "INSERT INTO recurring_transactions (description, amount, type, category, dayOfMonth, notes, isDeleted, lastRunDate, isActive, updatedAt, syncKey, syncStatus) " +
+                    "VALUES ('Listrik', 450000.5, 'expense', 'Tagihan', 10, '', 0, NULL, 1, 0, '', 1)"
+            )
+            db.execSQL(
+                "INSERT INTO categories (id, name, type, isDeleted, updatedAt, syncKey, syncStatus) " +
+                    "VALUES ('cat:expense:makanan', 'Makanan', 'expense', 0, 0, '', 0)"
+            )
+            db.execSQL(
+                "INSERT INTO category_budgets (categoryId, budgetLimit, isDeleted, updatedAt, syncKey, syncStatus) " +
+                    "VALUES ('cat:expense:makanan', 750000.75, 0, 0, '', 0)"
+            )
+            db.execSQL(
+                "INSERT INTO app_settings (key, valueText, valueReal, updatedAt, syncKey, syncStatus) " +
+                    "VALUES ('monthly_budget_limit', NULL, 3000000.0, 0, '', 1)"
+            )
+            db.execSQL(
+                "INSERT INTO app_settings (key, valueText, valueReal, updatedAt, syncKey, syncStatus) " +
+                    "VALUES ('saved_pin', '1234', NULL, 0, '', 1)"
+            )
+        }
+    }
+
     private fun openRoom() = Room.databaseBuilder(
         ApplicationProvider.getApplicationContext(),
         AppDatabase::class.java,
@@ -173,6 +301,56 @@ class Migration5To6Test {
             assertEquals(1, db.financialRecordDao().getRecordCount())
             assertNotNull(db.financialRecordDao().findBySyncKey("t:legacy:1"))
             assertEquals(1, db.recurringTransactionDao().getActiveRecurring().size)
+        } finally {
+            db.close()
+        }
+    }
+
+    @Test
+    fun db_lineage_lama_dipakai_bukan_hanya_lineage_main() = runBlocking {
+        createDivergentV5()
+        val db = openRoom()
+        try {
+            val writable = db.openHelper.writableDatabase
+
+            // Nominal REAL -> INTEGER, dan syncKey yang sudah ada tidak ditimpa
+            // (kalau ditimpa, dokumen cloud-nya jadi orphan lalu dobel).
+            writable.query(
+                "SELECT amount, syncKey, syncStatus, updatedAt, categoryId FROM financial_records ORDER BY id"
+            ).use { c ->
+                assertTrue(c.moveToFirst())
+                assertEquals(15_000L, c.getLong(0))
+                assertEquals("t:ada", c.getString(1))
+                assertEquals(SyncStatus.SYNCED.ordinal, c.getInt(2))
+                assertEquals(1_700_000_000_500L, c.getLong(3))
+                assertEquals("cat:expense:makanan", c.getString(4))
+
+                // Yang belum punya syncKey tetap diisi dari id baris.
+                assertTrue(c.moveToNext())
+                assertEquals(25_000L, c.getLong(0))
+                assertEquals("t:legacy:2", c.getString(1))
+                assertEquals(SyncStatus.PENDING.ordinal, c.getInt(2))
+            }
+
+            writable.query(
+                "SELECT amount, syncKey FROM recurring_transactions"
+            ).use { c ->
+                assertTrue(c.moveToFirst())
+                assertEquals(450_000L, c.getLong(0))
+                assertEquals("r:legacy:1", c.getString(1))
+            }
+
+            // syncKey kategori yang kosong harus diisi, kalau tidak documentId-nya
+            // tidak sah dan push ditolak Firestore.
+            assertEquals(
+                "cat:expense:makanan",
+                db.categoryDao().findById("cat:expense:makanan")!!.syncKey
+            )
+            assertEquals(750_000L, db.categoryBudgetDao().findByCategoryId("cat:expense:makanan")!!.budgetLimit)
+            assertEquals(3_000_000L, db.appSettingDao().find(SyncableSettings.MONTHLY_BUDGET_LIMIT)!!.valueLong)
+
+            // Baris di luar allow-list dibuang saat migrasi.
+            assertNull(db.appSettingDao().find("saved_pin"))
         } finally {
             db.close()
         }

@@ -6,6 +6,7 @@ import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.WriteBatch
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.withTimeout
 
 /**
  * Engine sinkronisasi untuk satu koleksi Firestore.
@@ -41,7 +42,7 @@ class CollectionSync<T : SyncEntity>(
             chunk.forEach { item ->
                 batch.set(collectionRef.document(item.syncKey), toDocument(item))
             }
-            batch.commit().await()
+            withTimeout(OP_TIMEOUT_MS) { batch.commit().await() }
 
             markSynced(chunk.map { it.syncKey })
             pushed += chunk.size
@@ -50,11 +51,13 @@ class CollectionSync<T : SyncEntity>(
     }
 
     suspend fun pull(lastSync: Long): PullResult {
-        val snapshot = collectionRef
-            .whereGreaterThan(FIELD_UPDATED_AT, lastSync)
-            .orderBy(FIELD_UPDATED_AT)
-            .get()
-            .await()
+        val snapshot = withTimeout(OP_TIMEOUT_MS) {
+            collectionRef
+                .whereGreaterThan(FIELD_UPDATED_AT, lastSync)
+                .orderBy(FIELD_UPDATED_AT)
+                .get()
+                .await()
+        }
 
         var applied = 0
         var newest = lastSync
@@ -95,5 +98,8 @@ class CollectionSync<T : SyncEntity>(
         const val FIELD_UPDATED_AT = "updatedAt"
         const val FIELD_IS_DELETED = "isDeleted"
         const val FIELD_SYNC_KEY = "syncKey"
+
+        /** Batas tunggu satu operasi jaringan, supaya sync tidak menggantung selamanya. */
+        const val OP_TIMEOUT_MS = 30_000L
     }
 }

@@ -412,6 +412,10 @@ object BackupHelper {
                 }
             }
 
+            // Data hasil restore harus menang atas versi yang ada di Firestore, jadi
+            // seluruh baris ditandai PENDING lalu diproses saat app start berikutnya.
+            RestoreSyncMarker.markPending(context)
+
             TelemetryHelper.trackBackupAction("restore", true)
             restartApplication(context)
             true

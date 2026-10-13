@@ -1,0 +1,19 @@
+rules_version = '2';
+
+// Data keuangan personal: satu pengguna hanya boleh membaca/menulis dokumennya sendiri.
+// Catatan: blok match digabung dengan OR, jadi tidak ada blok "deny" per sub-path.
+// Aplikasi tidak pernah menulis data keamanan (PIN/biometrik) ke Firestore; kuncinya
+// hanya ada di EncryptedSharedPreferences lokal dan tidak termasuk allow-list sync.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    match /users/{uid}/{document=**} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    // Default deny untuk semua koleksi lain.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
