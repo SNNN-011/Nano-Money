@@ -1,11 +1,15 @@
 package com.example.data
 
-import androidx.room.*
+import androidx.room.Dao
+import androidx.room.Insert
+import androidx.room.OnConflictStrategy
+import androidx.room.Query
+import androidx.room.Transaction
+import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.ZoneId
-import java.time.Instant
 
 @Dao
 interface FinancialRecordDao {
@@ -19,10 +23,11 @@ interface FinancialRecordDao {
     @Query("SELECT * FROM financial_records WHERE isDeleted = 1 ORDER BY date DESC")
     fun getDeletedRecords(): Flow<List<FinancialRecord>>
 
-    // Kembalikan record dari sampah ke daftar utama.
-    @Query("UPDATE financial_records SET isDeleted = 0 WHERE id IN (:ids)")
-    suspend fun restoreRecords(ids: List<Int>)
+    // Kembalikan record dari sampah ke daftar utama (perubahan lokal -> PENDING).
+    @Query("UPDATE financial_records SET isDeleted = 0, updatedAt = :now, syncStatus = 1 WHERE id IN (:ids)")
+    suspend fun restoreRecords(ids: List<Int>, now: Long)
 
+    // Hapus permanen: ikut dibersihkan dari cloud lewat purgeRecordsFromFirestore.
     @Query("DELETE FROM financial_records WHERE isDeleted = 1")
     suspend fun purgeDeletedRecords()
 
@@ -53,18 +58,49 @@ interface FinancialRecordDao {
     @Update
     suspend fun updateRecord(record: FinancialRecord)
 
-    @Delete
-    suspend fun deleteRecord(record: FinancialRecord)
-
     @Query("DELETE FROM financial_records")
     suspend fun deleteAllRecords()
 
     // Hapus semua transaksi yang masih aktif (tidak termasuk isi Sampah).
-    @Query("UPDATE financial_records SET isDeleted = 1 WHERE isDeleted = 0")
-    suspend fun softDeleteAllActiveRecords()
+    @Query("UPDATE financial_records SET isDeleted = 1, updatedAt = :now, syncStatus = 1 WHERE isDeleted = 0")
+    suspend fun softDeleteAllActiveRecords(now: Long)
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(records: List<FinancialRecord>)
+
+    // ---- Jalur sinkronisasi ----
+
+    @Query("SELECT * FROM financial_records WHERE syncKey = :syncKey LIMIT 1")
+    suspend fun findBySyncKey(syncKey: String): FinancialRecord?
+
+    @Query("SELECT * FROM financial_records WHERE syncStatus = 1")
+    suspend fun getPendingSync(): List<FinancialRecord>
+
+    @Query("UPDATE financial_records SET syncStatus = 0 WHERE syncKey IN (:syncKeys)")
+    suspend fun markSynced(syncKeys: List<String>)
+
+    /** Restore backup: seluruh baris dianggap perubahan terbaru (menang atas versi cloud). */
+    @Query("UPDATE financial_records SET syncStatus = 1, updatedAt = :now")
+    suspend fun markAllPendingForRestore(now: Long)
+
+    /** Rename kategori ikut mengubah nama yang tersimpan di transaksi (categoryId tetap). */
+    @Query(
+        "UPDATE financial_records SET category = :newName, updatedAt = :now, syncStatus = 1 " +
+            "WHERE categoryId = :categoryId AND isDeleted = 0"
+    )
+    suspend fun renameCategoryOnRecords(categoryId: String, newName: String, now: Long): Int
+
+    /** Kategori dihapus: transaksinya pindah ke kategori pengganti (Lainnya). */
+    @Query(
+        "UPDATE financial_records SET categoryId = :newCategoryId, category = :newName, " +
+            "updatedAt = :now, syncStatus = 1 WHERE categoryId = :oldCategoryId AND isDeleted = 0"
+    )
+    suspend fun moveRecordsToCategory(
+        oldCategoryId: String,
+        newCategoryId: String,
+        newName: String,
+        now: Long
+    ): Int
 
     @Transaction
     suspend fun replaceAllRecords(records: List<FinancialRecord>) {

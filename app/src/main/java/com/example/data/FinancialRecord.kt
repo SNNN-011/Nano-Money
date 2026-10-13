@@ -1,10 +1,15 @@
 package com.example.data
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 import java.io.Serializable
 
-@Entity(tableName = "financial_records")
+@Entity(
+    tableName = "financial_records",
+    indices = [Index(value = ["syncKey"], unique = true)]
+)
 data class FinancialRecord(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
     val description: String,
@@ -13,5 +18,23 @@ data class FinancialRecord(
     val category: String,
     val date: Long, // timestamp in ms
     val notes: String,
-    val isDeleted: Boolean = false
-) : Serializable
+    override val isDeleted: Boolean = false,
+
+    /** Kategori yang dirujuk transaksi (categories.id); kosong untuk data lama. */
+    @ColumnInfo(defaultValue = "''") val categoryId: String = "",
+
+    /** Waktu edit lokal terakhir (epoch ms). Diisi titik tulis lokal, bukan saat pull remote. */
+    @ColumnInfo(defaultValue = "0") override val updatedAt: Long = 0,
+
+    /** Kunci stabil untuk sinkronisasi; sekaligus id dokumen di Firestore. */
+    @ColumnInfo(defaultValue = "''") override val syncKey: String = "",
+
+    @ColumnInfo(defaultValue = "0") override val syncStatus: SyncStatus = SyncStatus.PENDING
+) : Serializable, SyncEntity {
+
+    /**
+     * Nama kategori saat transaksi dibuat. Dipakai sebagai fallback tampilan
+     * ketika categoryId kosong (data sebelum migrasi kategori).
+     */
+    val categoryName: String get() = category
+}

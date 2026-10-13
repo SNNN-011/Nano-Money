@@ -82,9 +82,10 @@ class FinancialTrackerViewModel(
     val allRecords: StateFlow<List<FinancialRecord>> = repository.allRecords
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    private val recurringDao = AppDatabase.getDatabase(application).recurringTransactionDao()
+    private val recurringRepository =
+        com.example.data.RecurringTransactionRepository(AppDatabase.getDatabase(application).recurringTransactionDao())
 
-    val recurringTransactions: StateFlow<List<RecurringTransaction>> = recurringDao.getAllRecurring()
+    val recurringTransactions: StateFlow<List<RecurringTransaction>> = recurringRepository.allRecurring
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     // Combined filtered & sorted records
@@ -1332,8 +1333,8 @@ class FinancialTrackerViewModel(
                     lastRunDate = null,
                     isActive = true
                 )
-                recurringDao.insertRecurring(recurring)
-                
+                recurringRepository.insert(recurring)
+
                 checkAndProcessRecurringTransactions()
                 
                 uiEvent.emit(UiEvent.ShowToast("Transaksi berulang berhasil ditambahkan!"))
@@ -1347,7 +1348,8 @@ class FinancialTrackerViewModel(
     fun deleteRecurringTransaction(item: RecurringTransaction) {
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             try {
-                recurringDao.deleteRecurring(item)
+                // Soft delete: aksi hapus ikut tersinkron ke perangkat lain.
+                recurringRepository.softDelete(item)
                 uiEvent.emit(UiEvent.ShowToast("Transaksi berulang berhasil dihapus!"))
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -1360,7 +1362,7 @@ class FinancialTrackerViewModel(
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             try {
                 val updated = item.copy(isActive = !item.isActive)
-                recurringDao.updateRecurring(updated)
+                recurringRepository.update(updated)
                 
                 if (updated.isActive) {
                     checkAndProcessRecurringTransactions()
@@ -1376,7 +1378,7 @@ class FinancialTrackerViewModel(
     fun checkAndProcessRecurringTransactions() {
         viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
             try {
-                val activeList = recurringDao.getActiveRecurring()
+                val activeList = recurringRepository.getActive()
                 val now = java.time.LocalDate.now()
                 val zoneId = java.time.ZoneId.systemDefault()
                 var processedAny = false
@@ -1405,18 +1407,21 @@ class FinancialTrackerViewModel(
                         val isNewerThanLastRun = lastSelectedRunMs == null || targetTs > lastSelectedRunMs
 
                         if (isPastOrToday && isNewerThanLastRun) {
-                            val record = FinancialRecord(
-                                description = recurring.description,
-                                amount = recurring.amount,
-                                type = recurring.type,
-                                category = recurring.category,
-                                date = targetTs,
-                                notes = recurring.notes.ifBlank { "Diproses otomatis dari transaksi berulang" }
-                            )
-                            val insertedId = repository.insert(record)
-                            val insertedRecord = record.copy(id = insertedId.toInt())
-                            com.example.util.FirebaseSyncHelper.uploadRecordToFirestoreDirectly(insertedRecord)
-                            
+                            // Kunci deterministik: dua perangkat yang memproses recurring
+                            // yang sama pada bulan yang sama harus menghasilkan satu baris.
+                            val generatedKey = com.example.data.SyncKeys.recurringGenerated(recurring, currentYM)
+                            if (repository.findBySyncKey(generatedKey) == null) {
+                                val record = FinancialRecord(
+                                    description = recurring.description,
+                                    amount = recurring.amount,
+                                    type = recurring.type,
+                                    category = recurring.category,
+                                    date = targetTs,
+                                    notes = recurring.notes.ifBlank { "Diproses otomatis dari transaksi berulang" }
+                                )
+                                repository.insert(record.copy(syncKey = generatedKey))
+                            }
+
                             lastSelectedRunMs = targetTs
                             processedAny = true
                         }
@@ -1426,7 +1431,7 @@ class FinancialTrackerViewModel(
                     
                     if (lastSelectedRunMs != recurring.lastRunDate) {
                         val updated = recurring.copy(lastRunDate = lastSelectedRunMs)
-                        recurringDao.updateRecurring(updated)
+                        recurringRepository.update(updated)
                     }
                 }
                 

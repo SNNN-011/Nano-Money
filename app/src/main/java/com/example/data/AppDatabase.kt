@@ -4,15 +4,40 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.TypeConverter
+import androidx.room.TypeConverters
 import net.sqlcipher.database.SupportFactory
 import net.sqlcipher.database.SQLiteDatabase
 import com.example.util.DatabaseKeyManager
 
-@Database(entities = [FinancialRecord::class, RecurringTransaction::class], version = 5, exportSchema = true)
+@Database(
+    entities = [
+        FinancialRecord::class,
+        RecurringTransaction::class,
+        Category::class,
+        CategoryBudget::class,
+        AppSetting::class
+    ],
+    version = 6,
+    exportSchema = true
+)
+@TypeConverters(AppDatabase.Converters::class)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun financialRecordDao(): FinancialRecordDao
     abstract fun analysisDao(): AnalysisDao
     abstract fun recurringTransactionDao(): RecurringTransactionDao
+    abstract fun categoryDao(): CategoryDao
+    abstract fun categoryBudgetDao(): CategoryBudgetDao
+    abstract fun appSettingDao(): AppSettingDao
+
+    class Converters {
+        @TypeConverter
+        fun fromSyncStatus(value: SyncStatus): Int = value.ordinal
+
+        @TypeConverter
+        fun toSyncStatus(value: Int): SyncStatus =
+            SyncStatus.values().getOrElse(value) { SyncStatus.PENDING }
+    }
 
     companion object {
         @Volatile
@@ -117,6 +142,113 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * v5 -> v6: metadata sinkronisasi (syncKey unik, updatedAt, syncStatus),
+         * soft delete untuk recurring, referensi kategori, dan tabel pendukung
+         * (categories, category_budgets, app_settings).
+         *
+         * Semua baris lama diberi syncKey unik ('t:legacy:'||id / 'r:legacy:'||id),
+         * updatedAt = sekarang, dan syncStatus = PENDING supaya terkirim sekali
+         * pada sinkronisasi pertama setelah upgrade. Nilai kolom lama tidak diubah.
+         */
+        val MIGRATION_5_6 = object : androidx.room.migration.Migration(5, 6) {
+            override fun migrate(database: androidx.sqlite.db.SupportSQLiteDatabase) {
+                val now = System.currentTimeMillis()
+
+                // --- financial_records ---
+                database.execSQL(
+                    "ALTER TABLE `financial_records` ADD COLUMN `categoryId` TEXT NOT NULL DEFAULT ''"
+                )
+                database.execSQL(
+                    "ALTER TABLE `financial_records` ADD COLUMN `updatedAt` INTEGER NOT NULL DEFAULT 0"
+                )
+                database.execSQL(
+                    "ALTER TABLE `financial_records` ADD COLUMN `syncKey` TEXT NOT NULL DEFAULT ''"
+                )
+                database.execSQL(
+                    "ALTER TABLE `financial_records` ADD COLUMN `syncStatus` INTEGER NOT NULL DEFAULT 0"
+                )
+                database.execSQL(
+                    "UPDATE `financial_records` SET `syncKey` = 't:legacy:' || `id`, `updatedAt` = ?, `syncStatus` = 1",
+                    arrayOf<Any>(now)
+                )
+                database.execSQL(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS `index_financial_records_syncKey` ON `financial_records` (`syncKey`)"
+                )
+
+                // --- recurring_transactions ---
+                database.execSQL(
+                    "ALTER TABLE `recurring_transactions` ADD COLUMN `isDeleted` INTEGER NOT NULL DEFAULT 0"
+                )
+                database.execSQL(
+                    "ALTER TABLE `recurring_transactions` ADD COLUMN `updatedAt` INTEGER NOT NULL DEFAULT 0"
+                )
+                database.execSQL(
+                    "ALTER TABLE `recurring_transactions` ADD COLUMN `syncKey` TEXT NOT NULL DEFAULT ''"
+                )
+                database.execSQL(
+                    "ALTER TABLE `recurring_transactions` ADD COLUMN `syncStatus` INTEGER NOT NULL DEFAULT 0"
+                )
+                database.execSQL(
+                    "UPDATE `recurring_transactions` SET `syncKey` = 'r:legacy:' || `id`, `updatedAt` = ?, `syncStatus` = 1",
+                    arrayOf<Any>(now)
+                )
+                database.execSQL(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS `index_recurring_transactions_syncKey` ON `recurring_transactions` (`syncKey`)"
+                )
+
+                // --- categories ---
+                database.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `categories` (
+                        `id` TEXT NOT NULL,
+                        `name` TEXT NOT NULL,
+                        `type` TEXT NOT NULL,
+                        `isDeleted` INTEGER NOT NULL DEFAULT 0,
+                        `updatedAt` INTEGER NOT NULL DEFAULT 0,
+                        `syncKey` TEXT NOT NULL DEFAULT '',
+                        `syncStatus` INTEGER NOT NULL DEFAULT 0,
+                        PRIMARY KEY(`id`)
+                    )
+                    """.trimIndent()
+                )
+                database.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_categories_type` ON `categories` (`type`)"
+                )
+
+                // --- category_budgets ---
+                database.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `category_budgets` (
+                        `categoryId` TEXT NOT NULL,
+                        `budgetLimit` INTEGER NOT NULL DEFAULT 0,
+                        `isDeleted` INTEGER NOT NULL DEFAULT 0,
+                        `updatedAt` INTEGER NOT NULL DEFAULT 0,
+                        `syncKey` TEXT NOT NULL DEFAULT '',
+                        `syncStatus` INTEGER NOT NULL DEFAULT 0,
+                        PRIMARY KEY(`categoryId`)
+                    )
+                    """.trimIndent()
+                )
+
+                // --- app_settings ---
+                database.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `app_settings` (
+                        `key` TEXT NOT NULL,
+                        `valueText` TEXT,
+                        `valueLong` INTEGER,
+                        `valueBool` INTEGER,
+                        `updatedAt` INTEGER NOT NULL DEFAULT 0,
+                        `syncKey` TEXT NOT NULL DEFAULT '',
+                        `syncStatus` INTEGER NOT NULL DEFAULT 0,
+                        PRIMARY KEY(`key`)
+                    )
+                    """.trimIndent()
+                )
+            }
+        }
+
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val passphraseBytes = com.example.util.DatabaseKeyManager.getOrCreatePassphrase(context)
@@ -130,7 +262,13 @@ abstract class AppDatabase : RoomDatabase() {
                     "financial_tracker_database"
                 )
                 .openHelperFactory(factory)
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+                .addMigrations(
+                    MIGRATION_1_2,
+                    MIGRATION_2_3,
+                    MIGRATION_3_4,
+                    MIGRATION_4_5,
+                    MIGRATION_5_6
+                )
                 // Sengaja TIDAK memakai fallbackToDestructiveMigration(): kalau ada
                 // versi DB tanpa migrasi, aplikasi harus error dengan jelas, bukan
                 // diam-diam menghapus seluruh data keuangan pengguna.
