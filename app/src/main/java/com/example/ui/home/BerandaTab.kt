@@ -271,42 +271,57 @@ fun BerandaTabContent(
         }
     } else {
         // MOBILE COMFORT LAYOUT
-        Column(
+        // Satu permukaan scroll untuk seluruh halaman. Sebelumnya header memakai banyak
+        // ruang dan daftar transaksi memakai weight(1f), jadi sisa ruang untuk daftar
+        // bisa tinggal setinggi satu-dua baris. Semua transaksi jadi item dalam satu
+        // LazyColumn supaya halaman bisa digulir utuh.
+        val listState = rememberLazyListState()
+        LaunchedEffect(filteredRecords) {
+            if (filteredRecords.isNotEmpty()) listState.scrollToItem(0)
+        }
+
+        LazyColumn(
+            state = listState,
             modifier = modifier
                 .fillMaxSize()
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            DashboardStatsSection(
-                totalIncome = totalIncome,
-                totalExpense = totalExpense,
-                currentBalance = currentBalance,
-                monthlySpendingTotal = monthlySpendingTotal,
-                monthlyBudgetLimit = monthlyBudgetLimit,
-                categoryBudgets = categoryBudgets,
+            item(key = "dashboard_stats") {
+                DashboardStatsSection(
+                    totalIncome = totalIncome,
+                    totalExpense = totalExpense,
+                    currentBalance = currentBalance,
+                    monthlySpendingTotal = monthlySpendingTotal,
+                    monthlyBudgetLimit = monthlyBudgetLimit,
+                    categoryBudgets = categoryBudgets,
                     categoryNameById = categoryNameById,
-                categorySpending = categorySpending,
-                selectedBudgetOffset = selectedBudgetOffset,
-                onBudgetOffsetChange = onBudgetOffsetChange,
-                onSetBudgetClick = onSetBudgetClick,
-                onRecurringClick = { showRecurringDialog = true },
-                welcomeMessage = welcomeMessage,
-                welcomeMessageColor = welcomeMessageColor,
-                showNewFeature = showNewFeature
-            )
+                    categorySpending = categorySpending,
+                    selectedBudgetOffset = selectedBudgetOffset,
+                    onBudgetOffsetChange = onBudgetOffsetChange,
+                    onSetBudgetClick = onSetBudgetClick,
+                    onRecurringClick = { showRecurringDialog = true },
+                    welcomeMessage = welcomeMessage,
+                    welcomeMessageColor = welcomeMessageColor,
+                    showNewFeature = showNewFeature
+                )
+            }
 
-            FilterAndSortHeader(
-                currentFilter = filterType,
-                isNewest = sortByNewest,
-                onFilterSelected = onFilterSelected,
-                onSortToggled = onSortToggled
-            )
+            item(key = "filter_sort") {
+                FilterAndSortHeader(
+                    currentFilter = filterType,
+                    isNewest = sortByNewest,
+                    onFilterSelected = onFilterSelected,
+                    onSortToggled = onSortToggled
+                )
+            }
 
-            Row(
-                modifier = Modifier.fillMaxWidth().height(48.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
+            item(key = "search_actions") {
+                Row(
+                    modifier = Modifier.fillMaxWidth().height(48.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                 // Minimalist Search Bar
                 Row(
                     modifier = Modifier
@@ -402,48 +417,39 @@ fun BerandaTabContent(
                         modifier = Modifier.size(19.dp)
                     )
                 }
+                }
             }
 
             if (filteredRecords.isEmpty()) {
-                Box(modifier = Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    TransactionEmptyState(
-                        isFiltered = isFilterActive,
-                        onSeedData = onSeedSampleData,
-                        onClearFilters = onClearFilters
-                    )
+                item(key = "empty_state") {
+                    Box(
+                        modifier = Modifier.fillMaxWidth().height(240.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        TransactionEmptyState(
+                            isFiltered = isFilterActive,
+                            onSeedData = onSeedSampleData,
+                            onClearFilters = onClearFilters
+                        )
+                    }
                 }
             } else {
-                // State eksplisit + scrollToItem(0): tanpa ini, mengubah filter
-                // atau urutan membuat LazyColumn mempertahankan key yang terlihat
-                // dan daftar justru terlempar ke bawah.
-                val listState = rememberLazyListState()
-                LaunchedEffect(filteredRecords) {
-                    if (filteredRecords.isNotEmpty()) listState.scrollToItem(0)
-                }
-                LazyColumn(
-                    state = listState,
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    // items(list) bukan items(list.size): versi count memaksa item
-                    // dicocokkan lewat indeks sehingga tiap perubahan daftar
-                    // mengulang semua slot item.
-                    items(filteredRecords, key = { it.id }) { rec ->
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(16.dp),
-                            colors = CardDefaults.cardColors(containerColor = TranslucentGlass),
-                            border = BorderStroke(1.dp, GhostWhite.copy(alpha = 0.05f))
-                        ) {
-                            TransactionListItem(
-                                record = rec,
-                                onEdit = { onEditRecord(rec) },
-                                onDelete = { onDeleteRecord(rec) },
-                                categoryNameById = categoryNameById
-                            )
-                        }
+                // items(list) bukan items(list.size): versi count memaksa item
+                // dicocokkan lewat indeks sehingga tiap perubahan daftar
+                // mengulang semua slot item.
+                items(filteredRecords, key = { it.id }) { rec ->
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = TranslucentGlass),
+                        border = BorderStroke(1.dp, GhostWhite.copy(alpha = 0.05f))
+                    ) {
+                        TransactionListItem(
+                            record = rec,
+                            onEdit = { onEditRecord(rec) },
+                            onDelete = { onDeleteRecord(rec) },
+                            categoryNameById = categoryNameById
+                        )
                     }
                 }
             }
