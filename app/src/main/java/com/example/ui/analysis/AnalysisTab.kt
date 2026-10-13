@@ -30,6 +30,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.clickable
+import com.example.data.CategoryAggregation
 import com.example.ui.theme.*
 import com.example.ui.components.GlassCard
 import com.example.ui.config.FormatUtils
@@ -43,6 +44,7 @@ fun AnalysisTabContent(
     modifier: Modifier = Modifier
 ) {
     val selectedPeriod by viewModel.selectedPeriod.collectAsState()
+    val categoryAggregations by viewModel.categoryAggregations.collectAsState()
     val totalExpense by viewModel.totalExpense.collectAsState()
     val averageDailyExpense by viewModel.averageDailyExpense.collectAsState()
     val totalIncome by viewModel.totalIncome.collectAsState()
@@ -69,7 +71,11 @@ fun AnalysisTabContent(
             totalTransactions = totalTransactions
         )
 
-        CombinedChartsCard(dailyTrends = dailyTrends)
+        CombinedChartsCard(
+            dailyTrends = dailyTrends,
+            aggregations = categoryAggregations,
+            totalExpense = totalExpense
+        )
     }
 }
 
@@ -202,16 +208,19 @@ val EaseInOutSine = CubicBezierEasing(0.37f, 0f, 0.63f, 1f)
 
 
 /**
- * Kartu chart tren harian.
+ * Kartu chart tren harian + daftar kategori.
  *
- * Sebelumnya kartu ini membagi ruang dua kolom-ber rowing: chart tren dan donut
- * kategori, masing-masing `weight(1f)`. Di layar sempit keduanya terperas menjadi
- * sekitar setengah lebar sehingga chart sulit dibaca. Kolom kategori dihapus dan
- * chart tren sekarang memakai lebar penuh.
+ * Kolom donut kategori sudah dihapus. Sebelumnya kartu ini membagi ruang dua kolom
+ * berdampingan dengan `weight(1f)` masing-masing, sehingga di layar sempit keduanya
+ * terperas jadi sekitar setengah lebar dan chart-nya sulit dibaca. Sekarang chart tren
+ * memakai lebar penuh, dan daftar kategori tetap ada di bawahnya sebagai rincian
+ * nominal per kategori.
  */
 @Composable
 fun CombinedChartsCard(
-    dailyTrends: List<DailyAggregation>
+    dailyTrends: List<DailyAggregation>,
+    aggregations: List<CategoryAggregation>,
+    totalExpense: Long
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -367,6 +376,59 @@ fun CombinedChartsCard(
                             modifier = Modifier.fillMaxWidth(),
                             textAlign = TextAlign.Center
                         )
+                    }
+                }
+            }
+
+            if (aggregations.isNotEmpty()) {
+                val listColors = listOf(
+                    Color(0xFFC2E0FF),
+                    Color(0xFF93C9FF),
+                    Color(0xFF5BA8F5),
+                    Color(0xFF2E86DE),
+                    Color(0xFF1E5FAD),
+                    Color(0xFF1A3A6B)
+                )
+
+                Spacer(modifier = Modifier.height(24.dp))
+                HorizontalDivider(color = GhostWhite.copy(alpha = 0.1f))
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    aggregations.forEachIndexed { index, agg ->
+                        val color = listColors[index % listColors.size]
+                        val percentage =
+                            if (totalExpense > 0) (agg.totalAmount.toDouble() / totalExpense) * 100 else 0.0
+
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp)
+                        ) {
+                            Box(modifier = Modifier.size(10.dp).background(color, CircleShape))
+                            Spacer(modifier = Modifier.width(8.dp))
+
+                            val (_, cleanCat) =
+                                com.example.ui.util.CategoryIconMapper.extractEmojiAndLabel(agg.category)
+                            Text(
+                                text = cleanCat,
+                                color = GhostWhite,
+                                modifier = Modifier.weight(1f),
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                            Text(
+                                text = String.format("%.1f%%", percentage),
+                                color = GhostWhite.copy(alpha = 0.7f),
+                                style = MaterialTheme.typography.bodySmall,
+                                modifier = Modifier.padding(end = 8.dp)
+                            )
+                            Text(
+                                text = FormatUtils.formatRupiahCompact(agg.totalAmount),
+                                color = GhostWhite,
+                                style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold)
+                            )
+                        }
                     }
                 }
             }
