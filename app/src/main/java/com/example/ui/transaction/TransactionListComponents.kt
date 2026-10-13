@@ -6,6 +6,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -228,11 +229,11 @@ fun TransactionList(
             modifier = modifier.fillMaxSize(),
             verticalArrangement = Arrangement.spacedBy(0.dp)
         ) {
-            items(records.size, key = { records[it].id }) { index ->
+            itemsIndexed(records, key = { _, record -> record.id }) { index, record ->
                 TransactionListItem(
-                    record = records[index],
-                    onEdit = { onEdit(records[index]) },
-                    onDelete = { onDelete(records[index]) }
+                    record = record,
+                    onEdit = { onEdit(record) },
+                    onDelete = { onDelete(record) }
                 )
                 if (index < records.lastIndex) {
                     HorizontalDivider(
@@ -245,6 +246,15 @@ fun TransactionList(
         }
     }
 }
+
+/**
+ * Dipakai untuk memecah kata pada judul transaksi.
+ *
+ * Sengaja dibuat sekali di level file: `String.toRegex()` menyusun ulang objek Pattern
+ * setiap kali dipanggil, dan pemanggilnya ada di dalam item daftar yang terus
+ * recomposition saat scroll. Menyusunnya per item terasa sebagai freeze saat digulir.
+ */
+private val WHITESPACE_REGEX = "\\s+".toRegex()
 
 @Composable
 fun TransactionListItem(
@@ -284,7 +294,7 @@ fun TransactionListItem(
     }
 
     // Capitalize each word in the title/description
-    val capitalizedDescription = record.description.trim().split("\\s+".toRegex())
+    val capitalizedDescription = record.description.trim().split(WHITESPACE_REGEX)
         .filter { it.isNotEmpty() }
         .joinToString(" ") { word ->
             word.lowercase(Locale.getDefault()).replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }

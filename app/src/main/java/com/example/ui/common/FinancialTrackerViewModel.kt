@@ -31,6 +31,23 @@ import java.time.ZoneId
 import java.time.YearMonth
 import com.example.ui.config.FormatUtils
 
+/** Total seluruh riwayat, dipakai angka besar di header dashboard. */
+data class DashboardTotals(val income: Long, val expense: Long) {
+    val balance: Long get() = income - expense
+}
+
+/**
+ * Menjumlah seluruh transaksi tanpa batas tanggal.
+ *
+ * Fungsi murni supaya bisa diuji. Pernah versi sebelumnya ikut difilter per bulan
+ * terpilih, sehingga "saldo total" ikut berubah kalau user memutar bulan.
+ */
+internal fun computeDashboardTotals(records: List<FinancialRecord>): DashboardTotals =
+    DashboardTotals(
+        income = records.filter { it.type == "income" }.sumOf { it.amount },
+        expense = records.filter { it.type == "expense" }.sumOf { it.amount }
+    )
+
 class FinancialTrackerViewModel(
     application: Application,
     private val repository: FinancialRecordRepository
@@ -63,7 +80,6 @@ class FinancialTrackerViewModel(
     val searchQuery: StateFlow<String> = _filterState
         .map { it.searchQuery }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "")
-
     fun updateFilterType(type: String) {
         _filterState.value = _filterState.value.copy(type = type)
     }
@@ -245,28 +261,24 @@ class FinancialTrackerViewModel(
             .sumOf { it.amount }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0L)
 
-    val totalIncome: StateFlow<Long> = combine(allRecords, selectedBudgetOffset) { records, offset ->
-        val (rangeStart, rangeEnd) = getMonthRange(offset)
-        records.filter { it.type == "income" && it.date in rangeStart..rangeEnd }
-            .sumOf { it.amount }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0L)
+    // Angka besar di header adalah total SELURUH riwayat, bukan hanya bulan yang
+    // sedang dipilih. Bagian anggaran tetap per bulan dan sudah punya judul bulan
+    // sendiri, jadi keduanya tidak perlu dicampur.
+    private val dashboardTotals: StateFlow<DashboardTotals> = allRecords
+        .map { records -> computeDashboardTotals(records) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), DashboardTotals(0L, 0L))
 
-    val totalExpense: StateFlow<Long> = combine(allRecords, selectedBudgetOffset) { records, offset ->
-        val (rangeStart, rangeEnd) = getMonthRange(offset)
-        records.filter { it.type == "expense" && it.date in rangeStart..rangeEnd }
-            .sumOf { it.amount }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0L)
+    val totalIncome: StateFlow<Long> = dashboardTotals
+        .map { it.income }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0L)
 
-    val currentBalance: StateFlow<Long> = combine(allRecords, selectedBudgetOffset) { records, offset ->
-        val (rangeStart, rangeEnd) = getMonthRange(offset)
-        records.sumOf { record ->
-            if (record.date <= rangeEnd) {
-                if (record.type == "income") record.amount else -record.amount
-            } else {
-                0L
-            }
-        }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0L)
+    val totalExpense: StateFlow<Long> = dashboardTotals
+        .map { it.expense }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0L)
+
+    val currentBalance: StateFlow<Long> = dashboardTotals
+        .map { it.balance }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0L)
 
     private fun getMonthRange(offset: Int): Pair<Long, Long> {
         val now = java.time.Instant.now()

@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -426,8 +427,10 @@ fun BerandaTabContent(
                         .fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    items(filteredRecords.size, key = { filteredRecords[it].id }) { idx ->
-                        val rec = filteredRecords[idx]
+                    // items(list) bukan items(list.size): versi count memaksa item
+                    // dicocokkan lewat indeks sehingga tiap perubahan daftar
+                    // mengulang semua slot item.
+                    items(filteredRecords, key = { it.id }) { rec ->
                         Card(
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(16.dp),
@@ -437,7 +440,8 @@ fun BerandaTabContent(
                             TransactionListItem(
                                 record = rec,
                                 onEdit = { onEditRecord(rec) },
-                                onDelete = { onDeleteRecord(rec) }
+                                onDelete = { onDeleteRecord(rec) },
+                                categoryNameById = categoryNameById
                             )
                         }
                     }
