@@ -153,12 +153,12 @@ class TransactionParserUseCase {
             var rawResponseText: String? = null
             var lastException: Throwable? = null
 
-            val modelsToTry = listOf(modelName, "gemini-3.5-flash-lite").distinct()
-
-            for (model in modelsToTry) {
+            for (model in com.example.ui.config.AiModelConfig.modelsToTry(modelName)) {
                 try {
                     val url = GeminiClient.getFullUrl("v1beta/models/$model:generateContent")
-                    val response = kotlinx.coroutines.withTimeout(30_000L) {
+                    val response = kotlinx.coroutines.withTimeout(
+                        com.example.ui.config.AiModelConfig.ATTEMPT_TIMEOUT_MS
+                    ) {
                         GeminiClient.service.generateContent(url, apiKey, request)
                     }
                     rawResponseText = response.candidates?.firstOrNull()?.content?.parts?.firstOrNull()?.text
@@ -173,7 +173,7 @@ class TransactionParserUseCase {
             }
 
             if (rawResponseText.isNullOrEmpty()) {
-                return@withContext RequestResult.Error("API tidak merespons", lastException)
+                return@withContext RequestResult.Error(describeAiFailure(lastException), lastException)
             }
 
             val cleanedJson = cleanJsonText(rawResponseText)

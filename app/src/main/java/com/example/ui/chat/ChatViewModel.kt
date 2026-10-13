@@ -357,17 +357,15 @@ class ChatViewModel(
             when (resultStatus) {
                 is com.example.domain.RequestResult.Error -> {
                     val e = resultStatus.e
-                    val errorMessage = if (e is IOException) {
-                        "Gagal terhubung. Periksa koneksi internet Anda."
-                    } else if (e is retrofit2.HttpException) {
-                        when (e.code()) {
-                            401 -> "Sesi login bermasalah, silakan coba lagi."
-                            429 -> "Terlalu banyak permintaan. Coba beberapa saat lagi."
-                            in 500..599 -> "Server AI sedang bermasalah. Coba kembali nanti."
-                            else -> "Terjadi kesalahan (HTTP ${e.code()}). Silakan coba lagi."
+                    // Pesan dari use case sudah menerjemahkan penyebabnya (timeout,
+                    // model ditolak, rate limit, dst). Pemetaan kedua di sini dulu
+                    // membuat semuanya jadi "Terjadi kesalahan" yang tidak membantu.
+                    val errorMessage = resultStatus.message.ifBlank {
+                        if (e is IOException) {
+                            "Gagal terhubung. Periksa koneksi internet Anda."
+                        } else {
+                            "Terjadi kesalahan. Silakan coba lagi atau gunakan tab 'Transaksi Baru'."
                         }
-                    } else {
-                        "Terjadi kesalahan. Silakan coba lagi atau gunakan tab 'Transaksi Baru'."
                     }
                     com.example.util.SecureLog.e("ChatVM", "AI request failed", e)
                     addAiMessage("$errorMessage\n\n(Catatan: Anda tetap dapat mencatat langsung melalui tab 'Transaksi Baru'.)")

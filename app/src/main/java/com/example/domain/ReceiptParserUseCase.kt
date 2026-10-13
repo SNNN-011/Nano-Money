@@ -105,16 +105,30 @@ class ReceiptParserUseCase {
                 )
             )
 
-            val modelName = "gemini-3.5-flash-lite"
-            val url = GeminiClient.getFullUrl("v1beta/models/$modelName:generateContent")
-            
-            val response = kotlinx.coroutines.withTimeout(30_000L) {
-                GeminiClient.service.generateContent(url, apiKey, request)
+            // Label UI dipetakan ke id model asli; memakai labelnya apa adanya
+            // membuat Google membalas 404.
+            var rawResponseText: String? = null
+            var lastException: Throwable? = null
+
+            for (model in com.example.ui.config.AiModelConfig.modelsToTry(
+                com.example.ui.config.AiModelConfig.GEMINI_MODEL
+            )) {
+                try {
+                    val url = GeminiClient.getFullUrl("v1beta/models/$model:generateContent")
+                    val response = kotlinx.coroutines.withTimeout(
+                        com.example.ui.config.AiModelConfig.ATTEMPT_TIMEOUT_MS
+                    ) {
+                        GeminiClient.service.generateContent(url, apiKey, request)
+                    }
+                    rawResponseText = response.candidates?.firstOrNull()?.content?.parts?.firstOrNull()?.text
+                    if (!rawResponseText.isNullOrEmpty()) break
+                } catch (e: Throwable) {
+                    lastException = e
+                }
             }
-            val rawResponseText = response.candidates?.firstOrNull()?.content?.parts?.firstOrNull()?.text
-            
+
             if (rawResponseText.isNullOrEmpty()) {
-                return@withContext RequestResult.Error("Model AI tidak memberikan respon kosong.")
+                return@withContext RequestResult.Error(describeAiFailure(lastException), lastException)
             }
 
             val cleanedJson = cleanJsonText(rawResponseText)
