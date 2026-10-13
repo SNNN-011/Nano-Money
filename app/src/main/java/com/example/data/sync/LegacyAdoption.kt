@@ -38,8 +38,51 @@ object LegacyAdoption {
         !data.containsKey(CollectionSync.FIELD_UPDATED_AT) &&
             !data.containsKey(CollectionSync.FIELD_SYNC_KEY)
 
-    /** Prefix kunci untuk data yang diadopsi, mis. "legacy:12". */
-    fun legacySyncKey(docId: String): String = "legacy:$docId"
+    /**
+     * Identitas lokal untuk dokumen legacy: id dokumennya sendiri.
+     *
+     * Jalur sync lawas memakai nomor baris Room sebagai id dokumen, jadi id itulah
+     * identitas yang sudah dimiliki transaksi tersebut di cloud. Memakai kunci
+     * turunan lain (mis. "legacy:12") akan membuat dokumen kedua untuk transaksi
+     * yang sama.
+     */
+    fun legacySyncKey(docId: String): String = docId
+
+    /**
+     * Membersihkan dokumen duplikat yang sample versi 6 pernah buat.
+     *
+     * Migrasi lama menulis dokumen "t:legacy:<id>" padahal dokumen aslinya "<id>"
+     * sudah ada, sehingga satu transaksi punya dua dokumen. Setelah kunci lokal
+     * dikembalikan ke "<id>" (MIGRATION_6_7), dokumen "t:legacy:*" menjadi sisa:
+     * tidak punya pasangan lokal dan akan ditarik balik sebagai duplikat saat pull.
+     *
+     * Pengaman: dokumen hanya dihapus kalau baris lokal dengan kunci tujuan benar-benar
+     * ada. Kalau tidak, dokumen itu satu-satunya salinan dan harus tetap disimpan.
+     */
+    suspend fun deleteRenamedDuplicates(
+        collectionRef: CollectionReference,
+        prefix: String,
+        hasLocalKey: suspend (String) -> Boolean
+    ): Int {
+        val snapshot = withTimeout(CollectionSync.OP_TIMEOUT_MS) { collectionRef.get().await() }
+        val orphans = snapshot.documents.filter { it.id.startsWith(prefix) }
+        if (orphans.isEmpty()) return 0
+
+        var deleted = 0
+        orphans.forEach { doc ->
+            val target = doc.id.removePrefix(prefix)
+            val hasLocal = runCatching { hasLocalKey(target) }.getOrDefault(false)
+            if (!hasLocal) {
+                Log.w(TAG, "Dokumen '${doc.id}' tidak punya pasangan lokal '$target', disimpan.")
+                return@forEach
+            }
+            runCatching { withTimeout(CollectionSync.OP_TIMEOUT_MS) { doc.reference.delete().await() } }
+                .onSuccess { deleted++ }
+                .onFailure { Log.w(TAG, "Hapus duplikat ${doc.id} gagal: ${it.message}") }
+        }
+        Log.i(TAG, "Menghapus $deleted dokumen duplikat berawalan '$prefix'")
+        return deleted
+    }
 
     /**
      * Membaca dokumen legacy lalu memetakannya menjadi entitas lokal.
@@ -76,6 +119,9 @@ object LegacyAdoption {
     /**
      * Menghapus dokumen legacy, tetapi hanya setelah dokumen penggantinya terbukti ada
      * di cloud. Yang belum ada pasangannya dilewati agar tidak kehilangan data.
+     *
+     * Kalau id dokumen pengganti sama dengan id dokumen legacy, itu berarti dokumen
+     * yang sama diperkaya di tempat (identitasnya memang id itu), jadi tidak dihapus.
      */
     suspend fun deleteVerified(
         refs: List<Adopted>,
@@ -83,6 +129,7 @@ object LegacyAdoption {
     ) {
         if (refs.isEmpty()) return
         refs.forEach { (legacyRef, newDocId) ->
+            if (legacyRef.id == newDocId) return@forEach
             val exists = runCatching {
                 withTimeout(CollectionSync.OP_TIMEOUT_MS) {
                     newCollectionRef.document(newDocId).get().await().exists()

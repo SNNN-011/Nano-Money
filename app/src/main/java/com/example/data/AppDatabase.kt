@@ -18,7 +18,7 @@ import com.example.util.DatabaseKeyManager
         CategoryBudget::class,
         AppSetting::class
     ],
-    version = 6,
+    version = 7,
     exportSchema = true
 )
 @TypeConverters(AppDatabase.Converters::class)
@@ -143,6 +143,60 @@ abstract class AppDatabase : RoomDatabase() {
         }
 
         /**
+         * v6 -> v7: memperbaiki transaksi yang terduplikasi.
+         *
+         * Versi 6 sempat memberi baris lama syncKey baru berawalan "t:legacy:<id>",
+         * padahal dokumen cloud-nya sudah ada dengan id angka yang sama. Akibatnya
+         * setiap transaksi lama punya dua dokumen (185 dan t:legacy:185) dan muncul
+         * dobel di aplikasi. Migrasi ini mengembalikan kunci aslinya: "t:legacy:<id>"
+         * menjadi "<id>".
+         *
+         * Kalau baris "<id>" sudah ada (diambil dari cloud), isi baris "t:legacy:" yang
+         * dipertahankan karena itu versi lokal terbaru, dan baris "<id>" dihapus.
+         * Hasilnya tepat satu baris per transaksi, tidak ada yang hilang.
+         */
+        val MIGRATION_6_7 = object : androidx.room.migration.Migration(6, 7) {
+            override fun migrate(database: androidx.sqlite.db.SupportSQLiteDatabase) {
+                repairLegacyKeys(database, "financial_records", "t:legacy:", now = null)
+                repairLegacyKeys(database, "recurring_transactions", "t:legacy:", now = null)
+            }
+        }
+
+        /**
+         * Menamai ulang syncKey berawalan [prefix] menjadi bagian setelah prefix,
+         * menghapus baris lama yang bertabrakan dengan kunci tujuan.
+         */
+        private fun repairLegacyKeys(
+            db: androidx.sqlite.db.SupportSQLiteDatabase,
+            table: String,
+            prefix: String,
+            now: Long?
+        ) {
+            if (!tableExists(db, table)) return
+            val updatedAt = if (now != null) "$now" else "`updatedAt`"
+
+            // Baris tujuan yang sudah ada dibuang lebih dulu; isinya digantikan baris
+            // "t:legacy:" karena itu versi lokal terbaru.
+            db.execSQL(
+                """
+                DELETE FROM `$table`
+                WHERE `syncKey` IN (
+                    SELECT substr(`syncKey`, ${prefix.length + 1}) FROM `$table` WHERE `syncKey` LIKE '${prefix}%'
+                ) AND `syncKey` NOT LIKE '${prefix}%'
+                """.trimIndent()
+            )
+            db.execSQL(
+                """
+                UPDATE `$table`
+                SET `syncKey` = substr(`syncKey`, ${prefix.length + 1}),
+                    `syncStatus` = 1,
+                    `updatedAt` = $updatedAt
+                WHERE `syncKey` LIKE '${prefix}%'
+                """.trimIndent()
+            )
+        }
+
+        /**
          * v5 -> v6: metadata sinkronisasi (syncKey unik, updatedAt, syncStatus),
          * soft delete untuk recurring, referensi kategori, dan tabel pendukung
          * (categories, category_budgets, app_settings).
@@ -217,12 +271,16 @@ abstract class AppDatabase : RoomDatabase() {
             val isDeleted = if ("isDeleted" in cols) "COALESCE(`isDeleted`, 0)" else "0"
             val categoryId = if ("categoryId" in cols) "COALESCE(`categoryId`, '')" else "''"
             val updatedAt = if ("updatedAt" in cols) "CASE WHEN `updatedAt` > 0 THEN `updatedAt` ELSE $now END" else "$now"
-            // syncKey yang sudah ada (dari lineage percobaan lama) dipertahankan agar
-            // dokumen cloud-nya tidak orphan; yang kosong diisi dari id baris.
+            // syncKey = nomor baris, yaitu identitas yang sudah dipakai dokumen cloud lama.
+            // Kalau di sini diberi prefix baru, setiap transaksi lama akan ter-push
+            // menjadi dokumen kedua (185 DAN t:legacy:185) sehingga muncul dobel di
+            // aplikasi. Nomor baris memang dipakai sebagai kunci sinkron hanya untuk
+            // data yang sudah ada sebelum v6; transaksi baru tetap memakai UUID
+            // (SyncKeys.newTransactionKey).
             val syncKey = if ("syncKey" in cols) {
-                "CASE WHEN `syncKey` <> '' THEN `syncKey` ELSE 't:legacy:' || `id` END"
+                "CASE WHEN `syncKey` <> '' THEN `syncKey` ELSE CAST(`id` AS TEXT) END"
             } else {
-                "'t:legacy:' || `id`"
+                "CAST(`id` AS TEXT)"
             }
             val syncStatus = if ("syncStatus" in cols) "CASE WHEN `syncStatus` IS NULL THEN 1 ELSE `syncStatus` END" else "1"
 
@@ -284,9 +342,9 @@ abstract class AppDatabase : RoomDatabase() {
             val isActive = if ("isActive" in cols) "COALESCE(`isActive`, 1)" else "1"
             val updatedAt = if ("updatedAt" in cols) "CASE WHEN `updatedAt` > 0 THEN `updatedAt` ELSE $now END" else "$now"
             val syncKey = if ("syncKey" in cols) {
-                "CASE WHEN `syncKey` <> '' THEN `syncKey` ELSE 'r:legacy:' || `id` END"
+                "CASE WHEN `syncKey` <> '' THEN `syncKey` ELSE CAST(`id` AS TEXT) END"
             } else {
-                "'r:legacy:' || `id`"
+                "CAST(`id` AS TEXT)"
             }
             val syncStatus = if ("syncStatus" in cols) "CASE WHEN `syncStatus` IS NULL THEN 1 ELSE `syncStatus` END" else "1"
 
@@ -512,7 +570,8 @@ abstract class AppDatabase : RoomDatabase() {
                     MIGRATION_2_3,
                     MIGRATION_3_4,
                     MIGRATION_4_5,
-                    MIGRATION_5_6
+                    MIGRATION_5_6,
+                    MIGRATION_6_7
                 )
                 // Sengaja TIDAK memakai fallbackToDestructiveMigration(): kalau ada
                 // versi DB tanpa migrasi, aplikasi harus error dengan jelas, bukan

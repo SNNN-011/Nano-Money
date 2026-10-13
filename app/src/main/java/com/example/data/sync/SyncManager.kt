@@ -43,6 +43,12 @@ object SyncManager {
     const val COLLECTION_CATEGORY_BUDGETS = "category_budgets"
     const val COLLECTION_SETTINGS = "settings"
 
+    /** Awalan kunci yang pernah dipakai migrasi v6 dan menyisakan dokumen duplikat. */
+    const val LEGACY_KEY_PREFIX = "t:legacy:"
+
+    /** Penanda pembersihan dokumen duplikat, dipakai sekali seumur device. */
+    const val CLEANUP_RENAMED_FLAG = "cleanup_renamed_v1"
+
     data class Report(
         val recordsPushed: Int = 0,
         val recordsApplied: Int = 0,
@@ -113,6 +119,14 @@ object SyncManager {
                     collectionRef = userCollection(COLLECTION_RECORDS),
                     fromLegacyDocument = ::mapLegacyRecord,
                     onAdopt = { entity ->
+                        // Id dokumen legacy = syncKey, jadi baris yang sama bisa sudah
+                        // ada di lokal. applyRemote menimpa apa adanya, jadi aturan
+                        // konflik wajib dicek lebih dulu supaya versi lokal yang lebih
+                        // baru tidak ditimpa data cloud yang lebih tua.
+                        val local = recordRepo.findBySyncKey(entity.syncKey)
+                        if (!ConflictResolver.shouldApplyRemote(local?.updatedAt, entity.updatedAt)) {
+                            return@adopt
+                        }
                         recordRepo.applyRemote(entity)
                         adopted++
                     },
@@ -182,6 +196,25 @@ object SyncManager {
             SyncCursors.markAdopted(context, COLLECTION_RECORDS)
         } else if (legacyPending) {
             Log.w(TAG, "Push transaksi gagal, adopsi legacy dicoba lagi nanti.")
+        }
+
+        // Sisa dari versi 6: dokumen "t:legacy:<id>" yang tadinya duplikat dokumen
+        // "<id>". Setelah MIGRATION_6_7 kunci lokal kembali ke "<id>", dokumen sisa ini
+        // tidak punya pasangan lokal dan akan ditarik balik sebagai duplikat saat pull.
+        // Bersihkan sekali saja, dan hanya dokumen yang pasangannya terkonfirmasi ada.
+        if (!SyncCursors.isAdopted(context, CLEANUP_RENAMED_FLAG)) {
+            runCatching {
+                val removedRecords = LegacyAdoption.deleteRenamedDuplicates(
+                    collectionRef = userCollection(COLLECTION_RECORDS),
+                    prefix = LEGACY_KEY_PREFIX
+                ) { key -> recordRepo.findBySyncKey(key) != null }
+                val removedRecurring = LegacyAdoption.deleteRenamedDuplicates(
+                    collectionRef = userCollection(COLLECTION_RECURRING),
+                    prefix = LEGACY_KEY_PREFIX
+                ) { key -> recurringRepo.findBySyncKey(key) != null }
+                Log.i(TAG, "Pembersihan duplikat: $removedRecords transaksi, $removedRecurring recurring")
+            }.onFailure { Log.w(TAG, "Pembersihan dokumen duplikat gagal: ${it.message}") }
+            SyncCursors.markAdopted(context, CLEANUP_RENAMED_FLAG)
         }
 
         Report(

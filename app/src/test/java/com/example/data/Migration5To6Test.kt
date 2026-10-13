@@ -6,6 +6,7 @@ import androidx.sqlite.db.SupportSQLiteOpenHelper
 import androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory
 import androidx.test.core.app.ApplicationProvider
 import java.io.File
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -239,7 +240,8 @@ class Migration5To6Test {
         AppDatabase.MIGRATION_2_3,
         AppDatabase.MIGRATION_3_4,
         AppDatabase.MIGRATION_4_5,
-        AppDatabase.MIGRATION_5_6
+        AppDatabase.MIGRATION_5_6,
+        AppDatabase.MIGRATION_6_7
     ).build()
 
     @Test
@@ -260,7 +262,7 @@ class Migration5To6Test {
                 assertEquals("Gaji", c.getString(0))
                 assertEquals(5_000_000L, c.getLong(1))
                 assertEquals(0, c.getInt(3))
-                assertEquals("t:legacy:1", c.getString(4))
+                assertEquals("1", c.getString(4))
                 assertTrue(c.getLong(5) > 0L)
                 assertEquals(SyncStatus.PENDING.ordinal, c.getInt(6))
 
@@ -269,7 +271,7 @@ class Migration5To6Test {
                 assertEquals(25_000L, c.getLong(1))
                 assertEquals("manual", c.getString(2))
                 assertEquals(1, c.getInt(3))
-                assertEquals("t:legacy:2", c.getString(4))
+                assertEquals("2", c.getString(4))
             }
 
             // syncKey unik per baris.
@@ -285,7 +287,7 @@ class Migration5To6Test {
                 assertEquals("Internet", c.getString(0))
                 assertEquals(350_000L, c.getLong(1))
                 assertEquals(0, c.getInt(2))
-                assertEquals("r:legacy:1", c.getString(3))
+                assertEquals("1", c.getString(3))
                 assertTrue(c.getLong(4) > 0L)
                 assertEquals(SyncStatus.PENDING.ordinal, c.getInt(5))
             }
@@ -299,7 +301,7 @@ class Migration5To6Test {
 
             // Query baca tetap benar: Sampah (isDeleted=1) tidak masuk daftar aktif.
             assertEquals(1, db.financialRecordDao().getRecordCount())
-            assertNotNull(db.financialRecordDao().findBySyncKey("t:legacy:1"))
+            assertNotNull(db.financialRecordDao().findBySyncKey("1"))
             assertEquals(1, db.recurringTransactionDao().getActiveRecurring().size)
         } finally {
             db.close()
@@ -328,7 +330,7 @@ class Migration5To6Test {
                 // Yang belum punya syncKey tetap diisi dari id baris.
                 assertTrue(c.moveToNext())
                 assertEquals(25_000L, c.getLong(0))
-                assertEquals("t:legacy:2", c.getString(1))
+                assertEquals("2", c.getString(1))
                 assertEquals(SyncStatus.PENDING.ordinal, c.getInt(2))
             }
 
@@ -337,7 +339,7 @@ class Migration5To6Test {
             ).use { c ->
                 assertTrue(c.moveToFirst())
                 assertEquals(450_000L, c.getLong(0))
-                assertEquals("r:legacy:1", c.getString(1))
+                assertEquals("1", c.getString(1))
             }
 
             // syncKey kategori yang kosong harus diisi, kalau tidak documentId-nya
@@ -357,6 +359,35 @@ class Migration5To6Test {
     }
 
     @Test
+    fun kunci_lama_kembali_ke_nomor_baris_setelah_migrasi_6_7() = runBlocking {
+        createV5()
+        val db = openRoom()
+        try {
+            // Meniru DB yang sudah terlanjur terduplikasi: baris "t:legacy:9" dan
+            // pasangannya yang sudah memakai nomor baris sebagai kunci.
+            val writable = db.openHelper.writableDatabase
+            writable.execSQL(
+                "INSERT INTO financial_records (id, description, amount, type, category, date, notes, isDeleted, categoryId, updatedAt, syncKey, syncStatus) " +
+                    "VALUES (9, 'Darikah', 30000, 'expense', 'Makanan', 1700000000000, '', 0, '', 1700000009000, 't:legacy:9', 1)"
+            )
+            writable.execSQL(
+                "INSERT INTO financial_records (id, description, amount, type, category, date, notes, isDeleted, categoryId, updatedAt, syncKey, syncStatus) " +
+                    "VALUES (10, 'Taxis', 12000, 'expense', 'Transportasi', 1700000000000, '', 0, '', 1700000009000, '10', 0)"
+            )
+            AppDatabase.MIGRATION_6_7.migrate(writable)
+
+            val keys = mutableListOf<String>()
+            writable.query("SELECT syncKey FROM financial_records ORDER BY CAST(syncKey AS INTEGER)").use { c ->
+                while (c.moveToNext()) keys += c.getString(0)
+            }
+            assertEquals(listOf("1", "2", "9", "10"), keys)
+            assertEquals(4, db.financialRecordDao().getAllRecordsWithDeleted().first().size)
+        } finally {
+            db.close()
+        }
+    }
+
+    @Test
     fun trash_restore_menandai_pending_lagi() = runBlocking {
         createV5()
         val db = openRoom()
@@ -364,7 +395,7 @@ class Migration5To6Test {
             // Sampah -> aktif harus jadi PENDING supaya ikut tersinkron.
             db.financialRecordDao().restoreRecords(listOf(2), System.currentTimeMillis())
 
-            val restored = db.financialRecordDao().findBySyncKey("t:legacy:2")!!
+            val restored = db.financialRecordDao().findBySyncKey("2")!!
             assertEquals(false, restored.isDeleted)
             assertEquals(SyncStatus.PENDING, restored.syncStatus)
         } finally {
@@ -372,3 +403,4 @@ class Migration5To6Test {
         }
     }
 }
+

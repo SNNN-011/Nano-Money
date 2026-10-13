@@ -44,9 +44,9 @@ class LegacyAdoptionTest {
     }
 
     @Test
-    fun `kunci legacy mengikuti id dokumen agar stabil antar perangkat`() {
-        assertEquals("legacy:42", LegacyAdoption.legacySyncKey("42"))
-        assertEquals("legacy:abc", LegacyAdoption.legacySyncKey("abc"))
+    fun `kunci legacy memakai id dokumen itu sendiri agar tidak membuat dokumen kedua`() {
+        assertEquals("42", LegacyAdoption.legacySyncKey("42"))
+        assertEquals("abc", LegacyAdoption.legacySyncKey("abc"))
     }
 
     @Test
