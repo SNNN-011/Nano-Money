@@ -7,8 +7,14 @@ const JWKS = createRemoteJWKSet(new URL(FIREBASE_JWKS_URI));
 const GEMINI_BASE = 'https://generativelanguage.googleapis.com';
 
 // Liveness. 503 "high demand" bersifat sementara, jadi masih layak dicoba ulang.
-const RETRYABLE_STATUS = new Set([429, 500, 502, 503, 504]);
+// 429 juga. 500 tidak: dari pengukuran, 500 pada model gemma muncul konsisten dan
+// hanya menambah satu putaran penuh sebelum pindah ke model lain.
+const RETRYABLE_STATUS = new Set([429, 503]);
 const MAX_ATTEMPTS_PER_MODEL = 2;
+
+// Batas waktu per panggilan ke Gemini. Tanpa ini satu request bisa menggantung
+// 40 detik (terukur), dan seluruh rantai ikut tertahan.
+const ATTEMPT_TIMEOUT_MS = 8000;
 
 /**
  * Model yang dipakai aplikasi, dipetakan ke urutan percobaan.
@@ -106,7 +112,8 @@ export default {
           method: request.method,
           headers,
           body: requestBlob,
-        })
+        }),
+        { signal: AbortSignal.timeout(ATTEMPT_TIMEOUT_MS) }
       );
     };
 
@@ -136,7 +143,7 @@ export default {
 
         if (!RETRYABLE_STATUS.has(status)) break;
 
-        if (attempt < MAX_ATTEMPTS_PER_MODEL) await sleep(400 * attempt);
+        if (attempt < MAX_ATTEMPTS_PER_MODEL) await sleep(300 * attempt);
       }
     }
 

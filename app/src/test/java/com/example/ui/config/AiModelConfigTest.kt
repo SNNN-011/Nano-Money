@@ -18,18 +18,18 @@ class AiModelConfigTest {
     @Test
     fun `urutan_pencobaan_sesuai_yang_diminta`() {
         assertEquals(
-            listOf("gemma-4-31b-it", "gemini-3.1-flash-lite", "gemini-3.5-flash-lite"),
+            listOf("gemini-3.1-flash-lite", "gemma-4-31b-it", "gemini-3.5-flash-lite"),
             AiModelConfig.modelsToTry()
         )
     }
 
     @Test
-    fun `model_utama_dipakai_tidak_ada_pilihan_lain_di_ui`() {
-        // Tidak ada lagi GEMMA_MODEL/GEMINI_MODEL sebagai pilihan; ladder tetap satu jalur.
-        assertEquals(AiModelConfig.PRIMARY_MODEL, AiModelConfig.modelsToTry().first())
-        assertEquals(AiModelConfig.PRIMARY_MODEL, "gemma-4-31b-it")
-        assertEquals(AiModelConfig.FALLBACK_MODEL_1, "gemini-3.1-flash-lite")
-        assertEquals(AiModelConfig.FALLBACK_MODEL_2, "gemini-3.5-flash-lite")
+    fun `model_tercepat_yang_dijadi_utama_bukan_yang_lama_menggantung`() {
+        // Pengukuran latency: gemma-4-31b-it hanging 40 detik lalu 500,
+        // gemini-3.1-flash-lite selalu 200 dalam ~3 detik.
+        assertEquals("gemini-3.1-flash-lite", AiModelConfig.PRIMARY_MODEL)
+        assertEquals("gemma-4-31b-it", AiModelConfig.FALLBACK_MODEL_1)
+        assertEquals("gemini-3.5-flash-lite", AiModelConfig.FALLBACK_MODEL_2)
     }
 
     @Test
@@ -51,9 +51,9 @@ class AiModelConfigTest {
         // gemini-3.5-flash-lite sempat membalas 503, jadi tidak boleh di posisi pertama.
         assertEquals(
             listOf(
-                AiModelConfig.FALLBACK_MODEL_1,
                 AiModelConfig.PRIMARY_MODEL,
-                AiModelConfig.FALLBACK_MODEL_2
+                AiModelConfig.FALLBACK_MODEL_2,
+                AiModelConfig.FALLBACK_MODEL_1
             ),
             AiModelConfig.RECEIPT_MODELS
         )
@@ -85,8 +85,11 @@ class AiModelConfigTest {
     }
 
     @Test
-    fun `timeout_percobaan_tidak_lama_banget`() {
-        // 30 detik x beberapa model = layar menggantung hampir semenit.
-        assertTrue(AiModelConfig.ATTEMPT_TIMEOUT_MS <= 15_000L)
+    fun `timeout_percobaan_cukup_untuk_rantai_worker_tapi_tetap_terbatas`() {
+        // Worker: 8 detik per panggilan x 2 percobaan, plus perpindahan model.
+        // Jadi batas aplikasi harus di atas itu, tapi tidak boleh 30 detik lagi
+        // seperti dulu karena itu membuat layar menggantung.
+        assertTrue(AiModelConfig.ATTEMPT_TIMEOUT_MS >= 18_000L)
+        assertTrue(AiModelConfig.ATTEMPT_TIMEOUT_MS <= 25_000L)
     }
 }
