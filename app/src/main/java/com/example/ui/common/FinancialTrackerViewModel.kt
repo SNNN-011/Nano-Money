@@ -347,10 +347,10 @@ class FinancialTrackerViewModel(
         val cleanedList = list.map {  com.example.ui.util.CategoryIconMapper.extractEmojiAndLabel(it).second.ifBlank { it }.trim() }.distinct()
         incomeCategories.value = cleanedList
         prefs.edit().putString("income_categories_list", cleanedList.joinToString(",")).apply()
-        // Upload to Firestore immediately so categories stay in sync
-        if (com.example.util.FirebaseSyncHelper.isUserSignedIn()) {
-            viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                com.example.util.FirebaseSyncHelper.uploadCategoriesToFirestore(getApplication())
+        // Kirim segera supaya kategori ikut sinkron di perangkat lain.
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            if (com.example.util.FirebaseSyncHelper.isUserSignedIn()) {
+                runCatching { com.example.util.FirebaseSyncHelper.syncFinancialRecordsWithFirestore(getApplication()) }
             }
         }
     }
@@ -359,10 +359,9 @@ class FinancialTrackerViewModel(
         val cleanedList = list.map {  com.example.ui.util.CategoryIconMapper.extractEmojiAndLabel(it).second.ifBlank { it }.trim() }.distinct()
         expenseCategories.value = cleanedList
         prefs.edit().putString("expense_categories_list", cleanedList.joinToString(",")).apply()
-        // Upload to Firestore immediately so categories stay in sync
-        if (com.example.util.FirebaseSyncHelper.isUserSignedIn()) {
-            viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                com.example.util.FirebaseSyncHelper.uploadCategoriesToFirestore(getApplication())
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            if (com.example.util.FirebaseSyncHelper.isUserSignedIn()) {
+                runCatching { com.example.util.FirebaseSyncHelper.syncFinancialRecordsWithFirestore(getApplication()) }
             }
         }
     }
@@ -504,13 +503,12 @@ class FinancialTrackerViewModel(
             try {
                 if (editingRecordId != null) {
                     repository.update(record)
-                    com.example.util.FirebaseSyncHelper.uploadRecordToFirestoreDirectly(record)
+                    pushPendingToCloud()
                     com.example.util.TelemetryHelper.trackTransactionAction("edit", record.type, record.category, record.amount)
                     uiEvent.emit(UiEvent.ShowToast("Transaksi berhasil diperbarui!"))
                 } else {
-                    val newId = repository.insert(record)
-                    val insertedRecord = record.copy(id = newId.toInt())
-                    com.example.util.FirebaseSyncHelper.uploadRecordToFirestoreDirectly(insertedRecord)
+                    repository.insert(record)
+                    pushPendingToCloud()
                     com.example.util.TelemetryHelper.trackTransactionAction("add", record.type, record.category, record.amount)
                     uiEvent.emit(UiEvent.ShowToast("Transaksi baru berhasil disimpan!"))
                 }
@@ -522,11 +520,17 @@ class FinancialTrackerViewModel(
         return true
     }
 
+    /** Dorong antrean PENDING ke Firestore setelah tulis lokal (diamkan bila gagal). */
+    private suspend fun pushPendingToCloud() {
+        if (!com.example.util.FirebaseSyncHelper.isUserSignedIn()) return
+        runCatching { com.example.util.FirebaseSyncHelper.pushPending(getApplication()) }
+    }
+
     fun deleteRecord(record: FinancialRecord) {
         viewModelScope.launch {
             try {
                 repository.delete(record)
-                com.example.util.FirebaseSyncHelper.deleteRecordFromFirestoreDirectly(record.id)
+                pushPendingToCloud()
                 com.example.util.TelemetryHelper.trackTransactionAction("delete", record.type, record.category, record.amount)
                 uiEvent.emit(UiEvent.ShowToast("Transaksi berhasil dihapus!"))
                 if (editingRecordId == record.id) {
@@ -548,7 +552,7 @@ class FinancialTrackerViewModel(
         viewModelScope.launch {
             try {
                 repository.restore(record)
-                com.example.util.FirebaseSyncHelper.uploadRecordToFirestoreDirectly(record.copy(isDeleted = false))
+                pushPendingToCloud()
                 uiEvent.emit(UiEvent.ShowToast("${record.description} berhasil dipulihkan!"))
             } catch (e: Exception) {
                 uiEvent.emit(UiEvent.ShowAlert("Gagal Memulihkan", "Gagal memulihkan transaksi: ${e.localizedMessage ?: "kesalahan database"}"))
@@ -565,7 +569,7 @@ class FinancialTrackerViewModel(
                     return@launch
                 }
                 repository.restore(items)
-                items.forEach { com.example.util.FirebaseSyncHelper.uploadRecordToFirestoreDirectly(it.copy(isDeleted = false)) }
+                pushPendingToCloud()
                 uiEvent.emit(UiEvent.ShowToast("${items.size} transaksi berhasil dipulihkan!"))
             } catch (e: Exception) {
                 uiEvent.emit(UiEvent.ShowAlert("Gagal Memulihkan", "Gagal memulihkan transaksi: ${e.localizedMessage ?: "kesalahan database"}"))
@@ -587,7 +591,7 @@ class FinancialTrackerViewModel(
                 // Cloud harus ikut dihapus permanen. Kalau tidak, dokumennya
                 // masih tertinggal di Firestore dan sync saat aplikasi dibuka
                 // menariknya kembali, sehingga Sampah terisi lagi.
-                com.example.util.FirebaseSyncHelper.purgeRecordsFromFirestore(trashed.map { it.id })
+                com.example.util.FirebaseSyncHelper.purgeRecordsFromFirestore(trashed)
                 uiEvent.emit(UiEvent.ShowToast("Sampah dikosongkan."))
             } catch (e: Exception) {
                 uiEvent.emit(UiEvent.ShowAlert("Gagal Mengosongkan", "Gagal mengosongkan sampah: ${e.localizedMessage ?: "kesalahan database"}"))
@@ -608,7 +612,7 @@ class FinancialTrackerViewModel(
                     return@launch
                 }
                 repository.moveAllActiveToTrash()
-                items.forEach { com.example.util.FirebaseSyncHelper.deleteRecordFromFirestoreDirectly(it.id) }
+                pushPendingToCloud()
                 com.example.util.TelemetryHelper.trackBackupAction("delete_all", true, "${items.size} transaksi dipindahkan ke Sampah")
                 uiEvent.emit(UiEvent.ShowToast("${items.size} transaksi dipindahkan ke Sampah."))
             } catch (e: Exception) {

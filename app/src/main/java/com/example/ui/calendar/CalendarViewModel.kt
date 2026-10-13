@@ -60,7 +60,9 @@ class CalendarViewModel(
     fun deleteRecord(record: FinancialRecord) {
         viewModelScope.launch {
             repository.delete(record)
-            com.example.util.FirebaseSyncHelper.deleteRecordFromFirestoreDirectly(record.id)
+            if (com.example.util.FirebaseSyncHelper.isUserSignedIn()) {
+                runCatching { com.example.util.FirebaseSyncHelper.pushPending(getApplication()) }
+            }
         }
     }
 

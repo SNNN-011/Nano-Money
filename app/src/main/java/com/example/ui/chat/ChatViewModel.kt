@@ -305,14 +305,19 @@ class ChatViewModel(
                         date = pending.dateMillis,
                         notes = recordNotes
                     )
-                    val insertedId = repository.insert(record)
-                    val insertedRecord = record.copy(id = insertedId.toInt())
-                    com.example.util.FirebaseSyncHelper.uploadRecordToFirestoreDirectly(insertedRecord)
+                    repository.insert(record)
                     count++
                 }
             }
+            if (count > 0) pushPendingToCloud()
             addAiMessage("Berhasil mencatat transaksi dari ${pending.title} ke data keuangan Anda! 🎉")
         }
+    }
+
+    /** Dorong antrean PENDING ke Firestore setelah tulis lokal (diamkan bila gagal). */
+    private suspend fun pushPendingToCloud() {
+        if (!com.example.util.FirebaseSyncHelper.isUserSignedIn()) return
+        runCatching { com.example.util.FirebaseSyncHelper.pushPending(application) }
     }
 
     fun cancelPendingReceipt() {
@@ -470,7 +475,7 @@ class ChatViewModel(
         // Simpan ke database
         val rowId = repository.insert(record)
         val savedRecord = record.copy(id = rowId.toInt())
-        com.example.util.FirebaseSyncHelper.uploadRecordToFirestoreDirectly(savedRecord)
+        pushPendingToCloud()
 
         // Format teks konfirmasi
         val displayType = if (recordType == "income") "Pemasukan" else "Pengeluaran"

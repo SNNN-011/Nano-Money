@@ -92,7 +92,12 @@ class MainActivity : FragmentActivity() {
                   context, true, 20, 0
               )
               
+              // Hasil restore backup harus menang atas versi cloud: tandai PENDING dulu.
+              com.example.util.RestoreSyncMarker.consumeIfPresent(context)
+
               if (com.example.util.FirebaseSyncHelper.isUserSignedIn()) {
+                  // Realtime: perubahan dari perangkat lain langsung masuk.
+                  com.example.data.sync.SyncManager.startRealtime(context)
                   launch {
                       com.example.util.FirebaseSyncHelper.syncFinancialRecordsWithFirestore(context)
                   }

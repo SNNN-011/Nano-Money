@@ -1,29 +1,24 @@
 package com.example.util
 
 import android.content.Context
-import com.example.data.AppDatabase
 import com.example.data.FinancialRecord
+import com.example.data.sync.SyncManager
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.firestore.FirebaseFirestore
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.tasks.await
 import kotlin.coroutines.resume
-import kotlin.coroutines.resumeWithException
 
+/**
+ * Gerbang autentikasi Google + pintu masuk tunggal ke sinkronisasi.
+ *
+ * Logika sinkronisasi (aturan konflik, batch, kursor, adopsi data lama) kini ada di
+ * [SyncManager]; kelas ini hanya mengurus sesi login dan operasi Sampah yang perlu
+ * menyentuh Firestore langsung.
+ */
 object FirebaseSyncHelper {
-
-    private fun recordToMap(r: FinancialRecord): Map<String, Any> = hashMapOf(
-        "id" to r.id,
-        "description" to r.description,
-        "amount" to r.amount,
-        "type" to r.type,
-        "category" to r.category,
-        "date" to r.date,
-        "notes" to r.notes,
-        "isDeleted" to r.isDeleted
-    )
 
     fun isUserSignedIn(): Boolean {
         return FirebaseAuth.getInstance().currentUser != null
@@ -49,6 +44,7 @@ object FirebaseSyncHelper {
             FirebaseAuth.getInstance().signInWithCredential(credential)
                 .addOnCompleteListener { task ->
                     if (task.isSuccessful) {
+                        SyncManager.startRealtime(context)
                         val email = task.result?.user?.email ?: ""
                         continuation.resume(Result.success(email))
                     } else {
@@ -60,400 +56,101 @@ object FirebaseSyncHelper {
     }
 
     fun signOut() {
+        SyncManager.stopRealtime()
         FirebaseAuth.getInstance().signOut()
         // Clear cached bearer token for Gemini proxy
         com.example.data.remote.GeminiClient.clearCachedToken()
     }
 
-    suspend fun uploadRecordToFirestoreDirectly(record: FinancialRecord) {
-        val uid = getCurrentUid() ?: return
-        val db = FirebaseFirestore.getInstance()
-        val docData = hashMapOf(
-            "id" to record.id,
-            "description" to record.description,
-            "amount" to record.amount,
-            "type" to record.type,
-            "category" to record.category,
-            "date" to record.date,
-            "notes" to record.notes,
-            "isDeleted" to record.isDeleted
-        )
-
-        suspendCancellableCoroutine<Unit> { continuation ->
-            db.collection("users").document(uid).collection("financial_records")
-                .document(record.id.toString())
-                .set(docData)
-                .addOnCompleteListener {
-                    continuation.resume(Unit)
-                }
-        }
-    }
-
-    suspend fun deleteRecordFromFirestoreDirectly(recordId: Int) {
-        val uid = getCurrentUid() ?: return
-        val db = FirebaseFirestore.getInstance()
-
-        suspendCancellableCoroutine<Unit> { continuation ->
-            db.collection("users").document(uid).collection("financial_records")
-                .document(recordId.toString())
-                .set(hashMapOf("isDeleted" to true), com.google.firebase.firestore.SetOptions.merge())
-                .addOnCompleteListener {
-                    continuation.resume(Unit)
-                }
-        }
-    }
+    /** Dipanggil setelah setiap tulis lokal: dorong antrean PENDING ke Firestore. */
+    suspend fun pushPending(context: Context) = SyncManager.pushPending(context)
 
     /**
      * Hapus permanen dari Firestore, bukan hanya menandai isDeleted.
      *
-     * Dipakai saat Sampah dikosongkan. Kalau hanya isDeleted yang diubah,
-     * dokumennya masih tertinggal di cloud dan sync saat aplikasi dibuka
-     * akan menariknya kembali, sehingga Sampah terisi lagi.
+     * Dipakai saat Sampah dikosongkan. Kalau hanya isDeleted yang diubah, dokumennya
+     * masih tertinggal di cloud dan sync akan menariknya kembali.
+     * Dokumen dihapus berdasarkan syncKey; id numerik lama tetap ditangani agar
+     * dokumen dari skema sebelumnya ikut bersih.
      */
-    suspend fun purgeRecordsFromFirestore(recordIds: List<Int>) {
-        if (recordIds.isEmpty()) return
+    suspend fun purgeRecordsFromFirestore(records: List<FinancialRecord>) {
         val uid = getCurrentUid() ?: return
+        if (records.isEmpty()) return
         val db = FirebaseFirestore.getInstance()
+        val collection = db.collection("users").document(uid).collection(SyncManager.COLLECTION_RECORDS)
 
         suspendCancellableCoroutine<Unit> { continuation ->
             val batch = db.batch()
-            recordIds.forEach { id ->
-                batch.delete(
-                    db.collection("users").document(uid)
-                        .collection("financial_records")
-                        .document(id.toString())
-                )
+            records.forEach { record ->
+                // Dokumen versi lama memakai id numerik sebagai id dokumen.
+                batch.delete(collection.document(record.syncKey.ifBlank { record.id.toString() }))
+                if (record.syncKey.isNotBlank()) {
+                    batch.delete(collection.document(record.id.toString()))
+                }
             }
-            batch.commit().addOnCompleteListener {
-                continuation.resume(Unit)
-            }
+            batch.commit().addOnCompleteListener { continuation.resume(Unit) }
         }
     }
 
-    /** Upload category settings to Firestore immediately when user adds/deletes a category */
-    suspend fun uploadCategoriesToFirestore(context: Context) {
+    /**
+     * Sinkron penuh: transaksi + transaksi berulang lewat engine, lalu sinkron
+     * kategori & preferensi lawas (akan digantikan tabel categories/app_settings).
+     */
+    suspend fun syncFinancialRecordsWithFirestore(context: Context): Result<String> {
+        val report = SyncManager.syncAll(context)
+        runCatching { syncCategoriesAndPreferences(context) }
+
+        return if (report.isFailure) {
+            Result.failure(Exception(report.errors.joinToString("; ")))
+        } else {
+            Result.success(
+                "Penyelarasan berhasil! ${report.recordsPushed} transaksi & " +
+                    "${report.recurringPushed} transaksi berulang terkirim, " +
+                    "${report.recordsApplied + report.recurringApplied} pembaruan diterima" +
+                    (if (report.legacyAdopted > 0) ", ${report.legacyAdopted} data lama dipulihkan" else "") +
+                    "."
+            )
+        }
+    }
+
+    /**
+     * Sinkron kategori & preferensi versi lama (masih berbasis SharedPreferences).
+     * Bertahan sampai digantikan tabel categories dan app_settings.
+     */
+    private suspend fun syncCategoriesAndPreferences(context: Context) {
         val uid = getCurrentUid() ?: return
         val db = FirebaseFirestore.getInstance()
-        val prefs = com.example.util.SecurePrefsHelper.getEncryptedPrefs(context, "financial_tracker_prefs")
-        val categories = hashMapOf<String, Any>()
-        prefs.getString("income_categories_list", null)?.let { categories["income_categories_list"] = it }
-        prefs.getString("expense_categories_list", null)?.let { categories["expense_categories_list"] = it }
+        val settingsRef = db.collection("users").document(uid)
+            .collection("settings").document("financial_tracker_prefs")
+        val prefs = SecurePrefsHelper.getEncryptedPrefs(context, "financial_tracker_prefs")
 
-        suspendCancellableCoroutine<Unit> { continuation ->
-            db.collection("users").document(uid).collection("settings")
-                .document("financial_tracker_prefs")
-                .set(categories, com.google.firebase.firestore.SetOptions.merge())
-                .addOnCompleteListener { continuation.resume(Unit) }
+        val remote = runCatching { settingsRef.get().await().data ?: emptyMap() }.getOrDefault(emptyMap())
+
+        val categoryKeys = listOf("income_categories_list", "expense_categories_list")
+        val defaultCategories = mapOf(
+            "income_categories_list" to "Gaji,Investasi,Freelance,Lainnya",
+            "expense_categories_list" to "Makanan,Transportasi,Tagihan,Hiburan,Belanja,Lainnya"
+        )
+        val skipKeys = categoryKeys + setOf("pin_hash", "pin_salt", "pin_enabled", "saved_pin")
+
+        val merged = mutableMapOf<String, Any>()
+        // Kategori: kalau user sudah pernah mengubahnya di perangkat ini, lokal yang menang.
+        categoryKeys.forEach { key ->
+            val localValue = prefs.getString(key, null)
+            val remoteValue = remote[key] as? String
+            val isLocalDefault = localValue.isNullOrBlank() || localValue == defaultCategories[key]
+            when {
+                !isLocalDefault -> merged[key] = localValue!!
+                !remoteValue.isNullOrBlank() -> {
+                    merged[key] = remoteValue
+                    prefs.edit().putString(key, remoteValue).apply()
+                }
+                !localValue.isNullOrBlank() -> merged[key] = localValue
+            }
         }
-    }
+        remote.forEach { (k, v) -> if (k !in skipKeys) merged[k] = v }
+        prefs.all.forEach { (k, v) -> if (v != null && k !in skipKeys) merged[k] = v }
 
-    suspend fun syncFinancialRecordsWithFirestore(context: Context): Result<String> {
-        val uid = getCurrentUid()
-            ?: return Result.failure(Exception("Silakan hubungkan akun Google Anda terlebih dahulu untuk penyelarasan cloud."))
-
-        val db = FirebaseFirestore.getInstance()
-        val userDocRef = db.collection("users").document(uid)
-        val collectionRef = userDocRef.collection("financial_records")
-        val recurringCollectionRef = userDocRef.collection("recurring_transactions")
-
-        val appDb = AppDatabase.getDatabase(context)
-        val dao = appDb.financialRecordDao()
-        val recurringDao = appDb.recurringTransactionDao()
-
-        return try {
-            val localRecords = dao.getAllRecordsWithDeleted().first()
-            val localRecurring = recurringDao.getAllRecurring().first()
-
-            // 1. Sync Financial Records
-            val firestoreSnapshot = suspendCancellableCoroutine { continuation ->
-                collectionRef.get().addOnCompleteListener { task ->
-                    if (task.isSuccessful) {
-                        continuation.resume(task.result)
-                    } else {
-                        continuation.resumeWithException(task.exception ?: Exception("Gagal mengambil data dari Google Firestore."))
-                    }
-                }
-            }
-
-            val firestoreDocs = firestoreSnapshot?.documents ?: emptyList()
-            val firestoreRecordsMap = firestoreDocs.mapNotNull { doc ->
-                try {
-                    val idObj = doc.get("id")
-                    val id = (idObj as? Number)?.toInt() ?: doc.id.toIntOrNull() ?: return@mapNotNull null
-                    
-                    val amountObj = doc.get("amount")
-                    val amount = (amountObj as? Number)?.toLong() ?: 0L
-                    
-                    val dateObj = doc.get("date")
-                    val date = (dateObj as? Number)?.toLong() ?: 0L
-                    
-                    id to FinancialRecord(
-                        id = id,
-                        description = doc.getString("description") ?: "",
-                        amount = amount,
-                        type = doc.getString("type") ?: "",
-                        category = doc.getString("category") ?: "",
-                        date = date,
-                        notes = doc.getString("notes") ?: "",
-                        isDeleted = doc.getBoolean("isDeleted") ?: false
-                    )
-                } catch (e: Exception) {
-                    null
-                }
-            }.toMap()
-
-            val localRecordsMap = localRecords.associateBy { it.id }
-            var uploadedCount = 0
-            var downloadedCount = 0
-
-            // Cloud (Firestore) adalah acuan.
-            // - Record hanya ada di lokal  -> kirim ke cloud.
-            // - Record ada di cloud         -> versi cloud menimpa versi lokal.
-            val recordsToWrite = mutableListOf<Pair<String, Map<String, Any>>>()
-            val recordsToOverwriteLocally = mutableListOf<FinancialRecord>()
-
-            for (localRecord in localRecords) {
-                val firestoreRecord = firestoreRecordsMap[localRecord.id]
-
-                if (firestoreRecord == null) {
-                    if (!localRecord.isDeleted) {
-                        recordsToWrite.add(localRecord.id.toString() to recordToMap(localRecord))
-                    }
-                    continue
-                }
-
-                if (firestoreRecord != localRecord) {
-                    recordsToOverwriteLocally.add(firestoreRecord)
-                }
-            }
-
-            if (recordsToOverwriteLocally.isNotEmpty()) {
-                for (r in recordsToOverwriteLocally) {
-                    dao.updateRecord(r)
-                    downloadedCount++
-                }
-            }
-
-            if (recordsToWrite.isNotEmpty()) {
-                val chunks = recordsToWrite.chunked(500)
-                for (chunk in chunks) {
-                    suspendCancellableCoroutine<Unit> { continuation ->
-                        val batch = db.batch()
-                        for ((docId, data) in chunk) {
-                            val docRef = collectionRef.document(docId)
-                            batch.set(docRef, data)
-                        }
-                        batch.commit().addOnCompleteListener { task ->
-                            if (task.isSuccessful) {
-                                uploadedCount += chunk.size
-                            }
-                            continuation.resume(Unit)
-                        }
-                    }
-                }
-            }
-
-            val recordsToInsertLocally = mutableListOf<FinancialRecord>()
-            for ((id, fsRecord) in firestoreRecordsMap) {
-                if (!localRecordsMap.containsKey(id)) {
-                    recordsToInsertLocally.add(fsRecord)
-                    downloadedCount++
-                }
-            }
-            if (recordsToInsertLocally.isNotEmpty()) {
-                dao.insertAll(recordsToInsertLocally)
-            }
-
-            // 2. Sync Recurring Transactions
-            val recurringSnapshot = suspendCancellableCoroutine { continuation ->
-                recurringCollectionRef.get().addOnCompleteListener { task ->
-                    if (task.isSuccessful) continuation.resume(task.result)
-                    else continuation.resume(null) // ignore error for recurring to not block
-                }
-            }
-            
-            val recurringDocs = recurringSnapshot?.documents ?: emptyList()
-            val firestoreRecurringMap = recurringDocs.mapNotNull { doc ->
-                try {
-                    val idObj = doc.get("id")
-                    val id = (idObj as? Number)?.toInt() ?: doc.id.toIntOrNull() ?: return@mapNotNull null
-                    
-                    val amountObj = doc.get("amount")
-                    val amount = (amountObj as? Number)?.toLong() ?: 0L
-                    
-                    val dayOfMonthObj = doc.get("dayOfMonth")
-                    val dayOfMonth = (dayOfMonthObj as? Number)?.toInt() ?: 1
-                    
-                    val lastRunDateObj = doc.get("lastRunDate")
-                    val lastRunDate = (lastRunDateObj as? Number)?.toLong()
-                    
-                    id to com.example.data.RecurringTransaction(
-                        id = id,
-                        description = doc.getString("description") ?: "",
-                        amount = amount,
-                        type = doc.getString("type") ?: "",
-                        category = doc.getString("category") ?: "",
-                        dayOfMonth = dayOfMonth,
-                        notes = doc.getString("notes") ?: "",
-                        lastRunDate = lastRunDate,
-                        isActive = doc.getBoolean("isActive") ?: true
-                    )
-                } catch (e: Exception) {
-                    null
-                }
-            }.toMap()
-
-            val localRecurringMap = localRecurring.associateBy { it.id }
-
-            val recurringToWrite = mutableListOf<Pair<String, Map<String, Any?>>>()
-
-            for (localRec in localRecurring) {
-                val firestoreRec = firestoreRecurringMap[localRec.id]
-                if (firestoreRec == null || firestoreRec != localRec) {
-                    val docData = hashMapOf(
-                        "id" to localRec.id,
-                        "description" to localRec.description,
-                        "amount" to localRec.amount,
-                        "type" to localRec.type,
-                        "category" to localRec.category,
-                        "dayOfMonth" to localRec.dayOfMonth,
-                        "notes" to localRec.notes,
-                        "lastRunDate" to localRec.lastRunDate,
-                        "isActive" to localRec.isActive
-                    )
-                    recurringToWrite.add(localRec.id.toString() to docData)
-                }
-            }
-
-            if (recurringToWrite.isNotEmpty()) {
-                val chunks = recurringToWrite.chunked(500)
-                for (chunk in chunks) {
-                    suspendCancellableCoroutine<Unit> { continuation ->
-                        val batch = db.batch()
-                        for ((docId, data) in chunk) {
-                            val docRef = recurringCollectionRef.document(docId)
-                            batch.set(docRef, data)
-                        }
-                        batch.commit().addOnCompleteListener { continuation.resume(Unit) }
-                    }
-                }
-            }
-
-            val recurringToInsertLocally = mutableListOf<com.example.data.RecurringTransaction>()
-            for ((id, fsRec) in firestoreRecurringMap) {
-                if (!localRecurringMap.containsKey(id)) {
-                    recurringToInsertLocally.add(fsRec)
-                }
-            }
-            if (recurringToInsertLocally.isNotEmpty()) {
-                recurringDao.insertAll(recurringToInsertLocally)
-            }
-
-            // 3. Sync Settings / Preferences (financial_tracker_prefs, app_security_prefs, security_prefs)
-            val prefNames = listOf("financial_tracker_prefs", "app_security_prefs", "security_prefs")
-            
-            for (prefName in prefNames) {
-                val prefs = com.example.util.SecurePrefsHelper.getEncryptedPrefs(context, prefName)
-                val settingsDocRef = userDocRef.collection("settings").document(prefName)
-                
-                val settingsSnapshot = suspendCancellableCoroutine { continuation ->
-                    settingsDocRef.get().addOnCompleteListener { task ->
-                        if (task.isSuccessful) continuation.resume(task.result)
-                        else continuation.resume(null)
-                    }
-                }
-
-                val firestoreSettingsMap = settingsSnapshot?.data ?: emptyMap<String, Any>()
-                val localSettingsMap = prefs.all.toMutableMap()
-
-                // Explicitly read category keys — prefs.all sometimes misses them in EncryptedSharedPreferences
-                val categoryKeys = listOf("income_categories_list", "expense_categories_list")
-                for (key in categoryKeys) {
-                    if (!localSettingsMap.containsKey(key)) {
-                        prefs.getString(key, null)?.let { localSettingsMap[key] = it }
-                    }
-                }
-
-                val mergedSettings = mutableMapOf<String, Any>()
-
-                // Category keys: local wins if user customized, Firestore wins if local still default
-                val defaultCategories = mapOf(
-                    "income_categories_list" to "Gaji,Investasi,Freelance,Lainnya",
-                    "expense_categories_list" to "Makanan,Transportasi,Tagihan,Hiburan,Belanja,Lainnya"
-                )
-                for (key in categoryKeys) {
-                    val localValue = localSettingsMap[key] as? String
-                    val firestoreValue = firestoreSettingsMap[key] as? String
-                    val isDefault = localValue.isNullOrBlank() || localValue == defaultCategories[key]
-                    if (!isDefault) {
-                        // User customized locally — local is source of truth (supports delete)
-                        mergedSettings[key] = localValue!!
-                    } else if (!firestoreValue.isNullOrBlank()) {
-                        // Local still default — use Firestore (restore scenario)
-                        mergedSettings[key] = firestoreValue
-                    } else if (!localValue.isNullOrBlank()) {
-                        mergedSettings[key] = localValue
-                    }
-                }
-
-                // PIN keys: selalu local wins — PIN adalah data keamanan lokal device
-                val pinKeys = listOf("pin_hash", "pin_salt", "pin_enabled")
-
-                // Filter out category keys, PIN keys, and legacy security fields at point of collection
-                val legacySecurityKeys = setOf(
-                    "saved_pin",
-                    "security_question", "security_answer", "security_question_answer",
-                    "answer_salt", "answer_hash", "biometric_enabled"
-                )
-                val skipKeys = categoryKeys + pinKeys + legacySecurityKeys
-
-                for ((k, v) in firestoreSettingsMap) {
-                    if (k !in skipKeys) mergedSettings[k] = v
-                }
-                for ((k, v) in localSettingsMap) {
-                    if (v != null && k !in skipKeys) {
-                        if (v is Set<*>) {
-                            mergedSettings[k] = v.toList()
-                        } else {
-                            mergedSettings[k] = v
-                        }
-                    }
-                }
-
-                // Cleanup legacy security fields from local SharedPreferences
-                for (key in legacySecurityKeys) {
-                    prefs.edit().remove(key).apply()
-                }
-                
-                suspendCancellableCoroutine<Unit> { continuation ->
-                    settingsDocRef.set(mergedSettings).addOnCompleteListener { continuation.resume(Unit) }
-                }
-                
-                val editor = prefs.edit()
-                for ((key, value) in mergedSettings) {
-                    when (value) {
-                        is String -> editor.putString(key, value)
-                        is Boolean -> editor.putBoolean(key, value)
-                        is Long -> editor.putLong(key, value)
-                        is Float -> editor.putFloat(key, value)
-                        is Double -> editor.putFloat(key, value.toFloat())
-                        is Int -> editor.putInt(key, value)
-                        is Set<*> -> {
-                            val stringSet = value.mapNotNull { it?.toString() }.toSet()
-                            editor.putStringSet(key, stringSet)
-                        }
-                        is List<*> -> {
-                            val stringSet = value.mapNotNull { it?.toString() }.toSet()
-                            editor.putStringSet(key, stringSet)
-                        }
-                    }
-                }
-                editor.apply()
-            }
-
-            Result.success("Penyelarasan berhasil dinormalisasi! Seluruh data (Transaksi, Rutin, & Pengaturan) telah disinkronkan.")
-        } catch (e: Exception) {
-            Result.failure(e)
-        }
+        runCatching { settingsRef.set(merged).await() }
     }
 }
