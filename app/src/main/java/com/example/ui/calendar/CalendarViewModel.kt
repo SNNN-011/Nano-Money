@@ -71,9 +71,10 @@ class CalendarViewModel(
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
                 val database = AppDatabase.getDatabase(application)
-                val repository = FinancialRecordRepository(database.financialRecordDao())
+                val repository = FinancialRecordRepository.create(database)
                 return CalendarViewModel(application, repository) as T
             }
         }
     }
 }
+

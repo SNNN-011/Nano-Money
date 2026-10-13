@@ -24,6 +24,18 @@ class FinancialRecordRepository(
         const val MAX_AMOUNT = 999_999_999_999L // 1 Triliun Rupiah
         const val MAX_DESC_LENGTH = 500
         const val MAX_CATEGORY_LENGTH = 100
+
+        /**
+         * Repository transaksi yang categoryId-nya selalu terisi.
+         *
+         * Dipakai semua titik ViewModel supaya tidak ada jalur tulis yang menghasilkan
+         * transaksi tanpa referensi kategori. Kalau ada, rename dan hapus kategori tidak
+         * akan berefek ke transaksi itu.
+         */
+        fun create(db: AppDatabase): FinancialRecordRepository =
+            FinancialRecordRepository(db.financialRecordDao()) { type, name ->
+                db.categoryDao().findIdByName(type, name).orEmpty()
+            }
     }
 
     private fun validateRecord(record: FinancialRecord) {
@@ -67,25 +79,40 @@ class FinancialRecordRepository(
         )
     }
 
+    /**
+     * Mengubah transaksi yang sudah ada.
+     *
+     * Form hanya mengirim id + isi baru, jadi `syncKey` dan status Sampah diambil
+     * kembali dari baris lama. Tanpa itu, edit akan membuat syncKey baru: dokumen
+     * cloud yang lama tidak pernah terpakai lagi dan akan muncul balik saat pull,
+     * sedangkan transaksi hasil edit tersimpan sebagai duplikat.
+     */
     suspend fun update(record: FinancialRecord) {
         validateRecord(record)
+        val existing = dao.findById(record.id)
         dao.updateRecord(
             record.copy(
                 updatedAt = System.currentTimeMillis(),
                 syncStatus = SyncStatus.PENDING,
-                syncKey = record.syncKey.ifBlank { SyncKeys.newTransactionKey() }
+                syncKey = existing?.syncKey?.takeIf { it.isNotBlank() } ?: SyncKeys.newTransactionKey(),
+                isDeleted = existing?.isDeleted ?: record.isDeleted,
+                // Kalau user mengganti kategori, categoryId lama harus ditulis ulang;
+                // kalau tidak, transaksi masih menunjuk ke kategori yang tidak dipilih.
+                categoryId = record.categoryId.ifBlank { resolveCategoryId(record.type, record.category) }
             )
         )
     }
 
     /** Soft delete: baris tetap ada agar aksi hapus bisa disinkronkan & dipulihkan dari Sampah. */
     suspend fun delete(record: FinancialRecord) {
+        val existing = dao.findById(record.id)
         dao.updateRecord(
             record.copy(
                 isDeleted = true,
                 updatedAt = System.currentTimeMillis(),
                 syncStatus = SyncStatus.PENDING,
-                syncKey = record.syncKey.ifBlank { SyncKeys.newTransactionKey() }
+                syncKey = existing?.syncKey?.takeIf { it.isNotBlank() }
+                    ?: record.syncKey.ifBlank { SyncKeys.newTransactionKey() }
             )
         )
     }
@@ -144,6 +171,26 @@ class FinancialRecordRepository(
 
     private suspend fun resolveCategoryId(type: String, name: String): String =
         runCatching { categoryIdResolver(type, name) }.getOrDefault("")
+
+    /**
+     * Mengisi categoryId pada transaksi lama yang masih kosong.
+     *
+     * Transaksi hasil migrasi v5 hanya punya nama kategori, sedangkan kategori kini
+     * punya id stabil. Tanpa pengisian ini, rename/hapus kategori tidak bisa efek ke
+     * transaksi lama. Idempoten: hanya baris dengan categoryId kosong yang disentuh.
+     */
+    suspend fun backfillCategoryIds(): Int {
+        val orphans = dao.getRecordsWithoutCategoryId()
+        var filled = 0
+        orphans.forEach { record ->
+            val id = resolveCategoryId(record.type, record.category)
+            if (id.isNotBlank()) {
+                dao.setCategoryId(record.id, id)
+                filled++
+            }
+        }
+        return filled
+    }
 
     fun getTransactionsByMonth(year: Int, month: Int): Flow<List<FinancialRecord>> = dao.getTransactionsByMonth(year, month)
 

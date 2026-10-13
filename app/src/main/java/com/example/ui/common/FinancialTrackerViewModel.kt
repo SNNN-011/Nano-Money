@@ -6,10 +6,16 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.data.AppDatabase
+import com.example.data.AppSettingsRepository
+import com.example.data.Category
+import com.example.data.CategoryBudgetRepository
+import com.example.data.CategoryCascadeService
+import com.example.data.CategoryRepository
 import com.example.data.FinancialRecord
 import com.example.data.FinancialRecordRepository
 import com.example.data.RecurringTransaction
-import com.example.data.RecurringTransactionDao
+import com.example.data.RecurringTransactionRepository
+import com.example.data.SyncableSettings
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import org.json.JSONArray
@@ -140,32 +146,71 @@ class FinancialTrackerViewModel(
 
     private val prefs = com.example.util.SecurePrefsHelper.getEncryptedPrefs(application, "financial_tracker_prefs")
 
-    val incomeCategories = MutableStateFlow<List<String>>(
-        prefs.getString("income_categories_list", "Gaji,Investasi,Freelance,Lainnya")
-            ?.split(",")?.filter { it.isNotEmpty() } ?: listOf("Gaji", "Investasi", "Freelance", "Lainnya")
-    )
-    val expenseCategories = MutableStateFlow<List<String>>(
-        prefs.getString("expense_categories_list", "Makanan,Transportasi,Tagihan,Hiburan,Belanja,Lainnya")
-            ?.split(",")?.filter { it.isNotEmpty() } ?: listOf("Makanan", "Transportasi", "Tagihan", "Hiburan", "Belanja", "Lainnya")
-    )
+    private val appDb = AppDatabase.getDatabase(application)
 
-    // Reload categories when prefs change (e.g. after Firestore sync)
-    private val prefsListener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-        if (key in setOf("income_categories_list", "expense_categories_list", "monthly_budget_limit")) {
-            reloadCategoriesFromPrefs()
-        }
-    }
+    /** Sumber tunggal kategori, anggaran, dan pengaturan (tabel Room, bukan prefs lagi). */
+    private val categoryRepository = CategoryRepository(appDb.categoryDao(), prefs)
+    private val categoryBudgetRepository = CategoryBudgetRepository(appDb.categoryBudgetDao())
+    private val appSettingsRepository = AppSettingsRepository(appDb.appSettingDao())
+    private val categoryCascade = CategoryCascadeService(appDb.financialRecordDao())
 
-    init {
-        prefs.registerOnSharedPreferenceChangeListener(prefsListener)
-    }
+    val incomeCategoryEntities: StateFlow<List<Category>> =
+        categoryRepository.observeByType("income")
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    val monthlyBudgetLimit = MutableStateFlow(prefs.getLong("monthly_budget_limit", 0L))
+    val expenseCategoryEntities: StateFlow<List<Category>> =
+        categoryRepository.observeByType("expense")
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    // Nama kategori untuk parser AI & chip form.
+    val incomeCategories: StateFlow<List<String>> = incomeCategoryEntities
+        .map { list -> list.map { it.name } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val expenseCategories: StateFlow<List<String>> = expenseCategoryEntities
+        .map { list -> list.map { it.name } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    /** Peta categoryId -> nama terbaru; tampilan transaksi me-resolve lewat peta ini. */
+    val categoryNameById: StateFlow<Map<String, String>> = categoryRepository.nameById
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
+
+    val monthlyBudgetLimit = MutableStateFlow(0L)
     val selectedBudgetOffset = MutableStateFlow(0)
 
-    // Map of expense category name to its customized budget limit
-    private val _categoryBudgets = MutableStateFlow<Map<String, Long>>(emptyMap())
-    val categoryBudgets: StateFlow<Map<String, Long>> = _categoryBudgets.asStateFlow()
+    init {
+        // Migrasi kategori, anggaran, dan anggaran bulanan dari prefs lama ke Room.
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                var migrated = CategoryRepository.runIfNeeded(
+                    appDb.categoryDao(), appDb.categoryBudgetDao(), prefs
+                )
+                migrated = AppSettingsRepository.runIfNeeded(appDb.appSettingDao(), prefs) || migrated
+
+                // Transaksi hasil migrasi DB lama belum punya categoryId, padahal
+                // kategorinya sudah ada. Diisi sekarang supaya rename/hapus kategori
+                // juga berefek ke transaksi lama.
+                val recordRepo = FinancialRecordRepository.create(appDb)
+                val backfilled = recordRepo.backfillCategoryIds() > 0
+
+                if (migrated || backfilled) pushPendingToCloud()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+
+        // Anggaran bulanan mengikuti tabel app_settings (allow-list), bukan prefs.
+        appSettingsRepository.observe(SyncableSettings.MONTHLY_BUDGET_LIMIT)
+            .onEach { setting -> setting?.valueLong?.let { monthlyBudgetLimit.value = it } }
+            .launchIn(viewModelScope)
+    }
+
+    // Batas anggaran per kategori, dikunci dengan categoryId (bukan nama).
+    val categoryBudgets: StateFlow<Map<String, Long>> = categoryBudgetRepository.observeAll()
+        .map { list ->
+            list.filter { !it.isDeleted && it.budgetLimit > 0L }.associate { it.categoryId to it.budgetLimit }
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
 
     // Map of category name to current month's expenses for that category
     val categorySpending: StateFlow<Map<String, Long>> = combine(allRecords, selectedBudgetOffset) { records, offset ->
@@ -175,15 +220,11 @@ class FinancialTrackerViewModel(
             .mapValues { entry -> entry.value.sumOf { it.amount } }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
 
-    fun updateCategoryBudget(category: String, limit: Long) {
-        prefs.edit().putLong("category_budget_$category", limit).apply()
-        val currentBudgets = _categoryBudgets.value.toMutableMap()
-        if (limit <= 0L) {
-            currentBudgets.remove(category)
-        } else {
-            currentBudgets[category] = limit
+    fun updateCategoryBudget(categoryId: String, limit: Long) {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            categoryBudgetRepository.setLimit(categoryId, limit)
+            pushPendingToCloud()
         }
-        _categoryBudgets.value = currentBudgets
     }
 
     fun changeBudgetMonthOffset(offset: Int) {
@@ -192,7 +233,10 @@ class FinancialTrackerViewModel(
 
     fun updateMonthlyBudgetLimit(limit: Long) {
         monthlyBudgetLimit.value = limit
-        prefs.edit().putLong("monthly_budget_limit", limit).apply()
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            appSettingsRepository.setLong(SyncableSettings.MONTHLY_BUDGET_LIMIT, limit)
+            pushPendingToCloud()
+        }
     }
 
     val monthlySpendingTotal: StateFlow<Long> = combine(allRecords, selectedBudgetOffset) { records, offset ->
@@ -253,18 +297,6 @@ class FinancialTrackerViewModel(
                     formCategory.value = expenseCategories.value.firstOrNull() ?: "Makanan"
                 }
             }
-        }.launchIn(viewModelScope)
-
-        // Reactively load category budgets when expenseCategories changes
-        expenseCategories.onEach { categories ->
-            val budgets = mutableMapOf<String, Long>()
-            categories.forEach { cat ->
-                val limit = prefs.getLong("category_budget_$cat", 0L)
-                if (limit > 0L) {
-                    budgets[cat] = limit
-                }
-            }
-            _categoryBudgets.value = budgets
         }.launchIn(viewModelScope)
 
         // One-time cleanup for old categories that were saved with emojis:
@@ -343,82 +375,53 @@ class FinancialTrackerViewModel(
         }
     }
 
-    private fun saveIncomeCategories(list: List<String>) {
-        val cleanedList = list.map {  com.example.ui.util.CategoryIconMapper.extractEmojiAndLabel(it).second.ifBlank { it }.trim() }.distinct()
-        incomeCategories.value = cleanedList
-        prefs.edit().putString("income_categories_list", cleanedList.joinToString(",")).apply()
-        // Kirim segera supaya kategori ikut sinkron di perangkat lain.
-        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-            if (com.example.util.FirebaseSyncHelper.isUserSignedIn()) {
-                runCatching { com.example.util.FirebaseSyncHelper.syncFinancialRecordsWithFirestore(getApplication()) }
-            }
-        }
-    }
-
-    private fun saveExpenseCategories(list: List<String>) {
-        val cleanedList = list.map {  com.example.ui.util.CategoryIconMapper.extractEmojiAndLabel(it).second.ifBlank { it }.trim() }.distinct()
-        expenseCategories.value = cleanedList
-        prefs.edit().putString("expense_categories_list", cleanedList.joinToString(",")).apply()
-        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-            if (com.example.util.FirebaseSyncHelper.isUserSignedIn()) {
-                runCatching { com.example.util.FirebaseSyncHelper.syncFinancialRecordsWithFirestore(getApplication()) }
-            }
-        }
-    }
-
-    /** Reload categories from prefs — called after Firestore sync restores data */
-    fun reloadCategoriesFromPrefs() {
-        incomeCategories.value = prefs.getString("income_categories_list", "Gaji,Investasi,Freelance,Lainnya")
-            ?.split(",")?.filter { it.isNotEmpty() } ?: listOf("Gaji", "Investasi", "Freelance", "Lainnya")
-        expenseCategories.value = prefs.getString("expense_categories_list", "Makanan,Transportasi,Tagihan,Hiburan,Belanja,Lainnya")
-            ?.split(",")?.filter { it.isNotEmpty() } ?: listOf("Makanan", "Transportasi", "Tagihan", "Hiburan", "Belanja", "Lainnya")
-        monthlyBudgetLimit.value = prefs.getLong("monthly_budget_limit", 0L)
-    }
-
     fun addCategory(type: String, category: String): Boolean {
         val (_, cleanName) = com.example.ui.util.CategoryIconMapper.extractEmojiAndLabel(category.trim())
         val trimmed = cleanName.ifBlank { category.trim() }.trim()
         if (trimmed.isEmpty()) return false
-        if (type == "income") {
-            val current = incomeCategories.value
-            if (current.any {
-                val (_, c) = com.example.ui.util.CategoryIconMapper.extractEmojiAndLabel(it)
-                c.trim().equals(trimmed, ignoreCase = true)
-            }) return false
-            saveIncomeCategories(current + trimmed)
-        } else {
-            val current = expenseCategories.value
-            if (current.any {
-                val (_, c) = com.example.ui.util.CategoryIconMapper.extractEmojiAndLabel(it)
-                c.trim().equals(trimmed, ignoreCase = true)
-            }) return false
-            saveExpenseCategories(current + trimmed)
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            if (categoryRepository.add(type, trimmed) != null) pushPendingToCloud()
         }
         return true
     }
 
     fun deleteCategory(type: String, category: String): Boolean {
         val trimmed = category.trim()
-        if (type == "income") {
-            val current = incomeCategories.value
-            if (!current.contains(trimmed)) return false
-            if (current.size <= 1) return false
-            val newList = current.filter { it != trimmed }
-            saveIncomeCategories(newList)
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            val existing = categoryRepository.findByName(type, trimmed) ?: return@launch
+            if (!categoryRepository.softDelete(existing.id)) return@launch
+
+            // Transaksi kategori yang dihapus pindah ke "Lainnya"; anggaran lamanya dilepas.
+            val fallback = categoryRepository.findByName(type, FALLBACK_CATEGORY_NAME)
+                ?: categoryRepository.add(type, FALLBACK_CATEGORY_NAME)
+            if (fallback != null) categoryCascade.applyMove(existing.id, fallback)
+            categoryBudgetRepository.setLimit(existing.id, 0L)
+
             if (formCategory.value == trimmed) {
-                formCategory.value = newList.firstOrNull() ?: ""
+                val replacement = fallback ?: categoryRepository.getByType(type).firstOrNull()
+                if (replacement != null) formCategory.value = replacement.name
             }
-        } else {
-            val current = expenseCategories.value
-            if (!current.contains(trimmed)) return false
-            if (current.size <= 1) return false
-            val newList = current.filter { it != trimmed }
-            saveExpenseCategories(newList)
-            if (formCategory.value == trimmed) {
-                formCategory.value = newList.firstOrNull() ?: ""
-            }
+            pushPendingToCloud()
         }
         return true
+    }
+
+    /**
+     * Mengubah nama kategori. ID kategori tetap sama, jadi anggaran tetap tertaut,
+     * dan nama yang tersimpan di transaksi ikut diperbarui.
+     */
+    suspend fun renameCategory(type: String, currentName: String, newName: String): Boolean {
+        val trimmed = newName.trim()
+        if (trimmed.isEmpty()) return false
+
+        val existing = categoryRepository.findByName(type, currentName.trim()) ?: return false
+        val renamed = categoryRepository.rename(existing.id, trimmed)
+        if (renamed) {
+            categoryCascade.applyRename(existing.id, trimmed)
+            if (formCategory.value == currentName.trim()) formCategory.value = trimmed
+            pushPendingToCloud()
+        }
+        return renamed
     }
 
     fun setEditingRecord(record: FinancialRecord?) {
@@ -637,41 +640,20 @@ class FinancialTrackerViewModel(
         return array.toString(4) // Pretty print indent 4
     }
 
-    private fun importCategoriesFromRecords(records: List<FinancialRecord>) {
-        val currentIncome = incomeCategories.value.toMutableList()
-        val currentExpense = expenseCategories.value.toMutableList()
+    /** Kategori yang muncul di data impor otomatis ditambahkan ke tabel kategori. */
+    private suspend fun importCategoriesFromRecords(records: List<FinancialRecord>) {
         var modified = false
         for (record in records) {
             val (_, cat) = com.example.ui.util.CategoryIconMapper.extractEmojiAndLabel(record.category.trim())
             val cleanCat = cat.ifBlank { record.category.trim() }.trim()
-            if (cleanCat.isNotEmpty()) {
-                if (record.type == "income") {
-                    if (!currentIncome.any {
-                        val (_, c) = com.example.ui.util.CategoryIconMapper.extractEmojiAndLabel(it)
-                        c.trim().equals(cleanCat, ignoreCase = true)
-                    }) {
-                        currentIncome.add(cleanCat)
-                        modified = true
-                    }
-                } else if (record.type == "expense") {
-                    if (!currentExpense.any {
-                        val (_, c) = com.example.ui.util.CategoryIconMapper.extractEmojiAndLabel(it)
-                        c.trim().equals(cleanCat, ignoreCase = true)
-                    }) {
-                        currentExpense.add(cleanCat)
-                        modified = true
-                    }
-                }
+            if (cleanCat.isEmpty()) continue
+            if (record.type != "income" && record.type != "expense") continue
+
+            if (categoryRepository.findByName(record.type, cleanCat) == null) {
+                if (categoryRepository.add(record.type, cleanCat) != null) modified = true
             }
         }
-        if (modified) {
-            if (currentIncome != incomeCategories.value) {
-                saveIncomeCategories(currentIncome)
-            }
-            if (currentExpense != expenseCategories.value) {
-                saveExpenseCategories(currentExpense)
-            }
-        }
+        if (modified) pushPendingToCloud()
     }
 
     // Import validation and logic
@@ -1449,13 +1431,17 @@ class FinancialTrackerViewModel(
     }
 
     companion object {
+        /** Tujuan transaksi saat kategorinya dihapus. */
+        const val FALLBACK_CATEGORY_NAME = "Lainnya"
+
         fun provideFactory(application: Application): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
                 val database = AppDatabase.getDatabase(application)
-                val repository = FinancialRecordRepository(database.financialRecordDao())
+                val repository = FinancialRecordRepository.create(database)
                 return FinancialTrackerViewModel(application, repository) as T
             }
         }
     }
 }
+

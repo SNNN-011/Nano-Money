@@ -49,6 +49,9 @@ interface FinancialRecordDao {
         return getTransactionsInTimeRange(startMs, endMs)
     }
 
+    @Query("SELECT * FROM financial_records WHERE id = :id LIMIT 1")
+    suspend fun findById(id: Int): FinancialRecord?
+
     @Query("SELECT COUNT(*) FROM financial_records WHERE isDeleted = 0")
     suspend fun getRecordCount(): Int
 
@@ -107,4 +110,16 @@ interface FinancialRecordDao {
         deleteAllRecords()
         insertAll(records)
     }
+
+    // ---- Backfill referensi kategori ----
+
+    /**
+     * Transaksi hasil migrasi lama belum punya categoryId, padahal nama kategorinya
+     * masih tersimpan. Baris seperti itu dikumpulkan supaya bisa diisi id-nya.
+     */
+    @Query("SELECT * FROM financial_records WHERE categoryId = ''")
+    suspend fun getRecordsWithoutCategoryId(): List<FinancialRecord>
+
+    @Query("UPDATE financial_records SET categoryId = :categoryId WHERE id = :id")
+    suspend fun setCategoryId(id: Int, categoryId: String)
 }

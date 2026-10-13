@@ -41,6 +41,7 @@ fun DashboardStatsSection(
     monthlySpendingTotal: Long,
     monthlyBudgetLimit: Long,
     categoryBudgets: Map<String, Long> = emptyMap(),
+    categoryNameById: Map<String, String> = emptyMap(),
     categorySpending: Map<String, Long> = emptyMap(),
     selectedBudgetOffset: Int = 0,
     onBudgetOffsetChange: (Int) -> Unit = {},
@@ -584,7 +585,9 @@ fun DashboardStatsSection(
                             modifier = Modifier.fillMaxWidth(),
                             verticalArrangement = Arrangement.spacedBy(Spacing.md)
                         ) {
-                            activeCategoryBudgets.forEach { (cat, limit) ->
+                            activeCategoryBudgets.forEach { (catId, limit) ->
+                                // Budget dikunci categoryId; label & spending pakai nama terbaru.
+                                val cat = categoryNameById[catId] ?: catId
                                 val spent = if (balanceVisible) (categorySpending[cat] ?: 0L) else 0L
                                 val catProgress = if (limit > 0L) (spent.toDouble() / limit).coerceIn(0.0, 1.0).toFloat() else 0f
                                 val isCatOver = spent > limit

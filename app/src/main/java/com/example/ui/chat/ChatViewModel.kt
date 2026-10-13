@@ -6,11 +6,16 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.BuildConfig
 import com.example.data.AppDatabase
+import com.example.data.CategoryMigration
+import com.example.data.CategoryRepository
 import com.example.data.FinancialRecord
 import com.example.data.FinancialRecordRepository
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.io.IOException
 
@@ -38,69 +43,45 @@ class ChatViewModel(
 
     private val prefs = com.example.util.SecurePrefsHelper.getEncryptedPrefs(application, "financial_tracker_prefs")
 
-    private val _incomeCategories = MutableStateFlow<List<String>>(
-        prefs.getString("income_categories_list", "Gaji,Investasi,Freelance,Lainnya")
-            ?.split(",")?.filter { it.isNotEmpty() } ?: listOf("Gaji", "Investasi", "Freelance", "Lainnya")
+    /**
+     * Kategori dibaca dari tabel Room, bukan dari string CSV di prefs.
+     *
+     * Sebelumnya tiap layar menyimpan daftarnya sendiri-sendiri di prefs, sehingga
+     * kategori yang ditambah lewat chat tidak terkirim ke cloud dan tidak muncul
+     * di perangkat lain. Sekarang semuanya lewat [CategoryRepository].
+     */
+    private val categoryRepository = CategoryRepository(
+        AppDatabase.getDatabase(application).categoryDao(),
+        prefs
     )
-    val incomeCategories: StateFlow<List<String>> = _incomeCategories.asStateFlow()
 
-    private val _expenseCategories = MutableStateFlow<List<String>>(
-        prefs.getString("expense_categories_list", "Makanan,Transportasi,Tagihan,Hiburan,Belanja,Lainnya")
-            ?.split(",")?.filter { it.isNotEmpty() } ?: listOf("Makanan", "Transportasi", "Tagihan", "Hiburan", "Belanja", "Lainnya")
-    )
-    val expenseCategories: StateFlow<List<String>> = _expenseCategories.asStateFlow()
+    val incomeCategories: StateFlow<List<String>> = categoryRepository.observeByType("income")
+        .map { list -> list.map { it.name } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    private fun saveIncomeCategories(list: List<String>) {
-        val cleanedList = list.map {  com.example.ui.util.CategoryIconMapper.extractEmojiAndLabel(it).second.ifBlank { it }.trim() }.distinct()
-        _incomeCategories.value = cleanedList
-        prefs.edit().putString("income_categories_list", cleanedList.joinToString(",")).apply()
-    }
+    val expenseCategories: StateFlow<List<String>> = categoryRepository.observeByType("expense")
+        .map { list -> list.map { it.name } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    private fun saveExpenseCategories(list: List<String>) {
-        val cleanedList = list.map {  com.example.ui.util.CategoryIconMapper.extractEmojiAndLabel(it).second.ifBlank { it }.trim() }.distinct()
-        _expenseCategories.value = cleanedList
-        prefs.edit().putString("expense_categories_list", cleanedList.joinToString(",")).apply()
-    }
+    /** Nama kategori yang sudah ada, untuk pengecekan duplikat sebelum menambah. */
+    private suspend fun knownCategoryNames(): Set<String> =
+        (incomeCategories.value + expenseCategories.value)
+            .mapTo(mutableSetOf()) { com.example.ui.util.CategoryIconMapper.extractEmojiAndLabel(it).second.trim() }
 
-    fun addCategory(type: String, category: String): Boolean {
+    /**
+     * Menambah kategori baru. Id, updatedAt, dan status sync diisi repository.
+     *_duplikat dicek dari daftar Room yang sudah ada, bukan dari prefs._
+     */
+    suspend fun addCategory(type: String, category: String): Boolean {
         val (_, cleanName) = com.example.ui.util.CategoryIconMapper.extractEmojiAndLabel(category.trim())
         val trimmed = cleanName.ifBlank { category.trim() }.trim()
         if (trimmed.isEmpty()) return false
-        if (type == "income") {
-            val current = _incomeCategories.value
-            if (current.any {
-                val (_, c) = com.example.ui.util.CategoryIconMapper.extractEmojiAndLabel(it)
-                c.trim().equals(trimmed, ignoreCase = true)
-            }) return false
-            saveIncomeCategories(current + trimmed)
-        } else {
-            val current = _expenseCategories.value
-            if (current.any {
-                val (_, c) = com.example.ui.util.CategoryIconMapper.extractEmojiAndLabel(it)
-                c.trim().equals(trimmed, ignoreCase = true)
-            }) return false
-            saveExpenseCategories(current + trimmed)
-        }
-        return true
-    }
 
-    private val prefChangeListener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { sharedPreferences, key ->
-        if (key == "income_categories_list") {
-            _incomeCategories.value = sharedPreferences.getString("income_categories_list", "Gaji,Investasi,Freelance,Lainnya")
-                ?.split(",")?.filter { it.isNotEmpty() } ?: listOf("Gaji", "Investasi", "Freelance", "Lainnya")
-        } else if (key == "expense_categories_list") {
-            _expenseCategories.value = sharedPreferences.getString("expense_categories_list", "Makanan,Transportasi,Tagihan,Hiburan,Belanja,Lainnya")
-                ?.split(",")?.filter { it.isNotEmpty() } ?: listOf("Makanan", "Transportasi", "Tagihan", "Hiburan", "Belanja", "Lainnya")
-        }
-    }
+        val normalized = trimmed.lowercase()
+        if (knownCategoryNames().any { it.lowercase() == normalized }) return false
 
-    init {
-        prefs.registerOnSharedPreferenceChangeListener(prefChangeListener)
-    }
-
-    override fun onCleared() {
-        super.onCleared()
-        prefs.unregisterOnSharedPreferenceChangeListener(prefChangeListener)
+        val normalizedType = if (type == "income") CategoryMigration.TYPE_INCOME else CategoryMigration.TYPE_EXPENSE
+        return categoryRepository.add(normalizedType, trimmed) != null
     }
 
     private val _messages = MutableStateFlow<List<ChatMessage>>(
@@ -195,7 +176,7 @@ class ChatViewModel(
                 val resultStatus = receiptUseCase.parseReceipt(
                     apiKey = apiKey,
                     bitmap = bitmap,
-                    expenseCategories = _expenseCategories.value
+                    expenseCategories = expenseCategories.value
                 )
 
                 removeTypingIndicator()
@@ -237,7 +218,7 @@ class ChatViewModel(
             breakdown.append("- $emoji $typeStr ${grp.category} (${grp.description}): ${FormatUtils.formatRupiah(grp.amount)}\n")
         }
         
-        val existingCats = (_expenseCategories.value + _incomeCategories.value).map { cat ->
+        val existingCats = (expenseCategories.value + incomeCategories.value).map { cat ->
             val (_, clean) = com.example.ui.util.CategoryIconMapper.extractEmojiAndLabel(cat)
             clean.ifBlank { cat }.trim().lowercase()
         }
@@ -268,7 +249,7 @@ class ChatViewModel(
                 if (grp.amount > 0L) {
                     val (_, cleanCatNameRaw) = com.example.ui.util.CategoryIconMapper.extractEmojiAndLabel(grp.category.trim())
                     val cleanCatName = cleanCatNameRaw.ifBlank { grp.category }.trim()
-                    val allCategories = _incomeCategories.value + _expenseCategories.value
+                    val allCategories = incomeCategories.value + expenseCategories.value
                     
                     val matched = allCategories.firstOrNull { 
                         val (_, cleanMatched) = com.example.ui.util.CategoryIconMapper.extractEmojiAndLabel(it)
@@ -367,8 +348,8 @@ class ChatViewModel(
                 modelName = modelName,
                 userText = userText,
                 pendingContext = pendingContext,
-                incomeCategories = _incomeCategories.value,
-                expenseCategories = _expenseCategories.value
+                incomeCategories = incomeCategories.value,
+                expenseCategories = expenseCategories.value
             )
 
             removeTypingIndicator()
@@ -425,7 +406,7 @@ class ChatViewModel(
 
     private suspend fun saveAndConfirmTransaction(result: ExtractionResult, userText: String) {
         val recordType = if (result.type?.uppercase() == "PEMASUKAN" || result.type?.lowercase() == "income") "income" else "expense"
-        val allCategories = _incomeCategories.value + _expenseCategories.value
+        val allCategories = incomeCategories.value + expenseCategories.value
         val resultCategory = result.category?.trim() ?: ""
 
         val categoryNameOnly = if (resultCategory.isNotEmpty()) {
@@ -514,7 +495,7 @@ class ChatViewModel(
         val tipe = if (rawType == "pemasukan" || rawType == "income") "Pemasukan" else "Pengeluaran"
         val nominal = FormatUtils.formatRupiah(result.amount ?: 0L)
         
-        val allCategories = _incomeCategories.value + _expenseCategories.value
+        val allCategories = incomeCategories.value + expenseCategories.value
         val resultCategoryRaw = result.category?.trim() ?: ""
         val (_, cleanResult) = com.example.ui.util.CategoryIconMapper.extractEmojiAndLabel(resultCategoryRaw)
         val cleanResultCategory = cleanResult.ifBlank { resultCategoryRaw }.trim()
@@ -544,9 +525,11 @@ class ChatViewModel(
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
                 val database = AppDatabase.getDatabase(application)
-                val repository = FinancialRecordRepository(database.financialRecordDao())
+                val repository = FinancialRecordRepository.create(database)
                 return ChatViewModel(application, repository) as T
             }
         }
     }
 }
+
+

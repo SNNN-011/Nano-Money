@@ -20,6 +20,9 @@ interface CategoryDao {
     @Query("SELECT * FROM categories WHERE id = :id LIMIT 1")
     suspend fun findById(id: String): Category?
 
+    @Query("SELECT id FROM categories WHERE type = :type AND name = :name COLLATE NOCASE AND isDeleted = 0 LIMIT 1")
+    suspend fun findIdByName(type: String, name: String): String?
+
     @Query("SELECT COUNT(*) FROM categories WHERE isDeleted = 0")
     suspend fun countActive(): Int
 

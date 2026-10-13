@@ -47,6 +47,7 @@ fun BerandaTabContent(
     monthlySpendingTotal: Long,
     monthlyBudgetLimit: Long,
     categoryBudgets: Map<String, Long> = emptyMap(),
+    categoryNameById: Map<String, String> = emptyMap(),
     categorySpending: Map<String, Long> = emptyMap(),
     selectedBudgetOffset: Int = 0,
     onBudgetOffsetChange: (Int) -> Unit = {},
@@ -96,6 +97,7 @@ fun BerandaTabContent(
                     monthlySpendingTotal = monthlySpendingTotal,
                     monthlyBudgetLimit = monthlyBudgetLimit,
                     categoryBudgets = categoryBudgets,
+                    categoryNameById = categoryNameById,
                     categorySpending = categorySpending,
                     selectedBudgetOffset = selectedBudgetOffset,
                     onBudgetOffsetChange = onBudgetOffsetChange,
@@ -280,6 +282,7 @@ fun BerandaTabContent(
                 monthlySpendingTotal = monthlySpendingTotal,
                 monthlyBudgetLimit = monthlyBudgetLimit,
                 categoryBudgets = categoryBudgets,
+                    categoryNameById = categoryNameById,
                 categorySpending = categorySpending,
                 selectedBudgetOffset = selectedBudgetOffset,
                 onBudgetOffsetChange = onBudgetOffsetChange,
@@ -454,3 +457,5 @@ fun BerandaTabContent(
         )
     }
 }
+
+

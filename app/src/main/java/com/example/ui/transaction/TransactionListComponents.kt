@@ -29,6 +29,7 @@ import com.example.ui.theme.*
 import com.example.ui.components.GlassCard
 import com.example.ui.config.FormatUtils
 import com.example.ui.util.CategoryIconMapper
+import com.example.ui.util.displayCategoryName
 import java.util.*
 
 @Composable
@@ -250,10 +251,13 @@ fun TransactionListItem(
     record: FinancialRecord,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
+    categoryNameById: Map<String, String> = emptyMap(),
     modifier: Modifier = Modifier
 ) {
     val isIncome = record.type == "income"
-    val (parsedEmoji, cleanCategory) = CategoryIconMapper.extractEmojiAndLabel(record.category)
+    // Nama kategori me-resolve dari categoryId supaya rename ikut tercermin.
+    val resolvedCategory = record.displayCategoryName(categoryNameById)
+    val (parsedEmoji, cleanCategory) = CategoryIconMapper.extractEmojiAndLabel(resolvedCategory)
 
     // Dynamic contextual category icon identification
     val icon = when (cleanCategory.lowercase(Locale.getDefault()).trim()) {

@@ -119,6 +119,8 @@ fun FinancialTrackerScreen(
 
     val incomeCategoriesState by viewModel.incomeCategories.collectAsState()
     val expenseCategoriesState by viewModel.expenseCategories.collectAsState()
+    val expenseCategoryEntitiesState by viewModel.expenseCategoryEntities.collectAsState()
+    val categoryNameByIdState by viewModel.categoryNameById.collectAsState()
 
     val monthlyBudgetLimit by viewModel.monthlyBudgetLimit.collectAsState()
     val monthlySpendingTotal by viewModel.monthlySpendingTotal.collectAsState()
@@ -301,6 +303,9 @@ fun FinancialTrackerScreen(
             currentCategories = currentCategories,
             onAddCategory = { viewModel.addCategory(formType, it) },
             onDeleteCategory = { viewModel.deleteCategory(formType, it) },
+            onRenameCategory = { oldName, newName ->
+                viewModel.renameCategory(formType, oldName, newName)
+            },
             onDismissRequest = { showCategoryDialog = false }
         )
     }
@@ -309,16 +314,11 @@ fun FinancialTrackerScreen(
         MonthlyBudgetDialog(
             currentBudgetLimit = monthlyBudgetLimit,
             categoryBudgets = categoryBudgets,
-            expenseCategories = expenseCategoriesState,
+            expenseCategories = expenseCategoryEntitiesState,
             onConfirm = { limit, updatedCategoryBudgets ->
                 viewModel.updateMonthlyBudgetLimit(limit)
-                updatedCategoryBudgets.forEach { (cat, valDouble) ->
-                    viewModel.updateCategoryBudget(cat, valDouble)
-                }
-                expenseCategoriesState.forEach { cat ->
-                    if (!updatedCategoryBudgets.containsKey(cat)) {
-                        viewModel.updateCategoryBudget(cat, 0L)
-                    }
+                expenseCategoryEntitiesState.forEach { category ->
+                    viewModel.updateCategoryBudget(category.id, updatedCategoryBudgets[category.id] ?: 0L)
                 }
                 showBudgetDialog = false
             },

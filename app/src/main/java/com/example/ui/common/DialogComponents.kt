@@ -12,7 +12,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.Edit
+import kotlinx.coroutines.launch
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -176,10 +180,49 @@ fun CategoryManagementDialog(
     currentCategories: List<String>,
     onDismissRequest: () -> Unit,
     onAddCategory: (String) -> Unit,
-    onDeleteCategory: (String) -> Boolean
+    onDeleteCategory: (String) -> Boolean,
+    onRenameCategory: suspend (String, String) -> Boolean = { _, _ -> false }
 ) {
     var newCategoryName by remember { mutableStateOf("") }
     var categoryNameError by remember { mutableStateOf<String?>(null) }
+
+    // Rename inline: ID kategori tidak berubah, hanya nama + updatedAt, sehingga
+    // anggaran dan transaksi lama tetap tertaut dan ikut ikut nama baru.
+    var renamingCategory by remember { mutableStateOf<String?>(null) }
+    var renameInput by remember { mutableStateOf("") }
+    var renameError by remember { mutableStateOf<String?>(null) }
+    val renameScope = rememberCoroutineScope()
+
+    fun startRename(category: String) {
+        renamingCategory = category
+        renameInput = category
+        renameError = null
+        categoryNameError = null
+    }
+
+    fun cancelRename() {
+        renamingCategory = null
+        renameInput = ""
+        renameError = null
+    }
+
+    fun confirmRename(category: String) {
+        val trimmed = renameInput.trim()
+        when {
+            trimmed.isEmpty() -> renameError = "Nama tidak boleh kosong"
+            trimmed == category -> cancelRename()
+            currentCategories.any { it.equals(trimmed, ignoreCase = true) } ->
+                renameError = "Kategori sudah ada"
+            else -> renameScope.launch {
+                renameError = if (onRenameCategory(category, trimmed)) {
+                    cancelRename()
+                    null
+                } else {
+                    "Gagal mengubah nama kategori"
+                }
+            }
+        }
+    }
 
     Dialog(onDismissRequest = onDismissRequest) {
         Card(
@@ -332,61 +375,154 @@ fun CategoryManagementDialog(
                         verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         currentCategories.forEach { cat ->
-                            Card(
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(8.dp),
-                                colors = CardDefaults.cardColors(
-                                    containerColor = TranslucentInput
-                                ),
-                                border = BorderStroke(1.dp, GhostWhite.copy(alpha = 0.05f))
-                            ) {
-                                Row(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(start = 12.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                    verticalAlignment = Alignment.CenterVertically
+                            val isRenaming = renamingCategory == cat
+
+                            if (isRenaming) {
+                                Card(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(8.dp),
+                                    colors = CardDefaults.cardColors(containerColor = TranslucentInput),
+                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f))
+                                ) {
+                                    Column(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        OutlinedTextField(
+                                            value = renameInput,
+                                            onValueChange = {
+                                                if (it.length <= 30) {
+                                                    renameInput = it
+                                                    renameError = null
+                                                }
+                                            },
+                                            placeholder = { Text("Nama baru", style = MaterialTheme.typography.bodyMedium) },
+                                            singleLine = true,
+                                            isError = renameError != null,
+                                            supportingText = renameError?.let { { Text(it) } },
+                                            modifier = Modifier.fillMaxWidth().testTag("rename_category_input"),
+                                            shape = RoundedCornerShape(10.dp),
+                                            colors = OutlinedTextFieldDefaults.colors(
+                                                focusedTextColor = GhostWhite,
+                                                unfocusedTextColor = GhostWhite,
+                                                focusedBorderColor = MaterialTheme.colorScheme.primary,
+                                                unfocusedBorderColor = GhostWhite.copy(alpha = 0.2f),
+                                                focusedContainerColor = GhostWhite.copy(alpha = 0.05f),
+                                                unfocusedContainerColor = GhostWhite.copy(alpha = 0.02f),
+                                                errorBorderColor = MaterialTheme.colorScheme.error,
+                                                errorTextColor = GhostWhite
+                                            )
+                                        )
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.End,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                text = "Anggaran & transaksi lama tetap tertaut",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = GhostWhite.copy(alpha = 0.5f),
+                                                modifier = Modifier.weight(1f)
+                                            )
+                                            IconButton(
+                                                onClick = { cancelRename() },
+                                                modifier = Modifier.size(36.dp).testTag("cancel_rename_category_button")
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Close,
+                                                    contentDescription = "Batal ubah nama",
+                                                    tint = GhostWhite.copy(alpha = 0.7f),
+                                                    modifier = Modifier.size(18.dp)
+                                                )
+                                            }
+                                            IconButton(
+                                                onClick = { confirmRename(cat) },
+                                                modifier = Modifier.size(36.dp).testTag("confirm_rename_category_button")
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Check,
+                                                    contentDescription = "Simpan nama kategori",
+                                                    tint = MaterialTheme.colorScheme.primary,
+                                                    modifier = Modifier.size(18.dp)
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            } else {
+                                Card(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(8.dp),
+                                    colors = CardDefaults.cardColors(
+                                        containerColor = TranslucentInput
+                                    ),
+                                    border = BorderStroke(1.dp, GhostWhite.copy(alpha = 0.05f))
                                 ) {
                                     Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                                    ) {
-                                        Box(
-                                            modifier = Modifier
-                                                .size(8.dp)
-                                                .background(
-                                                    color = if (formType == "income") Color(0xFF4CAF50) else Color(0xFFF44336),
-                                                    shape = CircleShape
-                                                )
-                                        )
-                                        Text(
-                                            text = cat,
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            fontWeight = FontWeight.SemiBold,
-                                            color = GhostWhite
-                                        )
-                                    }
-                                    IconButton(
-                                        onClick = {
-                                            if (currentCategories.size <= 1) {
-                                                categoryNameError = "Tidak bisa menghapus kategori terakhir!"
-                                            } else {
-                                                val deleted = onDeleteCategory(cat)
-                                                if (!deleted) {
-                                                    categoryNameError = "Gagal menghapus kategori!"
-                                                }
-                                            }
-                                        },
                                         modifier = Modifier
-                                            .size(32.dp)
-                                            .testTag("delete_category_button_${cat.lowercase(Locale.ROOT)}")
+                                            .fillMaxWidth()
+                                            .padding(start = 12.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
                                     ) {
-                                        Icon(
-                                            imageVector = Icons.Default.DeleteOutline,
-                                            contentDescription = "Hapus Kategori $cat",
-                                            tint = MaterialTheme.colorScheme.error.copy(alpha = 0.8f),
-                                            modifier = Modifier.size(18.dp)
-                                        )
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                        ) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(8.dp)
+                                                    .background(
+                                                        color = if (formType == "income") Color(0xFF4CAF50) else Color(0xFFF44336),
+                                                        shape = CircleShape
+                                                    )
+                                            )
+                                            Text(
+                                                text = cat,
+                                                style = MaterialTheme.typography.bodyMedium,
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = GhostWhite
+                                            )
+                                        }
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            IconButton(
+                                                onClick = { startRename(cat) },
+                                                modifier = Modifier
+                                                    .size(32.dp)
+                                                    .testTag("rename_category_button_${cat.lowercase(Locale.ROOT)}")
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Edit,
+                                                    contentDescription = "Ubah nama kategori $cat",
+                                                    tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
+                                                    modifier = Modifier.size(18.dp)
+                                                )
+                                            }
+                                            IconButton(
+                                                onClick = {
+                                                    if (currentCategories.size <= 1) {
+                                                        categoryNameError = "Tidak bisa menghapus kategori terakhir!"
+                                                    } else {
+                                                        val deleted = onDeleteCategory(cat)
+                                                        if (!deleted) {
+                                                            categoryNameError = "Gagal menghapus kategori!"
+                                                        }
+                                                    }
+                                                },
+                                                modifier = Modifier
+                                                    .size(32.dp)
+                                                    .testTag("delete_category_button_${cat.lowercase(Locale.ROOT)}")
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.DeleteOutline,
+                                                    contentDescription = "Hapus Kategori $cat",
+                                                    tint = MaterialTheme.colorScheme.error.copy(alpha = 0.8f),
+                                                    modifier = Modifier.size(18.dp)
+                                                )
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -416,10 +552,15 @@ fun CategoryManagementDialog(
 fun MonthlyBudgetDialog(
     currentBudgetLimit: Long,
     categoryBudgets: Map<String, Long>,
-    expenseCategories: List<String>,
+    expenseCategories: List<com.example.data.Category>,
     onConfirm: (Long, Map<String, Long>) -> Unit,
     onDismiss: () -> Unit
 ) {
+    // Kunci state = categoryId (stabil saat kategori di-rename); label = nama terbaru.
+    val categoryNameById = remember(expenseCategories) {
+        expenseCategories.associate { it.id to it.name }
+    }
+
     var budgetInput by remember {
         val initial = if (currentBudgetLimit > 0L) {
             FormatUtils.formatInputNumber(currentBudgetLimit.toString())
@@ -431,21 +572,19 @@ fun MonthlyBudgetDialog(
     // Map input states for category budgets in a mutable map
     val localCategoryBudgets = remember {
         mutableStateMapOf<String, String>().apply {
-            expenseCategories.forEach { cat ->
-                val value = categoryBudgets[cat]
-                put(cat, if (value != null && value > 0L) {
-                    value.toString()
-                } else "")
+            expenseCategories.forEach { category ->
+                val value = categoryBudgets[category.id]
+                put(category.id, if (value != null && value > 0L) value.toString() else "")
             }
         }
     }
 
     val selectedEnabledCategories = remember {
         mutableStateListOf<String>().apply {
-            expenseCategories.forEach { cat ->
-                val value = categoryBudgets[cat]
+            expenseCategories.forEach { category ->
+                val value = categoryBudgets[category.id]
                 if (value != null && value > 0L) {
-                    add(cat)
+                    add(category.id)
                 }
             }
         }
@@ -778,17 +917,18 @@ fun MonthlyBudgetDialog(
                                             verticalArrangement = Arrangement.spacedBy(4.dp)
                                         ) {
                                             for (category in expenseCategories) {
-                                                val isChecked = selectedEnabledCategories.contains(category)
+                                                val categoryId = category.id
+                                                val isChecked = selectedEnabledCategories.contains(categoryId)
                                                 Row(
                                                     modifier = Modifier
                                                         .fillMaxWidth()
                                                         .background(if (isChecked) SteelBlue.copy(alpha = 0.1f) else Color.Transparent, RoundedCornerShape(8.dp))
                                                         .clickable {
                                                             if (isChecked) {
-                                                                selectedEnabledCategories.remove(category)
-                                                                localCategoryBudgets[category] = ""
+                                                                selectedEnabledCategories.remove(categoryId)
+                                                                localCategoryBudgets[categoryId] = ""
                                                             } else {
-                                                                selectedEnabledCategories.add(category)
+                                                                selectedEnabledCategories.add(categoryId)
                                                             }
                                                         }
                                                         .padding(horizontal = 8.dp, vertical = 6.dp),
@@ -796,7 +936,7 @@ fun MonthlyBudgetDialog(
                                                     horizontalArrangement = Arrangement.SpaceBetween
                                                 ) {
                                                     Text(
-                                                        text = category,
+                                                        text = category.name,
                                                         style = MaterialTheme.typography.bodyMedium,
                                                         color = if (isChecked) SteelBlue else GhostWhite.copy(alpha = 0.8f)
                                                     )
@@ -805,10 +945,10 @@ fun MonthlyBudgetDialog(
                                                         checked = isChecked,
                                                         onCheckedChange = { checked ->
                                                             if (!checked) {
-                                                                selectedEnabledCategories.remove(category)
-                                                                localCategoryBudgets[category] = ""
+                                                                selectedEnabledCategories.remove(categoryId)
+                                                                localCategoryBudgets[categoryId] = ""
                                                             } else {
-                                                                selectedEnabledCategories.add(category)
+                                                                selectedEnabledCategories.add(categoryId)
                                                             }
                                                         },
                                                         colors = CheckboxDefaults.colors(
@@ -882,7 +1022,7 @@ fun MonthlyBudgetDialog(
                                                 )
                                         )
                                         Text(
-                                            text = category,
+                                            text = categoryNameById[category] ?: category,
                                             style = MaterialTheme.typography.bodyMedium,
                                             fontWeight = FontWeight.SemiBold,
                                             color = GhostWhite
