@@ -41,7 +41,9 @@ fun DashboardStatsSection(
     monthlySpendingTotal: Long,
     monthlyBudgetLimit: Long,
     categoryBudgets: Map<String, Long> = emptyMap(),
-    categoryNameById: Map<String, String> = emptyMap(),
+    // Tanpa default: peta ini wajib dikirim, kalau tidak label anggaran menampilkan
+    // id mentah (mis. "cat:expense:game") dan pemakaian kategorinya selalu nol.
+    categoryNameById: Map<String, String>,
     categorySpending: Map<String, Long> = emptyMap(),
     selectedBudgetOffset: Int = 0,
     onBudgetOffsetChange: (Int) -> Unit = {},
@@ -632,7 +634,9 @@ fun DashboardStatsSection(
                                         }
                                         Text(
                                             text = if (balanceVisible) {
-                                                if (isCatOver) "Over Rp ${FormatUtils.formatRupiahCompact(spent - limit)}" else "Sisa Rp ${FormatUtils.formatRupiahCompact(limit - spent)}"
+                                                // formatRupiahCompact sudah mem-prefix "Rp",
+                                                // jadi di sini jangan ditambah lagi.
+                                                if (isCatOver) "Over ${FormatUtils.formatRupiahCompact(spent - limit)}" else "Sisa ${FormatUtils.formatRupiahCompact(limit - spent)}"
                                             } else "Rp ••••••",
                                             style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold),
                                             color = if (isCatOver && balanceVisible) NeonRed else GhostWhite.copy(alpha = 0.5f),

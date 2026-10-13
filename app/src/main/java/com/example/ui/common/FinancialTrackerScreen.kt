@@ -553,6 +553,7 @@ fun FinancialTrackerScreen(
                             monthlySpendingTotal = monthlySpendingTotal,
                             monthlyBudgetLimit = monthlyBudgetLimit,
                             categoryBudgets = categoryBudgets,
+                            categoryNameById = categoryNameByIdState,
                             categorySpending = categorySpending,
                             selectedBudgetOffset = selectedBudgetOffset,
                             onBudgetOffsetChange = { viewModel.changeBudgetMonthOffset(it) },
