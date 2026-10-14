@@ -121,6 +121,7 @@ fun FinancialTrackerScreen(
     val expenseCategoriesState by viewModel.expenseCategories.collectAsState()
     val expenseCategoryEntitiesState by viewModel.expenseCategoryEntities.collectAsState()
     val categoryNameByIdState by viewModel.categoryNameById.collectAsState()
+    val isBalanceVisible by viewModel.isBalanceVisible.collectAsState()
 
     val monthlyBudgetLimit by viewModel.monthlyBudgetLimit.collectAsState()
     val monthlySpendingTotal by viewModel.monthlySpendingTotal.collectAsState()
@@ -554,6 +555,8 @@ fun FinancialTrackerScreen(
                             monthlyBudgetLimit = monthlyBudgetLimit,
                             categoryBudgets = categoryBudgets,
                             categoryNameById = categoryNameByIdState,
+                            balanceVisible = isBalanceVisible,
+                            onToggleBalanceVisible = { viewModel.toggleBalanceVisibility() },
                             categorySpending = categorySpending,
                             selectedBudgetOffset = selectedBudgetOffset,
                             onBudgetOffsetChange = { viewModel.changeBudgetMonthOffset(it) },

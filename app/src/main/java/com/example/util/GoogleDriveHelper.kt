@@ -289,6 +289,11 @@ object GoogleDriveHelper {
         }
 
         SecureLog.d(TAG, "Berkas berhasil diunggah/diperbarui ke Google Drive: $fileIdToUpload")
+
+        // Jaga agar tidak menumpuk. Tanpa ini folder Drive akan penuh file backup
+        // bertanggal yang isinya identik, dan memilih yang mana jadi membingungkan.
+        tryCleanOldDriveBackups(token)
+
         return DriveResult.Success(fileIdToUpload)
     }
 

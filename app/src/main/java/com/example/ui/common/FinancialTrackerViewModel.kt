@@ -45,6 +45,13 @@ data class MonthTotals(val income: Long, val expense: Long)
  * Fungsi murni supaya bisa diuji. Dipakai untuk angka PENDAPATAN dan PENGELUARAN di
  * header, yang sengaja mengikuti bulan terpilih, bukan saldo kumulatif.
  */
+/**
+ * Preferensi tampilan saldo tersembunyi.
+ *
+ * Murni lokal, tidak pernah ikut sinkron ke Firestore.
+ */
+const val PREF_SHOW_BALANCE = "show_balance"
+
 internal fun computeMonthTotals(
     records: List<FinancialRecord>,
     startMs: Long,
@@ -213,6 +220,23 @@ class FinancialTrackerViewModel(
     /** Peta categoryId -> nama terbaru; tampilan transaksi me-resolve lewat peta ini. */
     val categoryNameById: StateFlow<Map<String, String>> = categoryRepository.nameById
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
+
+    /**
+     * Apakah nominal saldo ditampilkan.
+     *
+     * Disimpan di prefs, bukan hanya di state: kalau hanya di remember, statusnya
+     * kembali ke "terlihat" setiap aplikasi ditutup dan dibuka ulang.
+     */
+    private val balanceVisibleState = MutableStateFlow(
+        prefs.getBoolean(PREF_SHOW_BALANCE, true)
+    )
+    val isBalanceVisible: StateFlow<Boolean> = balanceVisibleState.asStateFlow()
+
+    fun toggleBalanceVisibility() {
+        val next = !balanceVisibleState.value
+        balanceVisibleState.value = next
+        prefs.edit().putBoolean(PREF_SHOW_BALANCE, next).apply()
+    }
 
     val monthlyBudgetLimit = MutableStateFlow(0L)
     val selectedBudgetOffset = MutableStateFlow(0)

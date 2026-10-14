@@ -50,6 +50,8 @@ fun BerandaTabContent(
     categoryBudgets: Map<String, Long> = emptyMap(),
     // Tanpa default, lihat catatan di DashboardStatsSection.
     categoryNameById: Map<String, String>,
+    balanceVisible: Boolean = true,
+    onToggleBalanceVisible: () -> Unit = {},
     categorySpending: Map<String, Long> = emptyMap(),
     selectedBudgetOffset: Int = 0,
     onBudgetOffsetChange: (Int) -> Unit = {},
@@ -99,7 +101,9 @@ fun BerandaTabContent(
                     monthlySpendingTotal = monthlySpendingTotal,
                     monthlyBudgetLimit = monthlyBudgetLimit,
                 categoryBudgets = categoryBudgets,
-                categoryNameById = categoryNameById,
+                    categoryNameById = categoryNameById,
+                    balanceVisible = balanceVisible,
+                    onToggleBalanceVisible = onToggleBalanceVisible,
                     categorySpending = categorySpending,
                     selectedBudgetOffset = selectedBudgetOffset,
                     onBudgetOffsetChange = onBudgetOffsetChange,
@@ -287,7 +291,10 @@ fun BerandaTabContent(
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            item(key = "dashboard_stats") {
+            // Item header dipisah dari daftar transaksi. Kalau satu item memuat seluruh
+            // blok statistik beserta anggaran per kategori, setiap perubahan data di
+            // dashboard membuat subtree besar itu ikut recomposition.
+            item(key = "dashboard_stats", contentType = "header") {
                 DashboardStatsSection(
                     totalIncome = totalIncome,
                     totalExpense = totalExpense,
@@ -296,6 +303,8 @@ fun BerandaTabContent(
                     monthlyBudgetLimit = monthlyBudgetLimit,
                     categoryBudgets = categoryBudgets,
                     categoryNameById = categoryNameById,
+                    balanceVisible = balanceVisible,
+                    onToggleBalanceVisible = onToggleBalanceVisible,
                     categorySpending = categorySpending,
                     selectedBudgetOffset = selectedBudgetOffset,
                     onBudgetOffsetChange = onBudgetOffsetChange,
@@ -307,7 +316,7 @@ fun BerandaTabContent(
                 )
             }
 
-            item(key = "filter_sort") {
+            item(key = "filter_sort", contentType = "header") {
                 FilterAndSortHeader(
                     currentFilter = filterType,
                     isNewest = sortByNewest,
@@ -316,7 +325,7 @@ fun BerandaTabContent(
                 )
             }
 
-            item(key = "search_actions") {
+            item(key = "search_actions", contentType = "header") {
                 Row(
                     modifier = Modifier.fillMaxWidth().height(48.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -421,7 +430,7 @@ fun BerandaTabContent(
             }
 
             if (filteredRecords.isEmpty()) {
-                item(key = "empty_state") {
+                item(key = "empty_state", contentType = "header") {
                     Box(
                         modifier = Modifier.fillMaxWidth().height(240.dp),
                         contentAlignment = Alignment.Center
@@ -434,10 +443,15 @@ fun BerandaTabContent(
                     }
                 }
             } else {
-                // items(list) bukan items(list.size): versi count memaksa item
-                // dicocokkan lewat indeks sehingga tiap perubahan daftar
-                // mengulang semua slot item.
-                items(filteredRecords, key = { it.id }) { rec ->
+                // contentType wajib diisi: tanpa itu Compose menganggap semua slot
+                // item berbeda jenis dan tidak bisa memakai ulang node yang sama
+                // saat item berganti masuk viewport, sehingga setiap gulir menyusun
+                // ulang subtree dari nol.
+                items(
+                    items = filteredRecords,
+                    key = { it.id },
+                    contentType = { "transaction" }
+                ) { rec ->
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(16.dp),

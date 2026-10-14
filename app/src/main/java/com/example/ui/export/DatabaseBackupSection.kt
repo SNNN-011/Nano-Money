@@ -35,6 +35,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import com.example.ui.config.FormatUtils
+import androidx.compose.material.icons.outlined.DeleteOutline
+import com.example.ui.theme.NeonRed
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.util.BackupHelper
@@ -104,6 +108,10 @@ fun DatabaseBackupSection(
     var tempBackupHour by remember(autoBackupHour) { mutableStateOf(autoBackupHour) }
     var tempBackupMinute by remember(autoBackupMinute) { mutableStateOf(autoBackupMinute) }
     var tempBackupDayOfWeek by remember(autoBackupDayOfWeek) { mutableStateOf(autoBackupDayOfWeek) }
+
+    // Menu Cadangan Google Drive. Sheet expandable supaya tidak memakan tempat di
+    // halaman Simpan yang juga berisi Sampah dan Keamanan.
+    var showDriveMenu by remember { mutableStateOf(false) }
 
     fun getDayNameIndonesian(dayOfWeek: Int): String {
         return when (dayOfWeek) {
@@ -313,6 +321,131 @@ fun DatabaseBackupSection(
                         icon = Icons.Default.Sync,
                         modifier = Modifier.fillMaxWidth().testTag("sync_firestore_button")
                     )
+                }
+            }
+
+            // --- Menu Cadangan Google Drive ---
+            HorizontalDivider(
+                color = GhostWhite.copy(alpha = 0.08f),
+                modifier = Modifier.padding(vertical = 16.dp)
+            )
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { showDriveMenu = !showDriveMenu }
+                    .testTag("drive_menu_header"),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .width(3.dp)
+                            .height(20.dp)
+                            .background(
+                                brush = Brush.verticalGradient(
+                                    colors = listOf(SteelBlue, SteelBlue.copy(alpha = 0.4f))
+                                ),
+                                shape = RoundedCornerShape(2.dp)
+                            )
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column {
+                        Text(
+                            text = "Cadangan Google Drive",
+                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold, fontSize = 14.sp),
+                            color = GhostWhite
+                        )
+                        Text(
+                            text = if (driveBackupList.isEmpty()) {
+                                "Belum ada cadangan di cloud"
+                            } else {
+                                "${driveBackupList.size} cadangan tersimpan"
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = GhostWhite.copy(alpha = 0.5f)
+                        )
+                    }
+                }
+                Icon(
+                    imageVector = if (showDriveMenu) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                    contentDescription = if (showDriveMenu) "Tutup menu Drive" else "Buka menu Drive",
+                    tint = GhostWhite.copy(alpha = 0.6f)
+                )
+            }
+
+            if (showDriveMenu) {
+                Spacer(modifier = Modifier.height(16.dp))
+
+                if (driveBackupList.isEmpty()) {
+                    Text(
+                        text = if (connectedGoogleAccount == null) {
+                            "Hubungkan akun Google dulu untuk mengaktifkan cadangan cloud."
+                        } else {
+                            "Belum ada cadangan. Buat satu dari daftar cadangan lokal di bawah."
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = GhostWhite.copy(alpha = 0.5f)
+                    )
+                } else {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        driveBackupList.forEach { driveFile ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(TranslucentForm.copy(alpha = 0.4f))
+                                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = driveFile.name,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = GhostWhite,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Text(
+                                        text = FormatUtils.formatDriveTimestamp(driveFile.createdTime),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = GhostWhite.copy(alpha = 0.45f)
+                                    )
+                                }
+                                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                    IconButton(
+                                        onClick = { onSelectedDriveBackupToRestoreChange(driveFile) },
+                                        enabled = !isDriveProcessing,
+                                        modifier = Modifier.size(28.dp).testTag("restore_drive_backup_${driveFile.id}")
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Restore,
+                                            contentDescription = "Pulihkan dari Drive",
+                                            tint = SteelBlue,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+                                    IconButton(
+                                        onClick = { driveBackupFileToDelete = driveFile },
+                                        enabled = !isDriveProcessing,
+                                        modifier = Modifier.size(28.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Outlined.DeleteOutline,
+                                            contentDescription = "Hapus cadangan Drive",
+                                            tint = NeonRed.copy(alpha = 0.7f),
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }

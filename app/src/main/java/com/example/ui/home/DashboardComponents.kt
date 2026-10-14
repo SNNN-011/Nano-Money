@@ -52,9 +52,12 @@ fun DashboardStatsSection(
     welcomeMessage: String = "",
     welcomeMessageColor: String = "",
     showNewFeature: Boolean = false,
+    // Jangan pakai remember di sini: status saldo yang disembunyikan harus bertahan
+    // saat aplikasi ditutup dan dibuka lagi, bukan reset tiap scope dibuat ulang.
+    balanceVisible: Boolean,
+    onToggleBalanceVisible: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var balanceVisible by remember { mutableStateOf(true) }
     var showRutinInfo by remember { mutableStateOf(false) }
 
     val displayBalance = if (balanceVisible) {
@@ -150,7 +153,7 @@ fun DashboardStatsSection(
                         modifier = Modifier.testTag("total_balance_label")
                     )
                     IconButton(
-                        onClick = { balanceVisible = !balanceVisible },
+                        onClick = onToggleBalanceVisible,
                         modifier = Modifier
                             .size(20.dp)
                             .testTag("toggle_balance_visibility")
