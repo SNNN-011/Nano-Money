@@ -1,4 +1,4 @@
-package com.example.domain
+﻿package com.example.domain
 
 import com.example.data.remote.ExtractionResult
 import com.example.data.remote.GeminiClient
@@ -103,12 +103,14 @@ class TransactionParserUseCase {
             "description" deskripsi pendek transaksi(maksimal 2 kata), gunakan huruf kapital di setiap awal kalimat.
             "amount" nominal.
             "type" "income" atau "expense".
-            "category" WAJIB dipilih dari daftar di bawah, tidak boleh mengarang. Itu daftar kategori yang benar-benar dimiliki pengguna, dan kategori yang dibuat sendiri oleh pengguna LEBIH DIPRIORITKAN daripada kategori umum.
+            "category" pilih SATU kategori dari daftar di bawah. Daftar itu adalah daftar kategori yang benar-benar dimiliki pengguna.
             Daftar income: [$incomeCats]
             Daftar expense: [$expenseCats]
             Aturan pemilihan:
-            - Kalau ada kategori pengguna yang khusus dan cocok (mis. pengguna punya "Game", "Kopi", "Ojek"), pilih ITU, jangan pilih kategori umum yang mirip (mis. "Hiburan", "Makanan", "Transportasi").
-            - Jangan mengarang kategori yang tidak ada di daftar.
+            - Kalau ada kategori pengguna yang khusus dan cocok (mis. pengguna punya "Perawatan Tubuh"), pilih ITU, bukan kategori umum yang mirip (mis. "Belanja", "Hiburan").
+            - Kalau tidak ada yang cocok persis, pilih yang paling mendekati dari daftar. Tetap pilih, jangan berhenti.
+            - Kalau benar-benar tidak ada yang mendekati, pakai "Lainnya".
+            - JANGAN memakai "klarifikasi" hanya karena kategori kurang cocok. Kategori yang kurang cocok bukan alasan untuk bertanya balik; yang perlu ditanyakan hanya nominal, tanggal, dan jenis transaksi.
             - Tulis persis seperti tertulis di daftar, huruf besar-kecilnya ikut sama.
             "date" timestamp_ms.
             "notes" rangkuman singkat transaksi(maksimal 4 kata).

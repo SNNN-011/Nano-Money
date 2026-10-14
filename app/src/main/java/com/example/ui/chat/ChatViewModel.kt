@@ -211,16 +211,24 @@ class ChatViewModel(
             breakdown.append("- $emoji $typeStr ${grp.category} (${grp.description}): ${FormatUtils.formatRupiah(grp.amount)}\n")
         }
         
-        val existingCats = (expenseCategories.value + incomeCategories.value).map { cat ->
-            val (_, clean) = com.example.ui.util.CategoryIconMapper.extractEmojiAndLabel(cat)
-            clean.ifBlank { cat }.trim().lowercase()
-        }
-        val newCats = parsed.grouped.map { it.category }.filter { cat ->
-            val (_, clean) = com.example.ui.util.CategoryIconMapper.extractEmojiAndLabel(cat)
-            !existingCats.contains(clean.ifBlank { cat }.trim().lowercase())
-        }.distinct()
-        if (newCats.isNotEmpty()) {
-            breakdown.append("\n💡 *Kategori baru otomatis ditambahkan:* ${newCats.joinToString(", ")}")
+        // Kategori hasil bacaan struk yang tidak cocok dengan kategori milik user
+        // akan masuk ke kategori penampung, bukan dibuatkan kategori baru.
+        // Dicek dari hasil pencocokan, bukan dari beda nama: kategori user bisa
+        // punya emoji, jadi namanya tidak akan sama persis dengan jawaban AI
+        // meskipun sebenarnya sudah cocok.
+        val kePenampung = parsed.grouped
+            .filter { grp ->
+                val tersedia = if (grp.type == "income") incomeCategories.value else expenseCategories.value
+                com.example.domain.CategoryResolver.resolve(grp.category, tersedia) is
+                    com.example.domain.CategoryResolution.NeedsNewCategory
+            }
+            .map { it.category }
+            .distinct()
+        if (kePenampung.isNotEmpty()) {
+            breakdown.append(
+                "\n💡 Yang tidak punya kategori yang cocok, jadi masuk ke $CATCH_ALL_CATEGORY: " +
+                    kePenampung.joinToString(", ")
+            )
         }
         
         breakdown.append("\nApakah kamu ingin mencatat transaksi di atas?")
@@ -240,30 +248,13 @@ class ChatViewModel(
             var count = 0
             pending.grouped.forEach { grp ->
                 if (grp.amount > 0L) {
-                    val allCategories = incomeCategories.value + expenseCategories.value
-                    val resolution = com.example.domain.CategoryResolver.resolve(
-                        grp.category,
-                        allCategories
-                    )
-
-                    val finalCategoryName = when (resolution) {
-                        is com.example.domain.CategoryResolution.Matched -> resolution.category
-                        is com.example.domain.CategoryResolution.NeedsNewCategory -> {
-                            val suggested = resolution.suggestedName
-                            if (suggested.isEmpty()) "Lainnya" else {
-                                addCategory(grp.type, suggested)
-                                suggested
-                            }
-                        }
-                    }
-
-                    val recordCategory = finalCategoryName
+                    val recordCategory = resolveCategory(grp.type, grp.category)
 
                     val isFewItems = pending.items.size <= 3
                     val recordDesc = if (isFewItems && grp.description.isNotEmpty()) {
                         grp.description
                     } else {
-                        "${pending.title} - $finalCategoryName"
+                        "${pending.title} - $recordCategory"
                     }
                     val recordNotes = if (isFewItems) {
                         pending.title
@@ -392,26 +383,51 @@ class ChatViewModel(
         }
     }
 
+    /**
+     * Menentukan kategori transaksi dari jawaban AI.
+     *
+     * AI tidak pernah boleh membuat kategori dari jawabannya. Kalau boleh, model
+     * akan mengarang kategori umum dari pengetahuannya sendiri ("Belanja",
+     * "Hiburan") lalu applikasi menyimpannya sebagai kategori aktif. Akibatnya
+     * kategori yang SUDAH DIHAPUS user muncul kembali, karena pengecekan duplikat
+     * hanya membandingkan kategori aktif.
+     *
+     * Jadi jawaban yang tidak cocok Goes straight ke "Lainnya".
+     *
+     * Hanya kategori SESUAI TIPE yang dicocokkan. Kalau income dan expense digabung,
+     * jawaban "Bonus" untuk sebuah pengeluaran akan nyangkut ke kategori income.
+     */
+    private fun resolveCategory(type: String, aiCategory: String?): String {
+        val available = if (type == "income") incomeCategories.value else expenseCategories.value
+
+        return when (val result = com.example.domain.CategoryResolver.resolve(aiCategory, available)) {
+            is com.example.domain.CategoryResolution.Matched -> result.category
+            is com.example.domain.CategoryResolution.NeedsNewCategory ->
+                catchAllCategoryName(type)
+        }
+    }
+
+    /**
+     * Nama kategori penampung untuk jawaban AI yang tidak cocok dengan kategori user.
+     *
+     * Kalau kategori ini tidak ada (user menghapusnya), namanya tetap dikembalikan
+     * apa adanya. Itu disengaja: nama "Lainnya" sudah dipakai sebagai penanda di
+     * beberapa tempat lain, termasuk saat kategori dihapus lalu transaksinya
+     * dipindahkan. Membuatkan kategori ini diam-diem di belakang layar justru
+     * membatalkan pilihan user.
+     */
+    private fun catchAllCategoryName(type: String): String {
+        val fallback = CATCH_ALL_CATEGORY
+        val available = if (type == "income") incomeCategories.value else expenseCategories.value
+        return available.firstOrNull {
+            com.example.domain.CategoryResolver.normalize(it) ==
+                com.example.domain.CategoryResolver.normalize(fallback)
+        } ?: fallback
+    }
+
     private suspend fun saveAndConfirmTransaction(result: ExtractionResult, userText: String) {
         val recordType = if (result.type?.uppercase() == "PEMASUKAN" || result.type?.lowercase() == "income") "income" else "expense"
-        val allCategories = incomeCategories.value + expenseCategories.value
-
-        // AI sering membalas kategori umum ("Hiburan") padahal user punya kategori
-        // khusus ("Game"). Kategori milik user yang diunggulkan, bukan jawaban AI.
-        val resolution = com.example.domain.CategoryResolver.resolve(result.category, allCategories)
-
-        val recordCategory = when (resolution) {
-            is com.example.domain.CategoryResolution.Matched -> resolution.category
-            is com.example.domain.CategoryResolution.NeedsNewCategory -> {
-                val suggested = resolution.suggestedName
-                if (suggested.isEmpty()) {
-                    "Lainnya"
-                } else {
-                    addCategory(recordType, suggested)
-                    suggested
-                }
-            }
-        }
+        val recordCategory = resolveCategory(recordType, result.category)
 
         val recordAmount = result.amount ?: 0L
         if (recordAmount <= 0L) {
@@ -505,6 +521,15 @@ class ChatViewModel(
 
 
     companion object {
+        /**
+         * Kategori penampung untuk jawaban AI yang tidak cocok dengan kategori user.
+         *
+         * Namanya sama dengan yang dipakai FinancialTrackerViewModel saat kategori
+         * dihapus lalu transaksinya dipindahkan, jadi cukup satu nama penanda di
+         * seluruh aplikasi.
+         */
+        private const val CATCH_ALL_CATEGORY = "Lainnya"
+
         fun provideFactory(application: Application): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T {

@@ -14,8 +14,14 @@ import org.junit.Test
  *
  * Catatan: kasus AI membalas kategori umum yang tidak mirip sama sekali dengan
  * kategori user ("Hiburan" padahal user cuma punya "Game") TIDAK bisa ditangani
- * di sini. Tidak ada cara menebak bahwa "Hiburan"_author maksudnya "Game" tanpa
- * salah juga di kasus lain. Itu dicegah lewat prompt, bukan lewat pencocokan.
+ * di sini. Tidak ada cara menebak bahwa maksudnya "Game" tanpa salah juga di
+ * kasus lain. Itu dicegah lewat prompt, bukan lewat pencocokan.
+ *
+ * Konsekuensi yang disengaja: hasil NeedsNewCategory berarti pemanggil harus
+ * memakai kategori penampung, BUKAN membuat kategori baru. Kalau pemanggil
+ * membuatkannya, kategori yang sudah dihapus user akan muncul kembali -- AI
+ * mengarang "Belanja" dari pengetahuannya sendiri, pengecekan duplikat hanya
+ * membandingkan kategori aktif, jadi "Belanja" lolos dan dibuat ulang.
  */
 class CategoryResolverTest {
 
@@ -102,6 +108,29 @@ class CategoryResolverTest {
     @Test
     fun `daftar_kosong_selalu_minta_kategori_baru`() {
         assertTrue(CategoryResolver.resolve("Game", emptyList()) is CategoryResolution.NeedsNewCategory)
+    }
+
+    @Test
+    fun `kategori_yang_sudah_dihapus_tidak_bisa_dikembalikan_ai`() {
+        // User menghapus "Belanja". Daftar aktif tinggal ["Perawatan Tubuh", "Lainnya"].
+        // AI tetap akan mengarang "Belanja" dari pengetahuannya sendiri, dan itu
+        // harus tetap jadi NeedsNewCategory supaya pemanggil memakai penampung.
+        // Kalau ini sampai Matched, kategori yang dihapus user hidup lagi.
+        val setelahDihapus = listOf("Perawatan Tubuh", "Lainnya")
+
+        val hasil = CategoryResolver.resolve("Belanja", setelahDihapus)
+        assertTrue(
+            "kategori yang sudah dihapus tidak boleh dicocokkan lagi",
+            hasil is CategoryResolution.NeedsNewCategory
+        )
+    }
+
+    @Test
+    fun `kategori_penampung_sendiri_selalu_cocok_kalau_ada`() {
+        // Kalau AI menjawab "Lainnya" dan kategori itu memang ada, itu kategori
+        // yang dipakai -- bukan perlu membuat yang baru.
+        assertEquals("Lainnya", harusCocok("Lainnya", listOf("Makanan", "Lainnya")))
+        assertEquals("Lainnya", harusCocok("lainnya", listOf("Makanan", "Lainnya")))
     }
 
     @Test
