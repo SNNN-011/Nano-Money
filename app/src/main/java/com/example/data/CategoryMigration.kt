@@ -47,8 +47,18 @@ object CategoryMigration {
     /**
      * Membangun baris `categories` dari kedua daftar prefs.
      * ID memakai [legacyId] supaya idempoten antar perangkat.
+     *
+     * [seedDefaults] harus false kalau sumbernya adalah cloud. Di sana daftar
+     * kategori kosong berarti "user memang menghapus semuanya", bukan "belum ada
+     * data". Mengisi dengan [DEFAULT_EXPENSE] di jalur itu akan membangkitkan
+     * kategori yang sudah dihapus, persis seperti yang harus dicegah.
      */
-    fun buildCategories(incomeCsv: String?, expenseCsv: String?, now: Long): List<Category> {
+    fun buildCategories(
+        incomeCsv: String?,
+        expenseCsv: String?,
+        now: Long,
+        seedDefaults: Boolean = true
+    ): List<Category> {
         val result = mutableListOf<Category>()
 
         fun addAll(type: String, names: List<String>) {
@@ -70,8 +80,8 @@ object CategoryMigration {
             }
         }
 
-        addAll(TYPE_INCOME, parseCategoryList(incomeCsv).ifEmpty { DEFAULT_INCOME })
-        addAll(TYPE_EXPENSE, parseCategoryList(expenseCsv).ifEmpty { DEFAULT_EXPENSE })
+        addAll(TYPE_INCOME, parseCategoryList(incomeCsv).let { if (seedDefaults && it.isEmpty()) DEFAULT_INCOME else it })
+        addAll(TYPE_EXPENSE, parseCategoryList(expenseCsv).let { if (seedDefaults && it.isEmpty()) DEFAULT_EXPENSE else it })
         return result
     }
 

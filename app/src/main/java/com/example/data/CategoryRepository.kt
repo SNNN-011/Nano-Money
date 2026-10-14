@@ -118,6 +118,20 @@ class CategoryRepository(
         ): Boolean {
             if (prefs.getBoolean(CategoryMigration.PREF_MIGRATED_FLAG, false)) return false
 
+        // Guard kedua, dan yang sebenarnya menentukan. Flag migrasi disimpan di
+        // encrypted prefs, yang SecurePrefsHelper HAPUS lalu rebuild kosong kalau
+        // Keystore-nya error. Saat itu flag ikut hilang, migrasi jalan lagi, dan
+        // karena CSV-nya ikut hilang, buildCategories memakai daftar DEFAULT --
+        // sehingga setiap kategori bawaan yang sudah dihapus user hidup kembali.
+        //
+        // Tabel yang sudah berisi kategori adalah bukti migrasi sudah pernah
+        // jalan, jauh lebih kuat daripada flag di prefs. Kalau isinya tidak
+        // kosong, migrasi tidak boleh mengulang diri, apa pun isi prefs.
+        if (categoryDao.getAllIds().isNotEmpty()) {
+            prefs.edit().putBoolean(CategoryMigration.PREF_MIGRATED_FLAG, true).apply()
+            return false
+        }
+
             val now = System.currentTimeMillis()
             val categories = CategoryMigration.buildCategories(
                 incomeCsv = prefs.getString(CategoryMigration.PREF_INCOME_LIST, null),

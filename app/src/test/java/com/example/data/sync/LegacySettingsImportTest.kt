@@ -132,4 +132,46 @@ class LegacySettingsImportTest {
         assertFalse(LegacySettingsImport.isAllowedField("saved_pin"))
         assertFalse(LegacySettingsImport.isAllowedField("monthly_budget_limit"))
     }
+
+    @Test
+    fun daftar_kosong_di_cloud_tidak_mengisi_kategori_bawaan() {
+        // CSV kosong berarti user memang menghapus semua kategorinya. Mengisinya
+        // dengan DEFAULT_EXPENSE akan membangkitkan ulang semua kategori bawaan
+        // yang sengaja sudah dihapus.
+        val imporKosong = LegacySettingsImport.parse(
+            docData = mapOf(
+                CategoryMigration.PREF_INCOME_LIST to "",
+                CategoryMigration.PREF_EXPENSE_LIST to ""
+            ),
+            existingCategoryIds = emptySet(),
+            now = 1_000L
+        )
+        assertTrue("kategori tidak boleh dibangkitkan dari daftar kosong", imporKosong.categories.isEmpty())
+    }
+
+    @Test
+    fun csv_hanya_spandau_tidak_ikut_jadi_kategori() {
+        val imporSpasi = LegacySettingsImport.parse(
+            docData = mapOf(CategoryMigration.PREF_EXPENSE_LIST to "   "),
+            existingCategoryIds = emptySet(),
+            now = 1_000L
+        )
+        assertTrue(imporSpasi.categories.isEmpty())
+    }
+
+    @Test
+    fun daftar_asli_dari_cloud_masih_diimpor() {
+        val impor = LegacySettingsImport.parse(
+            docData = mapOf(
+                CategoryMigration.PREF_INCOME_LIST to "Gaji",
+                CategoryMigration.PREF_EXPENSE_LIST to "Perawatan Tubuh"
+            ),
+            existingCategoryIds = emptySet(),
+            now = 1_000L
+        )
+        assertEquals(
+            listOf("Gaji", "Perawatan Tubuh"),
+            impor.categories.map { it.name }
+        )
+    }
 }

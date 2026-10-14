@@ -49,18 +49,21 @@ object LegacySettingsImport {
         // Hanya daftar yang benar-benar ada di dokumen yang diproses. Kalau salah
         // satu tidak ada, tidak boleh diisi dengan daftar default: dari cloud kita
         // tidak boleh mengarang kategori yang mungkin memang sudah dihapus user.
+        // seedDefaults = false: daftar kosong di cloud berarti user memang menghapus
+        // kategori itu, bukan belum ada data. Kalau diisi DEFAULT di sini, semua
+        // kategori bawaan yang sudah dihapus akan dibangkitkan ulang.
         val built = buildList {
-            if (incomeCsv != null) {
+            if (!incomeCsv.isNullOrBlank()) {
                 addAll(
                     CategoryMigration
-                        .buildCategories(incomeCsv, null, now)
+                        .buildCategories(incomeCsv, null, now, seedDefaults = false)
                         .filter { it.type == CategoryMigration.TYPE_INCOME }
                 )
             }
-            if (expenseCsv != null) {
+            if (!expenseCsv.isNullOrBlank()) {
                 addAll(
                     CategoryMigration
-                        .buildCategories(null, expenseCsv, now)
+                        .buildCategories(null, expenseCsv, now, seedDefaults = false)
                         .filter { it.type == CategoryMigration.TYPE_EXPENSE }
                 )
             }

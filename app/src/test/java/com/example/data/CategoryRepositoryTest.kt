@@ -175,13 +175,35 @@ class CategoryRepositoryTest {
         assertTrue(CategoryRepository.runIfNeeded(db.categoryDao(), db.categoryBudgetDao(), prefs))
         val firstIds = db.categoryDao().getByType(CategoryMigration.TYPE_EXPENSE).map { it.id }
 
-        // Jalankan ulang walau flag sudah terpasang: hasil barisnya harus sama.
+        // Jalankan ulang dengan flag sengaja dihapus. Tabel sudah terisi, jadi
+        // migrasi harus menolak jalan -- bukan menulis ulang baris yang sama.
         prefs.edit().remove(CategoryMigration.PREF_MIGRATED_FLAG).commit()
-        assertTrue(CategoryRepository.runIfNeeded(db.categoryDao(), db.categoryBudgetDao(), prefs))
+        assertFalse(CategoryRepository.runIfNeeded(db.categoryDao(), db.categoryBudgetDao(), prefs))
         val secondIds = db.categoryDao().getByType(CategoryMigration.TYPE_EXPENSE).map { it.id }
 
         assertEquals(firstIds, secondIds)
         assertEquals(600_000L, db.categoryBudgetDao().findByCategoryId("cat:expense:makanan")!!.budgetLimit)
+    }
+
+    @Test
+    fun flag_hilang_tidak_membangkitkan_kategori_yang_sudah_dihapus() = runBlocking {
+        prefs.edit()
+            .putString(CategoryMigration.PREF_EXPENSE_LIST, "Makanan,Transportasi,Belanja,Lainnya")
+            .commit()
+        assertTrue(CategoryRepository.runIfNeeded(db.categoryDao(), db.categoryBudgetDao(), prefs))
+
+        // User menghapus "Belanja".
+        repo.softDelete("cat:expense:belanja")
+        assertTrue(db.categoryDao().findById("cat:expense:belanja")!!.isDeleted)
+
+        // SecurePrefsHelper menghapus file prefs lalu rebuild kosong saat Keystore
+        // error: flag hilang DAN CSV hilang. Migrasi lalu membaca daftar DEFAULT
+        // dan membangkitkan kembali "Belanja" yang sudah dihapus.
+        prefs.edit().clear().commit()
+        assertFalse(CategoryRepository.runIfNeeded(db.categoryDao(), db.categoryBudgetDao(), prefs))
+
+        val belanja = db.categoryDao().findById("cat:expense:belanja")!!
+        assertTrue("kategori yang dihapus tidak boleh hidup lagi", belanja.isDeleted)
     }
 
     @Test
