@@ -49,8 +49,15 @@ data class MonthTotals(val income: Long, val expense: Long)
  * Preferensi tampilan saldo tersembunyi.
  *
  * Murni lokal, tidak pernah ikut sinkron ke Firestore.
+ *
+ * Disimpan di SharedPreferences biasa, bukan encrypted prefs. Ini bukan rahasia,
+ * dan `SecurePrefsHelper` punya jalur recovery yang menghapus seluruh file prefs
+ * bila Keystore bermasalah — yang berarti preferensi tampilan ikut hilang padahal
+ * tidak ada hubungannya dengan PIN.
  */
 const val PREF_SHOW_BALANCE = "show_balance"
+
+private const val UI_PREFS_NAME = "ui_prefs"
 
 internal fun computeMonthTotals(
     records: List<FinancialRecord>,
@@ -227,15 +234,19 @@ class FinancialTrackerViewModel(
      * Disimpan di prefs, bukan hanya di state: kalau hanya di remember, statusnya
      * kembali ke "terlihat" setiap aplikasi ditutup dan dibuka ulang.
      */
+    private val uiPrefs = application.getSharedPreferences(UI_PREFS_NAME, android.content.Context.MODE_PRIVATE)
+
     private val balanceVisibleState = MutableStateFlow(
-        prefs.getBoolean(PREF_SHOW_BALANCE, true)
+        uiPrefs.getBoolean(PREF_SHOW_BALANCE, true)
     )
     val isBalanceVisible: StateFlow<Boolean> = balanceVisibleState.asStateFlow()
 
     fun toggleBalanceVisibility() {
         val next = !balanceVisibleState.value
         balanceVisibleState.value = next
-        prefs.edit().putBoolean(PREF_SHOW_BALANCE, next).apply()
+        // commit(), bukan apply(): apply() menunda penulisan ke disk, jadi kalau
+        // proses langsung mati prefs belum tentu sudah tersimpan.
+        uiPrefs.edit().putBoolean(PREF_SHOW_BALANCE, next).commit()
     }
 
     val monthlyBudgetLimit = MutableStateFlow(0L)

@@ -378,6 +378,56 @@ fun DatabaseBackupSection(
             if (showDriveMenu) {
                 Spacer(modifier = Modifier.height(16.dp))
 
+                // Dua aksi utama. Sebelumnya tidak ada tombol backup langsung ke
+                // Drive: blok unggah setelah "Cadangkan Sekarang" sengaja
+                // dikomentari, jadi hanya tersimpan lokal.
+                if (connectedGoogleAccount != null) {
+                    PremiumButton(
+                        text = if (isDriveProcessing) "MENGUNGGAH..." else "CADANGKAN KE GOOGLE DRIVE",
+                        onClick = {
+                            coroutineScope.launch {
+                                onIsDriveProcessingChanged(true)
+                                when (val backup = BackupHelper.performBackup(context, isAuto = false)) {
+                                    is BackupHelper.BackupResult.Success -> {
+                                        onBackupListChanged(BackupHelper.getBackups(context))
+                                        val backupDir = BackupHelper.getBackupDirectory(context)
+                                        val file = java.io.File(backupDir, backup.fileName)
+                                        when (val upload = GoogleDriveHelper.uploadBackupToDrive(context, file)) {
+                                            is GoogleDriveHelper.DriveResult.Success -> {
+                                                Toast.makeText(
+                                                    context,
+                                                    "Cadangan berhasil diunggah ke Google Drive",
+                                                    Toast.LENGTH_LONG
+                                                ).show()
+                                                when (val listRes = GoogleDriveHelper.listBackupsFromDrive(context)) {
+                                                    is GoogleDriveHelper.DriveResult.Success ->
+                                                        onDriveBackupListChanged(listRes.data)
+                                                    is GoogleDriveHelper.DriveResult.Error -> Unit
+                                                }
+                                            }
+                                            is GoogleDriveHelper.DriveResult.Error -> {
+                                                onDriveErrorDetailMessageChange(upload.message)
+                                            }
+                                        }
+                                    }
+                                    is BackupHelper.BackupResult.Error -> {
+                                        Toast.makeText(
+                                            context,
+                                            "Gagal membuat cadangan lokal: ${backup.message}",
+                                            Toast.LENGTH_LONG
+                                        ).show()
+                                    }
+                                }
+                                onIsDriveProcessingChanged(false)
+                            }
+                        },
+                        isActive = !isDriveProcessing,
+                        icon = Icons.Default.CloudUpload,
+                        modifier = Modifier.fillMaxWidth().testTag("backup_to_drive_now_button")
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                }
+
                 if (driveBackupList.isEmpty()) {
                     Text(
                         text = if (connectedGoogleAccount == null) {
@@ -393,6 +443,21 @@ fun DatabaseBackupSection(
                         modifier = Modifier.fillMaxWidth(),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.Restore,
+                                contentDescription = null,
+                                tint = SteelBlue.copy(alpha = 0.7f),
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "Pilih cadangan untuk dipulihkan:",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = GhostWhite.copy(alpha = 0.6f)
+                            )
+                        }
+
                         driveBackupList.forEach { driveFile ->
                             Row(
                                 modifier = Modifier
