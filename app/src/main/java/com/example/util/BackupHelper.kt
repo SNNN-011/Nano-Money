@@ -107,6 +107,10 @@ object BackupHelper {
                 return@withContext BackupResult.Error("Gagal menyiapkan database untuk dicadangkan: snapshot kosong.")
             }
 
+            // Nama lokal tetap memakai pola lama karena daftar cadangan lokal
+            // dan berkas pengaman sebelum-restore memfilter dengan pola itu.
+            // Nama yang dilihat pengguna dipakai di Google Drive (lihat
+            // GoogleDriveHelper.BACKUP_FILE_NAME).
             val prefix = if (isAuto) "auto_DataNanoMoney_" else "manual_DataNanoMoney_"
             val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
             val backupFile = File(backupDir, "$prefix$timestamp.db")

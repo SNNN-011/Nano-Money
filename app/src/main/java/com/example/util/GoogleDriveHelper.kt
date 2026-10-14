@@ -27,6 +27,29 @@ object GoogleDriveHelper {
     private const val TAG = "GoogleDriveHelper"
     private const val DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file"
 
+    /**
+     * Nama berkas cadangan di Google Drive.
+     *
+     * Sengaja satu nama tetap: backup berikutnya menimpa yang lama, jadi folder Drive
+     * tidak menumpuk berkas yang isinya hampir identik. Konsekuensinya hanya ada satu
+     * versi cadangan yang bisa dipulihkan, bukan riwayat.
+     */
+    const val BACKUP_FILE_NAME = "Cadangan_Data_NanoMoney.db"
+
+    /** Nama folder tujuan di Drive. */
+    const val BACKUP_FOLDER_NAME = "Backup Nano Money"
+
+    /**
+     * Berkas yang dianggap milik aplikasi ini.
+     *
+     * Mencakup nama lama (manual_DataNanoMoney_*, backup_*) supaya cadangan yang
+     * sudah terlanjung terunggah tetap muncul di daftar.
+     */
+    private fun isAppBackupName(name: String): Boolean =
+        name == BACKUP_FILE_NAME ||
+            name.contains("DataNanoMoney_") ||
+            name.contains("backup_")
+
     data class DriveBackupFile(
         val id: String,
         val name: String,
@@ -124,7 +147,7 @@ object GoogleDriveHelper {
      */
     private fun getOrCreateFolderId(token: String): String? {
         try {
-            val query = "mimeType = 'application/vnd.google-apps.folder' and name = 'Backup Nano Money' and trashed = false"
+            val query = "mimeType = 'application/vnd.google-apps.folder' and name = '${BACKUP_FOLDER_NAME}' and trashed = false"
             val searchUrl = "https://www.googleapis.com/drive/v3/files?q=${java.net.URLEncoder.encode(query, "UTF-8")}&fields=files(id)"
             val request = Request.Builder()
                 .url(searchUrl)
@@ -220,9 +243,18 @@ object GoogleDriveHelper {
         return null
     }
 
-    private fun uploadBackupToDriveInternal(token: String, backupFile: File, folderId: String?): DriveResult<String> {
+    /**
+     * @param driveFileName Nama berkas di Drive. Dipisah dari [sourceFile] karena
+     *   nama lokal bertanggal sementara nama di cloud sengaja dibuat tetap.
+     */
+    private fun uploadBackupToDriveInternal(
+        token: String,
+        sourceFile: File,
+        driveFileName: String,
+        folderId: String?
+    ): DriveResult<String> {
         // Check if file already exists with same name to overwrite it
-        val existingFileId = findExistingFileId(token, backupFile.name, folderId)
+        val existingFileId = findExistingFileId(token, driveFileName, folderId)
         val fileIdToUpload: String
 
         if (!existingFileId.isNullOrEmpty()) {
@@ -231,7 +263,7 @@ object GoogleDriveHelper {
         } else {
             // Step 1: Create the file metadata in Google Drive inside the directory
             val metadataJson = JSONObject().apply {
-                put("name", backupFile.name)
+                put("name", driveFileName)
                 put("mimeType", "application/x-sqlite3")
                 if (!folderId.isNullOrEmpty()) {
                     put("parents", JSONArray().apply { put(folderId) })
@@ -270,7 +302,7 @@ object GoogleDriveHelper {
             .url("https://www.googleapis.com/upload/drive/v3/files/$fileIdToUpload?uploadType=media")
             .header("Authorization", "Bearer $token")
             .header("Content-Type", "application/octet-stream")
-            .patch(backupFile.asRequestBody("application/octet-stream".toMediaType()))
+            .patch(sourceFile.asRequestBody("application/octet-stream".toMediaType()))
             .build()
 
         val mediaResponse = httpClient.newCall(mediaRequest).execute()
@@ -328,7 +360,7 @@ object GoogleDriveHelper {
 
         try {
             val folderId = getOrCreateFolderId(token)
-            val result = uploadBackupToDriveInternal(token, backupFile, folderId)
+            val result = uploadBackupToDriveInternal(token, backupFile, BACKUP_FILE_NAME, folderId)
             if (result is DriveResult.Success) {
                 tryCleanOldDriveBackups(token)
             }
@@ -342,7 +374,7 @@ object GoogleDriveHelper {
             token = (tokenResult as DriveResult.Success).data
             try {
                 val folderId = getOrCreateFolderId(token)
-                val result = uploadBackupToDriveInternal(token, backupFile, folderId)
+                val result = uploadBackupToDriveInternal(token, backupFile, BACKUP_FILE_NAME, folderId)
                 if (result is DriveResult.Success) {
                     tryCleanOldDriveBackups(token)
                 }
@@ -363,11 +395,13 @@ object GoogleDriveHelper {
     private fun listBackupsFromDriveInternal(token: String): List<DriveBackupFile> {
         val folderId = getOrCreateFolderId(token)
         
-        // Build a query focusing specifically on our backups folder if found
+        // Nama baru dan nama lama ikut dicakup supaya cadangan yang sudah
+        // pernah terunggah tidak hilang dari daftar.
+        val nameFilter = "name = '$BACKUP_FILE_NAME' or name contains 'DataNanoMoney_' or name contains 'backup_'"
         val query = if (!folderId.isNullOrEmpty()) {
-            "(name contains 'backup_' or name contains 'DataNanoMoney_') and name contains '.db' and '$folderId' in parents and trashed = false"
+            "($nameFilter) and name contains '.db' and '$folderId' in parents and trashed = false"
         } else {
-            "(name contains 'backup_' or name contains 'DataNanoMoney_') and name contains '.db' and trashed = false"
+            "($nameFilter) and name contains '.db' and trashed = false"
         }
         val url = "https://www.googleapis.com/drive/v3/files?q=${java.net.URLEncoder.encode(query, "UTF-8")}&fields=files(id,name,createdTime,size)&orderBy=createdTime desc"
 

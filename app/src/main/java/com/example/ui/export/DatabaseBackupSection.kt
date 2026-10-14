@@ -330,6 +330,23 @@ fun DatabaseBackupSection(
                 modifier = Modifier.padding(vertical = 16.dp)
             )
 
+            // Card dengan tampilan yang sama persis dengan card sinkronisasi
+            // Firestore di atas, supaya keduanya terbaca sebagai satu pasangan.
+            Card(
+                modifier = Modifier.fillMaxWidth().testTag("drive_backup_card"),
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = TranslucentForm.copy(alpha = 0.65f)),
+                border = BorderStroke(
+                    width = 1.dp,
+                    brush = Brush.verticalGradient(
+                        colors = listOf(GhostWhite.copy(alpha = 0.15f), GhostWhite.copy(alpha = 0.02f))
+                    )
+                )
+            ) {
+                Column(
+                    modifier = Modifier.padding(20.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -470,16 +487,19 @@ fun DatabaseBackupSection(
                             ) {
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
-                                        text = driveFile.name,
-                                        style = MaterialTheme.typography.bodySmall,
+                                        text = "Cadangan Data NanoMoney",
+                                        style = MaterialTheme.typography.bodyMedium,
                                         color = GhostWhite,
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
                                     )
                                     Text(
-                                        text = FormatUtils.formatDriveTimestamp(driveFile.createdTime),
+                                        text = FormatUtils.formatDriveTimestamp(driveFile.createdTime) +
+                                            " · " + FormatUtils.formatFileSize(driveFile.sizeBytes),
                                         style = MaterialTheme.typography.labelSmall,
-                                        color = GhostWhite.copy(alpha = 0.45f)
+                                        color = GhostWhite.copy(alpha = 0.45f),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
                                     )
                                 }
                                 Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -512,7 +532,9 @@ fun DatabaseBackupSection(
                         }
                     }
                 }
+                }
             }
+        }
         }
         
         // Disconnect Account Dialog handled within realtime context now

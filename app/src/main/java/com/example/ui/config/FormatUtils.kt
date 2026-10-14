@@ -101,6 +101,15 @@ object FormatUtils {
      * String yang tidak bisa diparse dikembalikan apa adanya, bukan string kosong,
      * supaya daftar cadangan tidak pernah tampil tanpa tanggal tanpa penjelasan.
      */
+        /** Ukuran berkas dalam satuan yang enak dibaca. */
+    fun formatFileSize(bytes: Long): String = when {
+        bytes <= 0L -> "0 B"
+        bytes < 1_024L -> "$bytes B"
+        bytes < 1_048_576L -> String.format(ID_LOCALE, "%.0f KB", bytes / 1_024.0)
+        bytes < 1_073_741_824L -> String.format(ID_LOCALE, "%.1f MB", bytes / 1_048_576.0)
+        else -> String.format(ID_LOCALE, "%.2f GB", bytes / 1_073_741_824.0)
+    }
+
     fun formatDriveTimestamp(iso: String?): String {
         if (iso.isNullOrBlank()) return "Waktu tidak diketahui"
         return try {
