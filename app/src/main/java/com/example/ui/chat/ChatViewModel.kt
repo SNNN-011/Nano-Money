@@ -240,21 +240,21 @@ class ChatViewModel(
             var count = 0
             pending.grouped.forEach { grp ->
                 if (grp.amount > 0L) {
-                    val (_, cleanCatNameRaw) = com.example.ui.util.CategoryIconMapper.extractEmojiAndLabel(grp.category.trim())
-                    val cleanCatName = cleanCatNameRaw.ifBlank { grp.category }.trim()
                     val allCategories = incomeCategories.value + expenseCategories.value
-                    
-                    val matched = allCategories.firstOrNull { 
-                        val (_, cleanMatched) = com.example.ui.util.CategoryIconMapper.extractEmojiAndLabel(it)
-                        cleanMatched.trim().equals(cleanCatName, ignoreCase = true)
-                    }
-                    
-                    val finalCategoryName = if (matched == null) {
-                        addCategory(grp.type, cleanCatName)
-                        cleanCatName
-                    } else {
-                        val (_, cleanMatched) = com.example.ui.util.CategoryIconMapper.extractEmojiAndLabel(matched)
-                        cleanMatched.trim()
+                    val resolution = com.example.domain.CategoryResolver.resolve(
+                        grp.category,
+                        allCategories
+                    )
+
+                    val finalCategoryName = when (resolution) {
+                        is com.example.domain.CategoryResolution.Matched -> resolution.category
+                        is com.example.domain.CategoryResolution.NeedsNewCategory -> {
+                            val suggested = resolution.suggestedName
+                            if (suggested.isEmpty()) "Lainnya" else {
+                                addCategory(grp.type, suggested)
+                                suggested
+                            }
+                        }
                     }
 
                     val recordCategory = finalCategoryName
@@ -395,27 +395,23 @@ class ChatViewModel(
     private suspend fun saveAndConfirmTransaction(result: ExtractionResult, userText: String) {
         val recordType = if (result.type?.uppercase() == "PEMASUKAN" || result.type?.lowercase() == "income") "income" else "expense"
         val allCategories = incomeCategories.value + expenseCategories.value
-        val resultCategory = result.category?.trim() ?: ""
 
-        val categoryNameOnly = if (resultCategory.isNotEmpty()) {
-            val (_, cleanResultRaw) = com.example.ui.util.CategoryIconMapper.extractEmojiAndLabel(resultCategory)
-            val cleanResult = cleanResultRaw.ifBlank { resultCategory }.trim()
-            val matched = allCategories.firstOrNull { 
-                val (_, cleanMatched) = com.example.ui.util.CategoryIconMapper.extractEmojiAndLabel(it)
-                cleanMatched.trim().equals(cleanResult, ignoreCase = true)
+        // AI sering membalas kategori umum ("Hiburan") padahal user punya kategori
+        // khusus ("Game"). Kategori milik user yang diunggulkan, bukan jawaban AI.
+        val resolution = com.example.domain.CategoryResolver.resolve(result.category, allCategories)
+
+        val recordCategory = when (resolution) {
+            is com.example.domain.CategoryResolution.Matched -> resolution.category
+            is com.example.domain.CategoryResolution.NeedsNewCategory -> {
+                val suggested = resolution.suggestedName
+                if (suggested.isEmpty()) {
+                    "Lainnya"
+                } else {
+                    addCategory(recordType, suggested)
+                    suggested
+                }
             }
-            if (matched == null) {
-                addCategory(recordType, cleanResult)
-                cleanResult
-            } else {
-                val (_, cleanMatched) = com.example.ui.util.CategoryIconMapper.extractEmojiAndLabel(matched)
-                cleanMatched.trim()
-            }
-        } else {
-            "Lainnya"
         }
-
-        val recordCategory = categoryNameOnly
 
         val recordAmount = result.amount ?: 0L
         if (recordAmount <= 0L) {

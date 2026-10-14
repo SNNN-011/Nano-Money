@@ -103,7 +103,13 @@ class TransactionParserUseCase {
             "description" deskripsi pendek transaksi(maksimal 2 kata), gunakan huruf kapital di setiap awal kalimat.
             "amount" nominal.
             "type" "income" atau "expense".
-            "category" SANGAT PENTING: Pilih SATU dari opsi berikut yang PALING COCOK. Untuk income: [$incomeCats]. Untuk expense: [$expenseCats]. JANGAN buat kategori baru KECUALI benar-benar tidak ada yang pas (gunakan opsi yang ada sebisa mungkin).
+            "category" WAJIB dipilih dari daftar di bawah, tidak boleh mengarang. Itu daftar kategori yang benar-benar dimiliki pengguna, dan kategori yang dibuat sendiri oleh pengguna LEBIH DIPRIORITKAN daripada kategori umum.
+            Daftar income: [$incomeCats]
+            Daftar expense: [$expenseCats]
+            Aturan pemilihan:
+            - Kalau ada kategori pengguna yang khusus dan cocok (mis. pengguna punya "Game", "Kopi", "Ojek"), pilih ITU, jangan pilih kategori umum yang mirip (mis. "Hiburan", "Makanan", "Transportasi").
+            - Jangan mengarang kategori yang tidak ada di daftar.
+            - Tulis persis seperti tertulis di daftar, huruf besar-kecilnya ikut sama.
             "date" timestamp_ms.
             "notes" rangkuman singkat transaksi(maksimal 4 kata).
             "emoji" satu karakter emoji yang merepresentasikan transaksi/kategori ini (Contoh: "🍔" untuk makan/minum, "🚗" untuk bensin/ojek, "🛒" untuk belanja, "💊" untuk obat, "💵" atau "💰" untuk gaji/bonus, "🔌" untuk tagihan/listrik, dll).
