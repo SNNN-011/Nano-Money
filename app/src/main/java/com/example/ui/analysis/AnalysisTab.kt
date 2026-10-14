@@ -73,7 +73,9 @@ fun AnalysisTabContent(
             totalExpense = totalExpense,
             averageDailyExpense = averageDailyExpense,
             topCategoryName = topCategory?.category ?: "-",
-            totalTransactions = totalTransactions
+            totalTransactions = totalTransactions,
+            aggregations = categoryAggregations,
+            showCategoryList = !showCharts
         )
 
         if (showCharts) {
@@ -82,86 +84,6 @@ fun AnalysisTabContent(
                 aggregations = categoryAggregations,
                 totalExpense = totalExpense
             )
-        } else {
-            // Grafik sudah jadi latar kalender; di sini cukup daftar kategorinya.
-            if (categoryAggregations.isNotEmpty()) {
-                CategoryListCard(
-                    aggregations = categoryAggregations,
-                    totalExpense = totalExpense
-                )
-            }
-        }
-    }
-}
-
-/** Rincian nominal per kategori. Dipisah dari grafik supaya bisa dipakai sendiri. */
-@Composable
-fun CategoryListCard(
-    aggregations: List<CategoryAggregation>,
-    totalExpense: Long
-) {
-    val listColors = listOf(
-        Color(0xFFC2E0FF),
-        Color(0xFF93C9FF),
-        Color(0xFF5BA8F5),
-        Color(0xFF2E86DE),
-        Color(0xFF1E5FAD),
-        Color(0xFF1A3A6B)
-    )
-
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = TranslucentGlass),
-        border = BorderStroke(
-            width = 1.dp,
-            brush = Brush.verticalGradient(
-                colors = listOf(GhostWhite.copy(alpha = 0.1f), GhostWhite.copy(alpha = 0.02f))
-            )
-        )
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            Text(
-                text = "Rincian per Kategori",
-                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                color = GhostWhite
-            )
-            aggregations.forEachIndexed { index, agg ->
-                val color = listColors[index % listColors.size]
-                val percentage =
-                    if (totalExpense > 0) (agg.totalAmount.toDouble() / totalExpense) * 100 else 0.0
-
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
-                ) {
-                    Box(modifier = Modifier.size(10.dp).background(color, CircleShape))
-                    Spacer(modifier = Modifier.width(8.dp))
-
-                    val (_, cleanCat) =
-                        com.example.ui.util.CategoryIconMapper.extractEmojiAndLabel(agg.category)
-                    Text(
-                        text = cleanCat,
-                        color = GhostWhite,
-                        modifier = Modifier.weight(1f),
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                    Text(
-                        text = String.format("%.1f%%", percentage),
-                        color = GhostWhite.copy(alpha = 0.7f),
-                        style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.padding(end = 8.dp)
-                    )
-                    Text(
-                        text = FormatUtils.formatRupiahCompact(agg.totalAmount),
-                        color = GhostWhite,
-                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold)
-                    )
-                }
-            }
         }
     }
 }
@@ -228,7 +150,9 @@ fun SummaryStatsCard(
     totalExpense: Long,
     averageDailyExpense: Double,
     topCategoryName: String,
-    totalTransactions: Int
+    totalTransactions: Int,
+    aggregations: List<CategoryAggregation> = emptyList(),
+    showCategoryList: Boolean = false
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -277,6 +201,64 @@ fun SummaryStatsCard(
                     valueColor = GhostWhite,
                     modifier = Modifier.weight(1f)
                 )
+            }
+
+            // Rincian kategori disatukan ke card yang sama, bukan card terpisah.
+            // Dipakai di tab Kalender karena grafiknya sudah jadi latar kalender.
+            if (showCategoryList && aggregations.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(16.dp))
+                HorizontalDivider(color = GhostWhite.copy(alpha = 0.1f))
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Text(
+                    text = "Rincian per Kategori",
+                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                    color = GhostWhite,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+
+                val listColors = listOf(
+                    Color(0xFFC2E0FF),
+                    Color(0xFF93C9FF),
+                    Color(0xFF5BA8F5),
+                    Color(0xFF2E86DE),
+                    Color(0xFF1E5FAD),
+                    Color(0xFF1A3A6B)
+                )
+
+                aggregations.forEachIndexed { index, agg ->
+                    val color = listColors[index % listColors.size]
+                    val percentage =
+                        if (totalExpense > 0) (agg.totalAmount.toDouble() / totalExpense) * 100 else 0.0
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                    ) {
+                        Box(modifier = Modifier.size(10.dp).background(color, CircleShape))
+                        Spacer(modifier = Modifier.width(8.dp))
+
+                        val (_, cleanCat) =
+                            com.example.ui.util.CategoryIconMapper.extractEmojiAndLabel(agg.category)
+                        Text(
+                            text = cleanCat,
+                            color = GhostWhite,
+                            modifier = Modifier.weight(1f),
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                        Text(
+                            text = String.format("%.1f%%", percentage),
+                            color = GhostWhite.copy(alpha = 0.7f),
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.padding(end = 8.dp)
+                        )
+                        Text(
+                            text = FormatUtils.formatRupiahCompact(agg.totalAmount),
+                            color = GhostWhite,
+                            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold)
+                        )
+                    }
+                }
             }
         }
     }

@@ -36,5 +36,14 @@ class AnalysisRepository(private val dao: AnalysisDao) {
         return dao.getAllTimeExpenseRecords()
     }
 
+    /** Income + expense sekaligus, untuk dua garis yang saling menindih. */
+    fun getRecordsInRange(startMs: Long, endMs: Long): Flow<List<com.example.data.FinancialRecord>> {
+        return dao.getRecordsInRange(startMs, endMs)
+    }
+
+    fun getAllRecords(): Flow<List<com.example.data.FinancialRecord>> {
+        return dao.getAllRecords()
+    }
+
     fun getOldestExpenseDate(): Flow<Long?> = dao.getOldestExpenseDate()
 }

@@ -47,41 +47,67 @@ class AnalysisViewModel(
         _calendarMonth.value = ym
     }
 
+    /**
+     * Catatan income + expense untuk periode aktif, diambil dalam satu query.
+     *
+     * Satu aliran dipakai untuk kedua garis supaya keranjang tanggalnya identik.
+     * Kalau tiap tipe diambil terpisah, ada hari yang ada pengeluaran tapi tidak ada
+     * pemasukan, sehingga kedua garis akan memakai jumlah titik berbeda dan tidak
+     * saling menindih dengan benar.
+     */
     @OptIn(ExperimentalCoroutinesApi::class)
-    val dailyTrends: StateFlow<List<DailyAggregation>> = combine(_selectedPeriod, _calendarMonth) { period, calendarMonth ->
-        Pair(period, calendarMonth)
-    }.flatMapLatest { (period, calendarMonth) ->
-        val (start, end) = getChartTimeRange(period, calendarMonth)
-        val recordsFlow = if (start != null && end != null) {
-            repository.getExpenseRecords(start, end)
-        } else {
-            repository.getAllTimeExpenseRecords()
-        }
-        recordsFlow.map { records ->
-            if (records.isEmpty()) return@map emptyList()
-            
-            val format = if (period == PeriodFilter.ALL_TIME) {
-                SimpleDateFormat("MMM yyyy", Locale.forLanguageTag("id-ID"))
+    private val chartRecords: StateFlow<List<com.example.data.FinancialRecord>> = combine(
+        _selectedPeriod, _calendarMonth
+    ) { period, calendarMonth -> Pair(period, calendarMonth) }
+        .flatMapLatest { (period, calendarMonth) ->
+            val (start, end) = getChartTimeRange(period, calendarMonth)
+            if (start != null && end != null) {
+                repository.getRecordsInRange(start, end)
             } else {
-                SimpleDateFormat("dd/MM", Locale.forLanguageTag("id-ID"))
+                repository.getAllRecords()
             }
-            
-            val map = mutableMapOf<String, Pair<Long, Long>>()
-            records.forEach { record ->
-                val dateStr = format.format(java.util.Date(record.date))
-                val existing = map[dateStr]
-                if (existing == null) {
-                    map[dateStr] = Pair(record.date, record.amount)
-                } else {
-                    map[dateStr] = Pair(existing.first, existing.second + record.amount)
-                }
-            }
-            
-            map.entries.map { (dateStr, data) ->
-                DailyAggregation(dateString = dateStr, dateMs = data.first, totalAmount = data.second)
-            }.sortedBy { it.dateMs }
         }
-    }.stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+        .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
+    /** Tren pengeluaran (garis merah). */
+    val dailyTrends: StateFlow<List<DailyAggregation>> = combine(
+        chartRecords, _selectedPeriod
+    ) { records, period -> aggregateDaily(records, period, "expense") }
+        .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
+    /** Tren pemasukan (garis hijau). */
+    val incomeTrends: StateFlow<List<DailyAggregation>> = combine(
+        chartRecords, _selectedPeriod
+    ) { records, period -> aggregateDaily(records, period, "income") }
+        .stateIn(viewModelScope, SharingStarted.Lazily, emptyList())
+
+    private fun aggregateDaily(
+        records: List<com.example.data.FinancialRecord>,
+        period: PeriodFilter,
+        type: String
+    ): List<DailyAggregation> {
+        val format = if (period == PeriodFilter.ALL_TIME) {
+            SimpleDateFormat("MMM yyyy", Locale.forLanguageTag("id-ID"))
+        } else {
+            SimpleDateFormat("dd/MM", Locale.forLanguageTag("id-ID"))
+        }
+
+        val map = mutableMapOf<String, Pair<Long, Long>>()
+        records.forEach { record ->
+            if (record.type != type) return@forEach
+            val dateStr = format.format(java.util.Date(record.date))
+            val existing = map[dateStr]
+            map[dateStr] = if (existing == null) {
+                Pair(record.date, record.amount)
+            } else {
+                Pair(existing.first, existing.second + record.amount)
+            }
+        }
+
+        return map.entries.map { (dateStr, data) ->
+            DailyAggregation(dateString = dateStr, dateMs = data.first, totalAmount = data.second)
+        }.sortedBy { it.dateMs }
+    }
 
     @OptIn(ExperimentalCoroutinesApi::class)
     val categoryAggregations: StateFlow<List<CategoryAggregation>> = combine(_selectedPeriod, _calendarMonth) { period, calendarMonth ->

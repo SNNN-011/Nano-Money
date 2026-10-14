@@ -55,6 +55,19 @@ interface AnalysisDao {
     @Query("SELECT * FROM financial_records WHERE type = 'expense' AND isDeleted = 0 ORDER BY date ASC")
     fun getAllTimeExpenseRecords(): Flow<List<com.example.data.FinancialRecord>>
 
+    /**
+     * Income dan expense sekaligus, tanpa filter tipe.
+     *
+     * Dipakai untuk menggambar dua garis yang saling menindih. Kalau tiap series
+     * diambil lewat query terpisah, keranjang tanggalnya bisa berbeda dan garisnya
+     * tidak akan sejajar despite keduanya dari periode yang sama.
+     */
+    @Query("SELECT * FROM financial_records WHERE date >= :startMs AND date <= :endMs AND isDeleted = 0 ORDER BY date ASC")
+    fun getRecordsInRange(startMs: Long, endMs: Long): Flow<List<com.example.data.FinancialRecord>>
+
+    @Query("SELECT * FROM financial_records WHERE isDeleted = 0 ORDER BY date ASC")
+    fun getAllRecords(): Flow<List<com.example.data.FinancialRecord>>
+
     @Query("SELECT MIN(date) FROM financial_records WHERE type = 'expense' AND isDeleted = 0")
     fun getOldestExpenseDate(): Flow<Long?>
 }

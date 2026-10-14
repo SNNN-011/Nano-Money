@@ -95,7 +95,10 @@ fun DatabaseBackupSection(
     onSelectedLocalBackupToUploadChange: (File?) -> Unit,
     driveErrorDetailMessage: String?,
     onDriveErrorDetailMessageChange: (String?) -> Unit,
-    onConnectGoogleDrive: () -> Unit
+    onConnectGoogleDrive: () -> Unit,
+    // Konten tambahan yang dirender di bagian atas card yang sama, supaya ekspor
+    // dan sinkronisasi bisa berada dalam satu kartu, bukan dua kartu bertumpuk.
+    headerContent: (@Composable () -> Unit)? = null
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -147,6 +150,19 @@ fun DatabaseBackupSection(
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 var showFirestoreHelpInfo by remember { mutableStateOf(false) }
+
+                headerContent?.let { extra ->
+                    HorizontalDivider(
+                        color = GhostWhite.copy(alpha = 0.1f),
+                        modifier = Modifier.padding(bottom = 4.dp)
+                    )
+                    extra()
+                    HorizontalDivider(
+                        color = GhostWhite.copy(alpha = 0.1f),
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
+                }
+
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),

@@ -30,6 +30,7 @@ import java.util.Locale
 import com.example.ui.common.FinancialTrackerViewModel
 import com.example.ui.analysis.AnalysisViewModel
 import com.example.ui.analysis.AnalysisTabContent
+import com.example.ui.analysis.PeriodFilterRow
 import com.example.ui.transaction.TransactionListItem
 
 // Custom design system variables as specified
@@ -59,7 +60,8 @@ fun CalendarTabContent(
     // Chart latar mengikuti bulan yang sedang dibuka di kalender. Sebelumnya
     // AnalysisViewModel punya bulan sendiri yang tidak pernah disinkronkan, jadi
     // chart bisa menampilkan bulan yang berbeda dari kalender.
-    val backgroundTrends by analysisViewModel.dailyTrends.collectAsState()
+    val backgroundExpenseTrends by analysisViewModel.dailyTrends.collectAsState()
+    val backgroundIncomeTrends by analysisViewModel.incomeTrends.collectAsState()
     val chartPeriod by analysisViewModel.selectedPeriod.collectAsState()
 
     LaunchedEffect(currentYm) {
@@ -132,7 +134,8 @@ fun CalendarTabContent(
                 // sel kalender dan teks tanggal tetap terbaca di atasnya.
                 Box(modifier = Modifier.fillMaxWidth()) {
                     CalendarTrendBackdrop(
-                        trends = backgroundTrends,
+                        expenseTrends = backgroundExpenseTrends,
+                        incomeTrends = backgroundIncomeTrends,
                         modifier = Modifier.matchParentSize()
                     )
 
@@ -291,40 +294,12 @@ fun CalendarTabContent(
                 }
             }
 
-            // Mode grafik: hanya dua pilihan, "Bulan Ini" mengikuti kalender di atas.
-            Row(
-                modifier = Modifier.fillMaxWidth().testTag("calendar_chart_mode_row"),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                AnalysisViewModel.PeriodFilter.entries.forEach { period ->
-                    val isActive = chartPeriod == period
-                    Row(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(
-                                if (isActive) SteelBlue.copy(alpha = 0.25f) else Color.Transparent
-                            )
-                            .border(
-                                width = 1.dp,
-                                color = if (isActive) SteelBlue else GhostWhite.copy(alpha = 0.15f),
-                                shape = RoundedCornerShape(12.dp)
-                            )
-                            .clickable { analysisViewModel.setPeriod(period) }
-                            .padding(vertical = 10.dp)
-                            .testTag("calendar_chart_mode_${period.name}"),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = period.displayName,
-                            style = MaterialTheme.typography.labelMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = if (isActive) CalTeksUtama else CalTeksSekunder
-                        )
-                    }
-                }
-            }
+            // Pakai komponen yang sama dengan tab Analisa supaya bentuknya tidak
+            // berbeda sendiri. Meniru desainnya di sini cepat jadi melenceng.
+            PeriodFilterRow(
+                selectedPeriod = chartPeriod,
+                onPeriodSelect = { analysisViewModel.setPeriod(it) }
+            )
 
             // Divider separating calendar and analysis
             HorizontalDivider(

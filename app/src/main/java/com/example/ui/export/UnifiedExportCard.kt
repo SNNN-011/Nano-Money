@@ -38,23 +38,16 @@ fun UnifiedExportCard(
     onIsMonthsExpandedChanged: (Boolean) -> Unit,
     onExportPdfFile: (List<YearMonth>) -> Unit,
     onExportCsvFile: (List<YearMonth>) -> Unit,
-    onImportCsvFile: () -> Unit
+    onImportCsvFile: () -> Unit,
+    // Kalau true, isi card ini ditampilkan di dalam card milik pemanggil tanpa
+    // bungkus Card-nya sendiri, supaya bisa digabung dengan section lain.
+    insideCard: Boolean = false
 ) {
     var showPdfHelpInfo by remember { mutableStateOf(false) }
 
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(CornerRadius.xl),
-        colors = CardDefaults.cardColors(containerColor = TranslucentForm.copy(alpha = 0.65f)),
-        border = BorderStroke(
-            width = 1.dp,
-            brush = Brush.verticalGradient(
-                colors = listOf(GhostWhite.copy(alpha = 0.15f), GhostWhite.copy(alpha = 0.02f))
-            )
-        )
-    ) {
+    val content: @Composable () -> Unit = {
         Column(
-            modifier = Modifier.padding(24.dp),
+            modifier = Modifier.padding(if (insideCard) 0.dp else 24.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             // Header inside card
@@ -315,6 +308,24 @@ fun UnifiedExportCard(
                     verticalPadding = 10.dp
                 )
             }
+        }
+    }
+
+    if (insideCard) {
+        content()
+    } else {
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(CornerRadius.xl),
+            colors = CardDefaults.cardColors(containerColor = TranslucentForm.copy(alpha = 0.65f)),
+            border = BorderStroke(
+                width = 1.dp,
+                brush = Brush.verticalGradient(
+                    colors = listOf(GhostWhite.copy(alpha = 0.15f), GhostWhite.copy(alpha = 0.02f))
+                )
+            )
+        ) {
+            content()
         }
     }
 }

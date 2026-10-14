@@ -10,91 +10,111 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
 import com.example.ui.analysis.DailyAggregation
-import com.example.ui.theme.SteelBlue
 
 /**
- * Grafik tren yang digambar di belakang grid kalender.
+ * Dua garis yang saling menindih di belakang grid kalender.
  *
- * Sengaja dibuat redup (alpha rendah) dan tanpa label: fungsinya memberi kesan
- * bentuk pengeluaran di belakang tanggal, bukan menjadi elemen bacaan utama. Angka
- * dan tanggal tetap di atasnya, jadi keterbacaan tidak boleh terganggu.
+ * Pengeluaran merah, pemasukan hijau. Sengaja redup (alpha rendah) dan tanpa
+ * label: fungsinya memberi bentuk Bipolar di belakang tanggal, bukan elemen bacaan
+ * utama. Angka dan tanggal tetap di atasnya.
  */
 @Composable
 fun CalendarTrendBackdrop(
-    trends: List<DailyAggregation>,
+    expenseTrends: List<DailyAggregation>,
+    incomeTrends: List<DailyAggregation>,
     modifier: Modifier = Modifier
 ) {
-    if (trends.isEmpty()) return
+    if (expenseTrends.isEmpty() && incomeTrends.isEmpty()) return
 
     Canvas(modifier = modifier) {
-        val lineAlpha = 0.28f
-        val fillAlpha = 0.10f
-        val width = size.width
-        val height = size.height
-        val maxAmount = (trends.maxOfOrNull { it.totalAmount }?.toFloat() ?: 0f).coerceAtLeast(1f)
-
-        // Sisakan ruang di kiri dan bawah supaya garis tidak menempel tepi card.
         val leftInset = 6f
         val bottomInset = 4f
-        val usableWidth = (width - leftInset * 2).coerceAtLeast(1f)
-        val usableHeight = (height - bottomInset * 2).coerceAtLeast(1f)
+        val usableWidth = (size.width - leftInset * 2).coerceAtLeast(1f)
+        val usableHeight = (size.height - bottomInset * 2).coerceAtLeast(1f)
 
-        val points = if (trends.size > 1) {
-            val stepX = usableWidth / (trends.size - 1)
-            trends.mapIndexed { index, agg ->
-                val x = leftInset + index * stepX
-                val y = height - bottomInset - (agg.totalAmount.toFloat() / maxAmount) * usableHeight
-                Offset(x, y)
-            }
-        } else {
-            val x = leftInset + usableWidth / 2f
-            val y = height - bottomInset - (trends.first().totalAmount.toFloat() / maxAmount) * usableHeight
-            listOf(Offset(x, y))
-        }
+        // Skala dipakai bersama dua garis supaya perbandingannya jujur: kalau
+        // masing-masing dinormalkan sendiri, pendapatan selalu terlihat lebih tinggi
+        // dari pengeluaran padahal tidak.
+        val maxAmount = maxOf(
+            expenseTrends.maxOfOrNull { it.totalAmount } ?: 0L,
+            incomeTrends.maxOfOrNull { it.totalAmount } ?: 0L
+        ).toFloat().coerceAtLeast(1f)
 
-        if (points.size > 1) {
-            val path = Path()
-            path.moveTo(points.first().x, points.first().y)
-            for (i in 0 until points.size - 1) {
-                val p0 = points[i]
-                val p1 = points[i + 1]
-                val cx = (p0.x + p1.x) / 2
-                path.cubicTo(cx, p0.y, cx, p1.y, p1.x, p1.y)
-            }
+        // Keranjang tanggal disamakan lebih dulu. Kalau income tidak punya entri
+        // pada hari yang ada pengeluaran, titiknya harus tetap dibuat, kalau tidak
+        // kedua garis akan menggeser dan tidak benar-benar saling menindih.
+        val buckets = (expenseTrends.map { it.dateString } + incomeTrends.map { it.dateString })
+            .distinct()
+            .size
+            .coerceAtLeast(1)
 
-            val fillPath = Path()
-            fillPath.addPath(path)
-            fillPath.lineTo(points.last().x, height)
-            fillPath.lineTo(points.first().x, height)
-            fillPath.close()
-
-            drawPath(
-                path = fillPath,
-                color = SteelBlue.copy(alpha = fillAlpha)
-            )
-            drawPath(
-                path = path,
-                color = SteelBlue.copy(alpha = lineAlpha),
-                style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round)
-            )
-        } else {
-            drawCircle(
-                color = SteelBlue.copy(alpha = lineAlpha),
-                radius = 3.dp.toPx(),
-                center = points.first()
-            )
-        }
-
-        // Titik penanda hanya digambar kalau jumlahnya masih masuk akal, supaya
-        // mode "Semua Bulan" yang punya banyak titik tidak jadi kotak padat.
-        if (points.size in 2..40) {
-            points.forEach { point ->
-                drawCircle(
-                    color = Color.White.copy(alpha = 0.22f),
-                    radius = 2.dp.toPx(),
-                    center = point
-                )
+        val pointsFor: (List<DailyAggregation>) -> List<Offset> = { trends ->
+            if (trends.isEmpty()) {
+                emptyList()
+            } else if (trends.size == 1) {
+                val y = size.height - bottomInset -
+                    (trends.first().totalAmount.toFloat() / maxAmount) * usableHeight
+                listOf(Offset(leftInset + usableWidth / 2f, y))
+            } else {
+                val stepX = usableWidth / (trends.size - 1)
+                trends.mapIndexed { index, agg ->
+                    val x = leftInset + index * stepX
+                    val y = size.height - bottomInset -
+                        (agg.totalAmount.toFloat() / maxAmount) * usableHeight
+                    Offset(x, y)
+                }
             }
         }
+
+        drawSeries(pointsFor(incomeTrends), CalPemasukan, 0.22f, 0.08f)
+        // Pengeluaran digambar belakangan supaya tidak tertutup garis pemasukan.
+        drawSeries(pointsFor(expenseTrends), CalPengeluaran, 0.28f, 0.10f)
+
+        // Poin penanda hanya bila jumlahnya masih terbaca; mode "Semua Bulan"
+        // bisa punya banyak titik dan akan berubah jadi kotak padat.
+        if (buckets in 2..40) {
+            pointsFor(expenseTrends).forEach { point ->
+                drawCircle(color = Color.White.copy(alpha = 0.20f), radius = 2.dp.toPx(), center = point)
+            }
+            pointsFor(incomeTrends).forEach { point ->
+                drawCircle(color = Color.White.copy(alpha = 0.16f), radius = 2.dp.toPx(), center = point)
+            }
+        }
+    }
+}
+
+/** Menggambar satu garis beserta areanya, dengan warna dan tingkat transparansi sendiri. */
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawSeries(
+    points: List<Offset>,
+    color: Color,
+    lineAlpha: Float,
+    fillAlpha: Float
+) {
+    if (points.isEmpty()) return
+
+    if (points.size > 1) {
+        val path = Path()
+        path.moveTo(points.first().x, points.first().y)
+        for (i in 0 until points.size - 1) {
+            val p0 = points[i]
+            val p1 = points[i + 1]
+            val cx = (p0.x + p1.x) / 2
+            path.cubicTo(cx, p0.y, cx, p1.y, p1.x, p1.y)
+        }
+
+        val fillPath = Path()
+        fillPath.addPath(path)
+        fillPath.lineTo(points.last().x, size.height)
+        fillPath.lineTo(points.first().x, size.height)
+        fillPath.close()
+
+        drawPath(path = fillPath, color = color.copy(alpha = fillAlpha))
+        drawPath(
+            path = path,
+            color = color.copy(alpha = lineAlpha),
+            style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round)
+        )
+    } else {
+        drawCircle(color = color.copy(alpha = lineAlpha), radius = 3.dp.toPx(), center = points.first())
     }
 }
