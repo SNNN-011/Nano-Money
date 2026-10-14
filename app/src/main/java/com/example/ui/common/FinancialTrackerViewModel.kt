@@ -31,9 +31,32 @@ import java.time.ZoneId
 import java.time.YearMonth
 import com.example.ui.config.FormatUtils
 
-/** Total seluruh riwayat, dipakai angka besar di header dashboard. */
+/** Saldo kumulatif sepanjang riwayat; tidak dibatasi bulan. */
 data class DashboardTotals(val income: Long, val expense: Long) {
     val balance: Long get() = income - expense
+}
+
+/** Pendapatan dan pengeluaran dalam satu bulan; mengikuti bulan yang sedang dipilih. */
+data class MonthTotals(val income: Long, val expense: Long)
+
+/**
+ * Menjumlah pendapatan dan pengeluaran dalam rentang tanggal tertentu.
+ *
+ * Fungsi murni supaya bisa diuji. Dipakai untuk angka PENDAPATAN dan PENGELUARAN di
+ * header, yang sengaja mengikuti bulan terpilih, bukan saldo kumulatif.
+ */
+internal fun computeMonthTotals(
+    records: List<FinancialRecord>,
+    startMs: Long,
+    endMs: Long
+): MonthTotals {
+    var income = 0L
+    var expense = 0L
+    for (record in records) {
+        if (record.date < startMs || record.date > endMs) continue
+        if (record.type == "income") income += record.amount else if (record.type == "expense") expense += record.amount
+    }
+    return MonthTotals(income, expense)
 }
 
 /**
@@ -261,23 +284,31 @@ class FinancialTrackerViewModel(
             .sumOf { it.amount }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0L)
 
-    // Angka besar di header adalah total SELURUH riwayat, bukan hanya bulan yang
-    // sedang dipilih. Bagian anggaran tetap per bulan dan sudah punya judul bulan
-    // sendiri, jadi keduanya tidak perlu dicampur.
+    // SALDO TOTAL: kumulatif sepanjang riwayat, tidak berubah saat bulan diputar.
+    // Ini yang menjelaskan berapa uang yang benar-benar ada sekarang, bukan berapa
+    // yang keluar bulan ini saja.
     private val dashboardTotals: StateFlow<DashboardTotals> = allRecords
         .map { records -> computeDashboardTotals(records) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), DashboardTotals(0L, 0L))
 
-    val totalIncome: StateFlow<Long> = dashboardTotals
+    val currentBalance: StateFlow<Long> = dashboardTotals
+        .map { it.balance }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0L)
+
+    // PENDAPATAN & PENGELUARAN: mengikuti bulan yang sedang dipilih, sama seperti
+    // bagian anggaran. Jadi memutar bulan ikut mengubah kedua angka ini, sedangkan
+    // SALDO TOTAL di atasnya tetap.
+    private val monthTotals: StateFlow<MonthTotals> = combine(allRecords, selectedBudgetOffset) { records, offset ->
+        val (rangeStart, rangeEnd) = getMonthRange(offset)
+        computeMonthTotals(records, rangeStart, rangeEnd)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), MonthTotals(0L, 0L))
+
+    val totalIncome: StateFlow<Long> = monthTotals
         .map { it.income }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0L)
 
-    val totalExpense: StateFlow<Long> = dashboardTotals
+    val totalExpense: StateFlow<Long> = monthTotals
         .map { it.expense }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0L)
-
-    val currentBalance: StateFlow<Long> = dashboardTotals
-        .map { it.balance }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0L)
 
     private fun getMonthRange(offset: Int): Pair<Long, Long> {
