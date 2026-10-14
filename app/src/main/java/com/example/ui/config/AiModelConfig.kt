@@ -3,10 +3,14 @@ package com.example.ui.config
 /**
  * Model AI untuk chat.
  *
- * Fallback TIDAK diatur berlapis di sini. Proxy Worker sudah menangani rantai model
- * beserta retry-nya, jadi satu permintaan dari aplikasi bisa menyentuh seluruh
- * rantai. Mencoba beberapa model dari aplikasi hanya memperpanjang waktu tunggu
- * tanpa menambah peluang berhasil.
+ * Rantai di bawah dipakai aplikasi, TIDAK hanya urutan preferensi: `parseTransaction`
+ * dan reader struk memang meng-loop daftar ini. Lapisan ini hanya berjalan setelah
+ * proxy Worker selesai mencoba rantainya sendiri dan tetap gagal, jadi bukan dua
+ * ladder yang berebutan.
+ *
+ * Kenapa tidak dihapus: Worker memakai nama model sebagai kunci chain-nya sendiri,
+ * dan kedua daftar harus tetap sinkron supaya permintaan tidak menyebut nama yang
+ * tidak dikenal Worker.
  *
  * Urutan di bawah hanya urutan preferensi. Angkanya berasal dari pengukuran latency
  * nyata ke /v1beta/models dengan kunci API, bukan tebakan nama model.

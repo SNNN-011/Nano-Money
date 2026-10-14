@@ -8,6 +8,7 @@ import com.example.data.remote.GeminiPart
 import com.example.data.remote.GeminiRequest
 import com.example.data.remote.GeminiSchemaOptions
 import com.example.data.remote.GeminiSchemaItem
+import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -23,6 +24,19 @@ class TransactionParserUseCase {
         incomeCategories: List<String>,
         expenseCategories: List<String>
     ): String {
+        // Kategori owner SUDAH dijamin minimal satu per tipe (softDelete menolak
+        // hapus kategori terakhir). Daftar kosong berarti ada bug di pemanggil,
+        // bukan state yang sah -- dan gejalanya jauh dari jelas: AI tetap
+        // membalas, tapi kategorinya meleset tanpa error apa pun. Dicatat di sini
+        // supaya kejadian yang sama bisa langsung terlihat di logcat.
+        if (incomeCategories.isEmpty() && expenseCategories.isEmpty()) {
+            Log.w(
+                "TransactionParser",
+                "Daftar kategori kosong saat prompt dibangun. AI tidak akan melihat kategori " +
+                    "milik user dan kemungkinan besar memilih kategori yang salah."
+            )
+        }
+
         val nowMs = System.currentTimeMillis()
         val zoneId = java.time.ZoneId.systemDefault()
         val localDate = try {

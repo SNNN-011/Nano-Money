@@ -55,13 +55,27 @@ class ChatViewModel(
         prefs
     )
 
+    /**
+     * Daftar kategori yang dikirim ke AI dan dipakai untuk pencocokan.
+     *
+     * WAJIB [SharingStarted.Eagerly], bukan WhileSubscribed. Aliran ini dibaca
+     * lewat `.value` dari beberapa tempat yang bukan composable -- saat membangun
+     * prompt dan saat menyimpan transaksi. Dengan WhileSubscribed,
+     * aliran hanya hidup selama ada collector, dan collector-nya yang ada
+     * (dialog konfirmasi) hanya tersusun ketika dialog itu terbuka. Akibatnya
+     * saat chat biasa, `.value` selalu kosong: prompt terkirim dengan
+     * "Daftar expense: []" dan AI tidak pernah melihat kategori milik user.
+     *
+     * Jangan dikembalikan ke WhileSubscribed tanpa menaikkan juga semua tempat
+     * yang membacanya ke collector.
+     */
     val incomeCategories: StateFlow<List<String>> = categoryRepository.observeByType("income")
         .map { list -> list.map { it.name } }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     val expenseCategories: StateFlow<List<String>> = categoryRepository.observeByType("expense")
         .map { list -> list.map { it.name } }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+        .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     /** Nama kategori yang sudah ada, untuk pengecekan duplikat sebelum menambah. */
     private suspend fun knownCategoryNames(): Set<String> =
@@ -384,26 +398,36 @@ class ChatViewModel(
     }
 
     /**
+     * Daftar kategori aktif untuk satu tipe, dibaca langsung dari Room.
+     *
+     * Sengaja tidak memakai `.value` dari [incomeCategories]/[expenseCategories].
+     * Kategori yang benar-benar tersimpan adalah keputusan akhir, jadi tidak
+     * boleh bergantung pada apakah sebuah StateFlow sempat ter-cache atau belum.
+     */
+    private suspend fun activeCategories(type: String): List<String> =
+        categoryRepository.getByType(type).map { it.name }
+
+    /**
      * Menentukan kategori transaksi dari jawaban AI.
      *
      * AI tidak pernah boleh membuat kategori dari jawabannya. Kalau boleh, model
      * akan mengarang kategori umum dari pengetahuannya sendiri ("Belanja",
-     * "Hiburan") lalu applikasi menyimpannya sebagai kategori aktif. Akibatnya
+     * "Hiburan") lalu aplikasi menyimpannya sebagai kategori aktif. Akibatnya
      * kategori yang SUDAH DIHAPUS user muncul kembali, karena pengecekan duplikat
      * hanya membandingkan kategori aktif.
      *
-     * Jadi jawaban yang tidak cocok Goes straight ke "Lainnya".
+     * Jadi jawaban yang tidak cocok langsung ke "Lainnya".
      *
      * Hanya kategori SESUAI TIPE yang dicocokkan. Kalau income dan expense digabung,
      * jawaban "Bonus" untuk sebuah pengeluaran akan nyangkut ke kategori income.
      */
-    private fun resolveCategory(type: String, aiCategory: String?): String {
-        val available = if (type == "income") incomeCategories.value else expenseCategories.value
+    private suspend fun resolveCategory(type: String, aiCategory: String?): String {
+        val available = activeCategories(type)
 
         return when (val result = com.example.domain.CategoryResolver.resolve(aiCategory, available)) {
             is com.example.domain.CategoryResolution.Matched -> result.category
             is com.example.domain.CategoryResolution.NeedsNewCategory ->
-                catchAllCategoryName(type)
+                catchAllCategoryName(type, available)
         }
     }
 
@@ -416,9 +440,8 @@ class ChatViewModel(
      * dipindahkan. Membuatkan kategori ini diam-diem di belakang layar justru
      * membatalkan pilihan user.
      */
-    private fun catchAllCategoryName(type: String): String {
+    private fun catchAllCategoryName(type: String, available: List<String>): String {
         val fallback = CATCH_ALL_CATEGORY
-        val available = if (type == "income") incomeCategories.value else expenseCategories.value
         return available.firstOrNull {
             com.example.domain.CategoryResolver.normalize(it) ==
                 com.example.domain.CategoryResolver.normalize(fallback)
