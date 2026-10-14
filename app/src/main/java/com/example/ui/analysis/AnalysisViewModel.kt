@@ -31,10 +31,10 @@ class AnalysisViewModel(
 ) : AndroidViewModel(application) {
 
     enum class PeriodFilter(val displayName: String) {
-        THIS_WEEK("Minggu"),
-        THIS_MONTH("Bulan"),
-        LAST_3_MONTHS("3 bulan"),
-        ALL_TIME("Semua")
+        /** Bulan yang sedang dibuka di kalender. */
+        THIS_MONTH("Bulan Ini"),
+        /** Seluruh riwayat. */
+        ALL_TIME("Semua Bulan")
     }
 
     private val _selectedPeriod = MutableStateFlow(PeriodFilter.THIS_MONTH)
@@ -60,7 +60,7 @@ class AnalysisViewModel(
         recordsFlow.map { records ->
             if (records.isEmpty()) return@map emptyList()
             
-            val format = if (period == PeriodFilter.LAST_3_MONTHS || period == PeriodFilter.ALL_TIME) {
+            val format = if (period == PeriodFilter.ALL_TIME) {
                 SimpleDateFormat("MMM yyyy", Locale.forLanguageTag("id-ID"))
             } else {
                 SimpleDateFormat("dd/MM", Locale.forLanguageTag("id-ID"))
@@ -144,14 +144,7 @@ class AnalysisViewModel(
         val now = LocalDate.now()
         val zoneId = ZoneId.systemDefault()
         return when (period) {
-            PeriodFilter.THIS_WEEK -> {
-                7
-            }
             PeriodFilter.THIS_MONTH -> calendarMonth.lengthOfMonth()
-            PeriodFilter.LAST_3_MONTHS -> {
-                val start = now.minusMonths(3)
-                java.time.temporal.ChronoUnit.DAYS.between(start, now).toInt() + 1
-            }
             PeriodFilter.ALL_TIME -> {
                 if (oldestDateMs == null) return 1
                 val oldest = java.time.Instant.ofEpochMilli(oldestDateMs)
@@ -166,25 +159,10 @@ class AnalysisViewModel(
         val now = LocalDate.now()
 
         return when (period) {
-            PeriodFilter.THIS_WEEK -> {
-                val referenceDate = if (calendarMonth == YearMonth.now()) now else calendarMonth.atDay(1)
-                val currentDayOfWeek = referenceDate.dayOfWeek.value
-                val firstDayOfWeek = referenceDate.minusDays((currentDayOfWeek - 1).toLong())
-                val lastDayOfWeek = firstDayOfWeek.plusDays(6)
-                val startMs = firstDayOfWeek.atStartOfDay(zoneId).toInstant().toEpochMilli()
-                val endMs = lastDayOfWeek.plusDays(1).atStartOfDay(zoneId).toInstant().toEpochMilli() - 1
-                startMs to endMs
-            }
             PeriodFilter.THIS_MONTH -> {
                 val startMs = calendarMonth.atDay(1).atStartOfDay(zoneId).toInstant().toEpochMilli()
                 val endMsSelected = calendarMonth.atEndOfMonth().plusDays(1).atStartOfDay(zoneId).toInstant().toEpochMilli() - 1
                 startMs to endMsSelected
-            }
-            PeriodFilter.LAST_3_MONTHS -> {
-                val referenceDate = if (calendarMonth == YearMonth.now()) now else calendarMonth.atEndOfMonth()
-                val startMs = referenceDate.minusMonths(3).withDayOfMonth(1).atStartOfDay(zoneId).toInstant().toEpochMilli()
-                val endMs = referenceDate.plusDays(1).atStartOfDay(zoneId).toInstant().toEpochMilli() - 1
-                startMs to endMs
             }
             PeriodFilter.ALL_TIME -> null to null
         }

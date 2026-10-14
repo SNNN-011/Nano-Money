@@ -56,6 +56,16 @@ fun CalendarTabContent(
     val transactionsByDate by calendarViewModel.transactionsByDate.collectAsState()
     val selectedDateTransactions by calendarViewModel.selectedDateTransactions.collectAsState()
 
+    // Chart latar mengikuti bulan yang sedang dibuka di kalender. Sebelumnya
+    // AnalysisViewModel punya bulan sendiri yang tidak pernah disinkronkan, jadi
+    // chart bisa menampilkan bulan yang berbeda dari kalender.
+    val backgroundTrends by analysisViewModel.dailyTrends.collectAsState()
+    val chartPeriod by analysisViewModel.selectedPeriod.collectAsState()
+
+    LaunchedEffect(currentYm) {
+        analysisViewModel.setCalendarMonth(currentYm)
+    }
+
     var showBottomSheet by remember { mutableStateOf(false) }
 
     // Prepare calendar grid
@@ -118,10 +128,18 @@ fun CalendarTabContent(
                     )
                 )
             ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
+                // Chart digambar lebih dulu di dalam Box ini, jadi posisinya di belakang
+                // sel kalender dan teks tanggal tetap terbaca di atasnya.
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    CalendarTrendBackdrop(
+                        trends = backgroundTrends,
+                        modifier = Modifier.matchParentSize()
+                    )
+
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
                     // Header navigasi bulan
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -270,6 +288,42 @@ fun CalendarTabContent(
                         }
                     }
                 }
+                }
+            }
+
+            // Mode grafik: hanya dua pilihan, "Bulan Ini" mengikuti kalender di atas.
+            Row(
+                modifier = Modifier.fillMaxWidth().testTag("calendar_chart_mode_row"),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                AnalysisViewModel.PeriodFilter.entries.forEach { period ->
+                    val isActive = chartPeriod == period
+                    Row(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(
+                                if (isActive) SteelBlue.copy(alpha = 0.25f) else Color.Transparent
+                            )
+                            .border(
+                                width = 1.dp,
+                                color = if (isActive) SteelBlue else GhostWhite.copy(alpha = 0.15f),
+                                shape = RoundedCornerShape(12.dp)
+                            )
+                            .clickable { analysisViewModel.setPeriod(period) }
+                            .padding(vertical = 10.dp)
+                            .testTag("calendar_chart_mode_${period.name}"),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = period.displayName,
+                            style = MaterialTheme.typography.labelMedium,
+                            fontWeight = FontWeight.Bold,
+                            color = if (isActive) CalTeksUtama else CalTeksSekunder
+                        )
+                    }
+                }
             }
 
             // Divider separating calendar and analysis
@@ -278,8 +332,12 @@ fun CalendarTabContent(
                 modifier = Modifier.padding(vertical = 8.dp)
             )
 
-            // Include analysis content directly within Kalender screen
-            AnalysisTabContent(viewModel = analysisViewModel)
+            // Ringkasan angka dan daftar kategori. Grafiknya sudah pindah ke
+            // belakang kalender, jadi tidak perlu diulang di sini.
+            AnalysisTabContent(
+                viewModel = analysisViewModel,
+                showCharts = false
+            )
         }
 
         // 1. Semi-transparent dimming background backdrop
