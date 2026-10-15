@@ -1,5 +1,6 @@
 package com.example.data
 
+import android.util.Log
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -53,13 +54,50 @@ class RecurringTransactionRepository(private val dao: RecurringTransactionDao) {
 
     suspend fun markSynced(syncKeys: List<String>) = dao.markSynced(syncKeys)
 
-    /** Menerapkan versi remote; dicocokkan lewat syncKey, updatedAt remote dipertahankan. */
-    suspend fun applyRemote(remote: RecurringTransaction) {
-        val existing = dao.findBySyncKey(remote.syncKey)
-        if (existing == null) {
-            dao.insertRecurring(remote)
-        } else {
-            dao.updateRecurring(remote.copy(id = existing.id))
+    /**
+     * H1: tandai SYNCED hanya untuk baris yang updatedAt-nya belum berubah sejak push.
+     */
+    suspend fun markSyncedIfUnchanged(items: List<Pair<String, Long>>) {
+        items.forEach { (syncKey, pushedUpdatedAt) ->
+            dao.markSyncedIfUnchanged(syncKey, pushedUpdatedAt)
         }
+    }
+
+    /**
+     * Menerapkan versi remote; dicocokkan lewat syncKey, updatedAt remote dipertahankan.
+     * H8: baris cloud yang rusak divalidasi dulu; yang tidak layak dilewati.
+     * Mengembalikan true bila baris benar-benar diterapkan.
+     */
+    suspend fun applyRemote(remote: RecurringTransaction): Boolean {
+        if (remote.syncKey.isBlank()) {
+            Log.w(TAG, "Recurring remote tanpa syncKey dilewati.")
+            return false
+        }
+        val normalized = remote.copy(type = FinancialRecordRepository.normalizeType(remote.type))
+        val valid = normalized.description.isNotBlank() &&
+            normalized.description.length <= FinancialRecordRepository.MAX_DESC_LENGTH &&
+            normalized.amount > 0L &&
+            normalized.amount <= FinancialRecordRepository.MAX_AMOUNT &&
+            normalized.type in TYPE_SET &&
+            normalized.category.isNotBlank() &&
+            normalized.category.length <= FinancialRecordRepository.MAX_CATEGORY_LENGTH &&
+            normalized.dayOfMonth in 1..31
+        if (!valid) {
+            Log.w(TAG, "Recurring remote tidak valid dilewati (syncKey='${remote.syncKey}').")
+            return false
+        }
+
+        val existing = dao.findBySyncKey(normalized.syncKey)
+        if (existing == null) {
+            dao.insertRecurring(normalized)
+        } else {
+            dao.updateRecurring(normalized.copy(id = existing.id))
+        }
+        return true
+    }
+
+    companion object {
+        private const val TAG = "RecurringTransactionRepository"
+        private val TYPE_SET = setOf("income", "expense")
     }
 }

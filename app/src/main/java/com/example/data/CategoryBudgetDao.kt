@@ -29,6 +29,14 @@ interface CategoryBudgetDao {
     @Query("UPDATE category_budgets SET syncStatus = 0 WHERE syncKey IN (:syncKeys)")
     suspend fun markSynced(syncKeys: List<String>)
 
+    /** H1: tandai SYNCED hanya bila updatedAt baris belum berubah sejak dibaca untuk push. */
+    @Query("UPDATE category_budgets SET syncStatus = 0 WHERE syncKey = :syncKey AND updatedAt = :pushedUpdatedAt")
+    suspend fun markSyncedIfUnchanged(syncKey: String, pushedUpdatedAt: Long)
+
+    /** Ganti akun (K5): kosongkan tabel; hanya isi yang dibuang, bukan skema/DB-nya. */
+    @Query("DELETE FROM category_budgets")
+    suspend fun deleteAllHard()
+
     @Query("UPDATE category_budgets SET syncStatus = 1, updatedAt = :now")
     suspend fun markAllPendingForRestore(now: Long)
 }

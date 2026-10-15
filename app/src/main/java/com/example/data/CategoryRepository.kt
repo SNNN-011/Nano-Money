@@ -28,7 +28,7 @@ class CategoryRepository(
 
     /** Mencari kategori berdasarkan nama (case-insensitive), untuk resolving id saat tulis. */
     suspend fun findByName(type: String, name: String): Category? =
-        dao.getByType(type).firstOrNull { it.name.trim().equals(name.trim(), ignoreCase = true) }
+        dao.findByTypeAndName(type, name)
 
     /** Peta id -> nama terbaru; dipakai tampilan agar rename langsung tercermin. */
     val nameById: Flow<Map<String, String>> = dao.observeAll().map { list ->
@@ -101,7 +101,36 @@ class CategoryRepository(
 
     suspend fun markSynced(syncKeys: List<String>) = dao.markSynced(syncKeys)
 
-    suspend fun applyRemote(remote: Category) = dao.upsertRemote(listOf(remote))
+    /**
+     * H1: tandai SYNCED hanya untuk baris yang updatedAt-nya belum berubah sejak push.
+     */
+    suspend fun markSyncedIfUnchanged(items: List<Pair<String, Long>>) {
+        items.forEach { (syncKey, pushedUpdatedAt) ->
+            dao.markSyncedIfUnchanged(syncKey, pushedUpdatedAt)
+        }
+    }
+
+    /**
+     * Menerapkan versi remote (updatedAt remote dipertahankan).
+     * H8: baris cloud yang rusak divalidasi dulu dan dilewati bila tidak layak.
+     */
+    suspend fun applyRemote(remote: Category) {
+        if (remote.id.isBlank() || remote.syncKey.isBlank()) {
+            Log.w(TAG, "Kategori remote tanpa id/syncKey dilewati.")
+            return
+        }
+        val name = remote.name.trim()
+        if (name.isEmpty() || name.length > FinancialRecordRepository.MAX_CATEGORY_LENGTH) {
+            Log.w(TAG, "Nama kategori remote tidak valid dilewati.")
+            return
+        }
+        val type = FinancialRecordRepository.normalizeType(remote.type)
+        if (type != CategoryMigration.TYPE_INCOME && type != CategoryMigration.TYPE_EXPENSE) {
+            Log.w(TAG, "Tipe kategori remote '$type' tidak dikenal, dilewati.")
+            return
+        }
+        dao.upsertRemote(listOf(remote.copy(name = name, type = type)))
+    }
 
     companion object {
         private const val TAG = "CategoryMigration"

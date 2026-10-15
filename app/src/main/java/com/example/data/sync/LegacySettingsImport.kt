@@ -3,6 +3,7 @@ package com.example.data.sync
 import com.example.data.Category
 import com.example.data.CategoryBudget
 import com.example.data.CategoryMigration
+import com.example.data.SyncableSettings
 import java.util.Locale
 
 /**
@@ -28,7 +29,9 @@ object LegacySettingsImport {
         val categories: List<Category>,
         val budgets: List<CategoryBudget>,
         /** Id kategori yang tidak ada, sehingga anggarannya tidak bisa dipasang. */
-        val orphanBudgets: List<String>
+        val orphanBudgets: List<String>,
+        /** M5: anggaran bulanan dari dokumen lawas, atau null bila tidak ada. */
+        val monthlyBudgetLimit: Long? = null
     )
 
     /**
@@ -76,10 +79,15 @@ object LegacySettingsImport {
         // bukan cuma yang ikut terimpor.
         val knownIds = existingCategoryIds + built.map { it.id }
 
+        // M5: dokumen lawas juga memuat anggaran bulanan. Tanpa ikut diimpor, nilainya
+        // hilang saat dokumen itu dihapus setelah migrasi.
+        val monthlyBudget = (docData[SyncableSettings.MONTHLY_BUDGET_LIMIT] as? Number)?.toLong()
+
         return Imported(
             categories = built.filter { it.id !in existingCategoryIds },
             budgets = budgets.filter { it.categoryId in knownIds },
-            orphanBudgets = orphans
+            orphanBudgets = orphans,
+            monthlyBudgetLimit = monthlyBudget
         )
     }
 
@@ -87,6 +95,7 @@ object LegacySettingsImport {
     fun isAllowedField(key: String): Boolean =
         key.lowercase(Locale.ROOT) == CategoryMigration.PREF_INCOME_LIST ||
             key.lowercase(Locale.ROOT) == CategoryMigration.PREF_EXPENSE_LIST ||
+            key.lowercase(Locale.ROOT) == SyncableSettings.MONTHLY_BUDGET_LIMIT ||
             key.lowercase(Locale.ROOT).startsWith(CategoryMigration.PREF_BUDGET_PREFIX)
 
     /** Hanya baris field yang diizinkan, sebagai pengaman tambahan. */
