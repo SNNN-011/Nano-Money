@@ -17,6 +17,7 @@ import com.example.data.ImportMode
 import com.example.data.RecurringTransaction
 import com.example.data.RecurringTransactionRepository
 import com.example.data.SyncableSettings
+import androidx.room.withTransaction
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -177,8 +178,10 @@ class FinancialTrackerViewModel(
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     // Form inputs state
-    var editingRecordId: Int? = null
-        private set
+    // L11: satu sumber kebenaran sebagai StateFlow supaya header "EDIT TRANSAKSI"
+    // dan tombol simpan ikut recompose saat mode edit berubah.
+    private val _editingRecordId = MutableStateFlow<Int?>(null)
+    val editingRecordId: StateFlow<Int?> = _editingRecordId.asStateFlow()
 
     val formDescription = MutableStateFlow("")
     val formAmount = MutableStateFlow("")
@@ -229,6 +232,14 @@ class FinancialTrackerViewModel(
 
     /** Peta categoryId -> nama terbaru; tampilan transaksi me-resolve lewat peta ini. */
     val categoryNameById: StateFlow<Map<String, String>> = categoryRepository.nameById
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
+
+    /**
+     * Jumlah transaksi aktif per nama kategori. Dipakai dialog hapus kategori (H7)
+     * untuk menyebut berapa transaksi yang akan dipindah ke "Lainnya".
+     */
+    val categoryRecordCounts: StateFlow<Map<String, Int>> = allRecords
+        .map { records -> records.groupingBy { it.category }.eachCount() }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
 
     /**
@@ -456,35 +467,60 @@ class FinancialTrackerViewModel(
         }
     }
 
-    fun addCategory(type: String, category: String): Boolean {
+    /**
+     * Menambah kategori. Hasil nyata dikembalikan (bukan selalu `true`) supaya
+     * dialog bisa menampilkan kegagalan, mis. duplikat beda huruf besar-kecil.
+     */
+    suspend fun addCategory(type: String, category: String): Boolean {
         val (_, cleanName) = com.example.ui.util.CategoryIconMapper.extractEmojiAndLabel(category.trim())
         val trimmed = cleanName.ifBlank { category.trim() }.trim()
         if (trimmed.isEmpty()) return false
-        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-            if (categoryRepository.add(type, trimmed) != null) pushPendingToCloud()
+        return withContext(Dispatchers.IO) {
+            val added = categoryRepository.add(type, trimmed) != null
+            if (added) {
+                pushPendingToCloud()
+                uiEvent.emit(UiEvent.ShowToast("Kategori \"$trimmed\" ditambahkan."))
+            }
+            added
         }
-        return true
     }
 
-    fun deleteCategory(type: String, category: String): Boolean {
+    /**
+     * Menghapus kategori: soft delete kategori + pindah transaksi (termasuk isi
+     * Sampah) + cabut anggaran, semuanya dalam SATU transaksi (H7). Gagal di
+     * tengah = rollback penuh; tidak ada transaksi yang menunjuk kategori mati.
+     */
+    suspend fun deleteCategory(type: String, category: String): Boolean {
         val trimmed = category.trim()
-        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-            val existing = categoryRepository.findByName(type, trimmed) ?: return@launch
-            if (!categoryRepository.softDelete(existing.id)) return@launch
+        return try {
+            val ok = appDb.withTransaction {
+                val existing = categoryRepository.findByName(type, trimmed) ?: return@withTransaction false
+                if (!categoryRepository.softDelete(existing.id)) return@withTransaction false
 
-            // Transaksi kategori yang dihapus pindah ke "Lainnya"; anggaran lamanya dilepas.
-            val fallback = categoryRepository.findByName(type, FALLBACK_CATEGORY_NAME)
-                ?: categoryRepository.add(type, FALLBACK_CATEGORY_NAME)
-            if (fallback != null) categoryCascade.applyMove(existing.id, fallback)
-            categoryBudgetRepository.setLimit(existing.id, 0L)
-
-            if (formCategory.value == trimmed) {
-                val replacement = fallback ?: categoryRepository.getByType(type).firstOrNull()
-                if (replacement != null) formCategory.value = replacement.name
+                val fallback = categoryRepository.findByName(type, FALLBACK_CATEGORY_NAME)
+                    ?: categoryRepository.add(type, FALLBACK_CATEGORY_NAME)
+                if (fallback != null) categoryCascade.applyMove(existing.id, fallback)
+                categoryBudgetRepository.setLimit(existing.id, 0L)
+                true
             }
-            pushPendingToCloud()
+            if (ok) {
+                if (formCategory.value == trimmed) {
+                    val replacement = categoryRepository.getByType(type).firstOrNull()
+                    if (replacement != null) formCategory.value = replacement.name
+                }
+                pushPendingToCloud()
+                uiEvent.emit(UiEvent.ShowToast("Kategori \"$trimmed\" dihapus."))
+            }
+            ok
+        } catch (e: Exception) {
+            uiEvent.emit(
+                UiEvent.ShowAlert(
+                    "Gagal Menghapus Kategori",
+                    "Kategori tidak dihapus: ${e.localizedMessage ?: "kesalahan database"}"
+                )
+            )
+            false
         }
-        return true
     }
 
     /**
@@ -507,7 +543,7 @@ class FinancialTrackerViewModel(
 
     fun setEditingRecord(record: FinancialRecord?) {
         if (record != null) {
-            editingRecordId = record.id
+            _editingRecordId.value = record.id
             formDescription.value = record.description
             val rawAmt = record.amount.toString()
             formAmount.value = FormatUtils.formatInputNumber(rawAmt)
@@ -524,7 +560,7 @@ class FinancialTrackerViewModel(
     }
 
     fun resetForm() {
-        editingRecordId = null
+        _editingRecordId.value = null
         formDescription.value = ""
         formAmount.value = ""
         formType.value = "income"
@@ -556,8 +592,12 @@ class FinancialTrackerViewModel(
         if (amtStr.isEmpty()) {
             amountError.value = "Jumlah tidak boleh kosong"
             isValid = false
-        } else if (amt == null || amt <= 0) {
+        } else if (amt == null || amt <= 0L) {
             amountError.value = "Jumlah harus berupa angka positif"
+            isValid = false
+        } else if (amt > FinancialRecordRepository.MAX_AMOUNT) {
+            // M12: batas atas eksplisit, bukan hanya toLongOrNull (overflow).
+            amountError.value = "Jumlah melebihi batas maksimum"
             isValid = false
         } else {
             amountError.value = null
@@ -573,8 +613,10 @@ class FinancialTrackerViewModel(
 
         if (!isValid) return false
 
+        // Ambil sekali supaya mode edit tidak berubah di tengah proses simpan.
+        val editingId = _editingRecordId.value
         val record = FinancialRecord(
-            id = editingRecordId ?: 0,
+            id = editingId ?: 0,
             description = desc,
             amount = amt ?: 0L,
             type = formType.value,
@@ -585,7 +627,7 @@ class FinancialTrackerViewModel(
 
         viewModelScope.launch {
             try {
-                if (editingRecordId != null) {
+                if (editingId != null) {
                     repository.update(record)
                     pushPendingToCloud()
                     com.example.util.TelemetryHelper.trackTransactionAction("edit", record.type, record.category, record.amount)
@@ -617,7 +659,7 @@ class FinancialTrackerViewModel(
                 pushPendingToCloud()
                 com.example.util.TelemetryHelper.trackTransactionAction("delete", record.type, record.category, record.amount)
                 uiEvent.emit(UiEvent.ShowToast("Transaksi berhasil dihapus!"))
-                if (editingRecordId == record.id) {
+                if (_editingRecordId.value == record.id) {
                     resetForm()
                 }
             } catch (e: Exception) {
@@ -724,13 +766,19 @@ class FinancialTrackerViewModel(
     /** Kategori yang muncul di data impor otomatis ditambahkan ke tabel kategori. */
     private suspend fun importCategoriesFromRecords(records: List<FinancialRecord>) {
         var modified = false
+        // M20: muat kategori sekali per tipe (hindari satu query per baris impor).
+        val knownByType = HashMap<String, MutableSet<String>>()
+        for (type in listOf("income", "expense")) {
+            knownByType[type] = categoryRepository.getByType(type)
+                .mapTo(HashSet()) { it.name.trim().lowercase() }
+        }
         for (record in records) {
             val (_, cat) = com.example.ui.util.CategoryIconMapper.extractEmojiAndLabel(record.category.trim())
             val cleanCat = cat.ifBlank { record.category.trim() }.trim()
             if (cleanCat.isEmpty()) continue
-            if (record.type != "income" && record.type != "expense") continue
+            val known = knownByType[record.type] ?: continue
 
-            if (categoryRepository.findByName(record.type, cleanCat) == null) {
+            if (known.add(cleanCat.lowercase())) {
                 if (categoryRepository.add(record.type, cleanCat) != null) modified = true
             }
         }
@@ -798,9 +846,25 @@ class FinancialTrackerViewModel(
         }
     }
 
+    /**
+     * Escape nilai CSV + netralkan formula spreadsheet (M9), sama seperti sisi impor:
+     * nilai berawalan `=`, `+`, `-`, `@`, tab, CR, LF diberi awalan apostrof supaya
+     * tidak dieksekusi sebagai formula saat file dibuka Excel/Sheets.
+     */
+    private fun escapeCsvField(field: String): String {
+        val neutralized = if (field.isNotEmpty() && field[0] in setOf('=', '+', '-', '@', '\t', '\r', '\n')) {
+            "'" + field
+        } else {
+            field
+        }
+        return "\"" + neutralized.replace("\"", "\"\"") + "\""
+    }
+
     // Export Excel/CSV logic
     fun getExportCsvString(selectedMonths: List<YearMonth>): String {
         val sb = java.lang.StringBuilder()
+        // BOM UTF-8 supaya Excel membaca file sebagai UTF-8, diikuti baris header.
+        sb.append('\uFEFF')
         sb.append("Deskripsi,Jumlah,Tipe,Kategori,Tanggal,Catatan\n")
         val sdf = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US)
         
@@ -813,18 +877,14 @@ class FinancialTrackerViewModel(
         }.sortedBy { it.date }
 
         filtered.forEach { record ->
-            fun escapeField(field: String): String {
-                val clean = field.replace("\"", "\"\"")
-                return "\"$clean\""
-            }
-            sb.append(escapeField(record.description)).append(",")
+            sb.append(escapeCsvField(record.description)).append(",")
             sb.append(record.amount).append(",")
             val typeLabel = if (record.type == "income") "Pemasukan" else "Pengeluaran"
-            sb.append(escapeField(typeLabel)).append(",")
-            sb.append(escapeField(record.category)).append(",")
+            sb.append(escapeCsvField(typeLabel)).append(",")
+            sb.append(escapeCsvField(record.category)).append(",")
             val formattedDate = sdf.format(java.util.Date(record.date))
-            sb.append(escapeField(formattedDate)).append(",")
-            sb.append(escapeField(record.notes)).append("\n")
+            sb.append(escapeCsvField(formattedDate)).append(",")
+            sb.append(escapeCsvField(record.notes)).append("\n")
         }
         return sb.toString()
     }
@@ -1430,7 +1490,9 @@ class FinancialTrackerViewModel(
                 recurringRepository.insert(recurring)
 
                 checkAndProcessRecurringTransactions()
-                
+                // L8: mutasi recurring juga harus mendorong antrean PENDING ke cloud,
+                // sama seperti transaksi biasa.
+                pushPendingToCloud()
                 uiEvent.emit(UiEvent.ShowToast("Transaksi berulang berhasil ditambahkan!"))
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -1444,6 +1506,7 @@ class FinancialTrackerViewModel(
             try {
                 // Soft delete: aksi hapus ikut tersinkron ke perangkat lain.
                 recurringRepository.softDelete(item)
+                pushPendingToCloud()
                 uiEvent.emit(UiEvent.ShowToast("Transaksi berulang berhasil dihapus!"))
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -1457,6 +1520,7 @@ class FinancialTrackerViewModel(
             try {
                 val updated = item.copy(isActive = !item.isActive)
                 recurringRepository.update(updated)
+                pushPendingToCloud()
                 
                 if (updated.isActive) {
                     checkAndProcessRecurringTransactions()
@@ -1530,6 +1594,8 @@ class FinancialTrackerViewModel(
                 }
                 
                 if (processedAny) {
+                    // Transaksi hasil recurring + perubahan lastRunDate ikut ter-push (L8).
+                    pushPendingToCloud()
                     uiEvent.emit(UiEvent.ShowToast("Transaksi berulang baru berhasil dimasukkan otomatis!"))
                 }
             } catch (e: Exception) {
