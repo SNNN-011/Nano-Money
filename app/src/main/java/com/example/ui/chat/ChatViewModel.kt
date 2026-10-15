@@ -6,7 +6,6 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.BuildConfig
 import com.example.data.AppDatabase
-import com.example.data.CategoryMigration
 import com.example.data.CategoryRepository
 import com.example.data.FinancialRecord
 import com.example.data.FinancialRecordRepository
@@ -77,27 +76,6 @@ class ChatViewModel(
     val expenseCategories: StateFlow<List<String>> = categoryRepository.observeByType("expense")
         .map { list -> list.map { it.name } }
         .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
-
-    /** Nama kategori yang sudah ada, untuk pengecekan duplikat sebelum menambah. */
-    private suspend fun knownCategoryNames(): Set<String> =
-        (incomeCategories.value + expenseCategories.value)
-            .mapTo(mutableSetOf()) { com.example.ui.util.CategoryIconMapper.extractEmojiAndLabel(it).second.trim() }
-
-    /**
-     * Menambah kategori baru. Id, updatedAt, dan status sync diisi repository.
-     *_duplikat dicek dari daftar Room yang sudah ada, bukan dari prefs._
-     */
-    suspend fun addCategory(type: String, category: String): Boolean {
-        val (_, cleanName) = com.example.ui.util.CategoryIconMapper.extractEmojiAndLabel(category.trim())
-        val trimmed = cleanName.ifBlank { category.trim() }.trim()
-        if (trimmed.isEmpty()) return false
-
-        val normalized = trimmed.lowercase()
-        if (knownCategoryNames().any { it.lowercase() == normalized }) return false
-
-        val normalizedType = if (type == "income") CategoryMigration.TYPE_INCOME else CategoryMigration.TYPE_EXPENSE
-        return categoryRepository.add(normalizedType, trimmed) != null
-    }
 
     private val _messages = MutableStateFlow<List<ChatMessage>>(
         listOf(

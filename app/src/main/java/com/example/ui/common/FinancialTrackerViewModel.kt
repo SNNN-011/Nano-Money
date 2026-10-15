@@ -327,17 +327,23 @@ class FinancialTrackerViewModel(
         }
     }
 
-    val monthlySpendingTotal: StateFlow<Long> = combine(allRecords, selectedBudgetOffset) { records, offset ->
-        val (rangeStart, rangeEnd) = getMonthRange(offset)
-        records.filter { it.type == "expense" && it.date in rangeStart..rangeEnd }
-            .sumOf { it.amount }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0L)
+    val monthlySpendingTotal: StateFlow<Long> = selectedBudgetOffset
+        .flatMapLatest { offset ->
+            val (rangeStart, rangeEnd) = getMonthRange(offset)
+            appDb.analysisDao().getTotalExpense(rangeStart, rangeEnd)
+        }
+        .map { it ?: 0L }
+        .distinctUntilChanged()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0L)
 
     // SALDO TOTAL: kumulatif sepanjang riwayat, tidak berubah saat bulan diputar.
     // Ini yang menjelaskan berapa uang yang benar-benar ada sekarang, bukan berapa
     // yang keluar bulan ini saja.
-    private val dashboardTotals: StateFlow<DashboardTotals> = allRecords
-        .map { records -> computeDashboardTotals(records) }
+    private val dashboardTotals: StateFlow<DashboardTotals> = combine(
+        appDb.analysisDao().getAllTimeTotalIncome(),
+        appDb.analysisDao().getAllTimeTotalExpense()
+    ) { income, expense -> DashboardTotals(income ?: 0L, expense ?: 0L) }
+        .distinctUntilChanged()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), DashboardTotals(0L, 0L))
 
     val currentBalance: StateFlow<Long> = dashboardTotals
@@ -347,10 +353,17 @@ class FinancialTrackerViewModel(
     // PENDAPATAN & PENGELUARAN: mengikuti bulan yang sedang dipilih, sama seperti
     // bagian anggaran. Jadi memutar bulan ikut mengubah kedua angka ini, sedangkan
     // SALDO TOTAL di atasnya tetap.
-    private val monthTotals: StateFlow<MonthTotals> = combine(allRecords, selectedBudgetOffset) { records, offset ->
-        val (rangeStart, rangeEnd) = getMonthRange(offset)
-        computeMonthTotals(records, rangeStart, rangeEnd)
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), MonthTotals(0L, 0L))
+    // M2: agregat bulanan dihitung SQL (AnalysisDao) dan berhenti memuat seluruh tabel.
+    private val monthTotals: StateFlow<MonthTotals> = selectedBudgetOffset
+        .flatMapLatest { offset ->
+            val (rangeStart, rangeEnd) = getMonthRange(offset)
+            combine(
+                appDb.analysisDao().getTotalIncome(rangeStart, rangeEnd),
+                appDb.analysisDao().getTotalExpense(rangeStart, rangeEnd)
+            ) { income, expense -> MonthTotals(income ?: 0L, expense ?: 0L) }
+        }
+        .distinctUntilChanged()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), MonthTotals(0L, 0L))
 
     val totalIncome: StateFlow<Long> = monthTotals
         .map { it.income }
