@@ -179,12 +179,16 @@ fun CategoryManagementDialog(
     formType: String,
     currentCategories: List<String>,
     onDismissRequest: () -> Unit,
-    onAddCategory: (String) -> Unit,
-    onDeleteCategory: (String) -> Boolean,
-    onRenameCategory: suspend (String, String) -> Boolean = { _, _ -> false }
+    onAddCategory: suspend (String) -> Boolean,
+    onDeleteCategory: suspend (String) -> Boolean,
+    onRenameCategory: suspend (String, String) -> Boolean = { _, _ -> false },
+    categoryRecordCounts: Map<String, Int> = emptyMap()
 ) {
     var newCategoryName by remember { mutableStateOf("") }
     var categoryNameError by remember { mutableStateOf<String?>(null) }
+
+    // H7: hapus kategori butuh konfirmasi; kategori yang menunggu konfirmasi disimpan di sini.
+    var pendingDeleteCategory by remember { mutableStateOf<String?>(null) }
 
     // Rename inline: ID kategori tidak berubah, hanya nama + updatedAt, sehingga
     // anggaran dan transaksi lama tetap tertaut dan ikut ikut nama baru.
@@ -296,14 +300,20 @@ fun CategoryManagementDialog(
                         Card(
                             onClick = {
                                 val trimmed = newCategoryName.trim()
-                                if (trimmed.isEmpty()) {
-                                    categoryNameError = "Nama tidak boleh kosong"
-                                } else if (currentCategories.contains(trimmed)) {
-                                    categoryNameError = "Kategori sudah ada"
-                                } else {
-                                    onAddCategory(trimmed)
-                                    newCategoryName = ""
-                                    categoryNameError = null
+                                when {
+                                    trimmed.isEmpty() -> categoryNameError = "Nama tidak boleh kosong"
+                                    // M13: cek duplikat case-insensitive SEBELUM submit.
+                                    currentCategories.any { it.equals(trimmed, ignoreCase = true) } ->
+                                        categoryNameError = "Kategori sudah ada"
+                                    else -> renameScope.launch {
+                                        val added = onAddCategory(trimmed)
+                                        if (added) {
+                                            newCategoryName = ""
+                                            categoryNameError = null
+                                        } else {
+                                            categoryNameError = "Gagal menambah kategori (mungkin sudah ada)"
+                                        }
+                                    }
                                 }
                             },
                             shape = RoundedCornerShape(CornerRadius.xl),
@@ -505,10 +515,9 @@ fun CategoryManagementDialog(
                                                     if (currentCategories.size <= 1) {
                                                         categoryNameError = "Tidak bisa menghapus kategori terakhir!"
                                                     } else {
-                                                        val deleted = onDeleteCategory(cat)
-                                                        if (!deleted) {
-                                                            categoryNameError = "Gagal menghapus kategori!"
-                                                        }
+                                                        // H7: selalu lewat dialog konfirmasi,
+                                                        // jangan langsung eksekusi.
+                                                        pendingDeleteCategory = cat
                                                     }
                                                 },
                                                 modifier = Modifier
@@ -545,6 +554,68 @@ fun CategoryManagementDialog(
             }
         }
     }
+
+    // H7: konfirmasi sebelum menghapus; sebutkan berapa transaksi yang ikut dipindah.
+    val deletingCategory = pendingDeleteCategory
+    if (deletingCategory != null) {
+        val movedCount = categoryRecordCounts[deletingCategory] ?: 0
+        val fallbackName = FinancialTrackerViewModel.FALLBACK_CATEGORY_NAME
+        AlertDialog(
+            onDismissRequest = { pendingDeleteCategory = null },
+            containerColor = MidnightAbyss,
+            title = {
+                Text(
+                    text = "Hapus Kategori?",
+                    color = GhostWhite,
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Text(
+                    text = if (movedCount > 0) {
+                        "Kategori \"$deletingCategory\" akan dihapus. $movedCount transaksi akan dipindah ke \"$fallbackName\"."
+                    } else {
+                        "Kategori \"$deletingCategory\" akan dihapus. Transaksi pada kategori ini akan dipindah ke \"$fallbackName\"."
+                    },
+                    color = GhostWhite.copy(alpha = 0.8f)
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        renameScope.launch {
+                            val deleted = onDeleteCategory(deletingCategory)
+                            pendingDeleteCategory = null
+                            categoryNameError = if (deleted) null else "Gagal menghapus kategori!"
+                        }
+                    },
+                    modifier = Modifier.testTag("confirm_delete_category_button")
+                ) {
+                    Text("Ya, Hapus", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = { pendingDeleteCategory = null },
+                    modifier = Modifier.testTag("dismiss_delete_category_button")
+                ) {
+                    Text("Batal", color = GhostWhite.copy(alpha = 0.7f))
+                }
+            }
+        )
+    }
+}
+
+/**
+ * M12: parse nominal anggaran. Hanya digit yang diterima (titik dianggap
+ * pemisah ribuan dari formatter), wajib 1..MAX_AMOUNT. Kosong, NaN, negatif,
+ * maupun nilai tak terbatas semuanya menghasilkan null.
+ */
+private fun parseBudgetInput(raw: String): Long? {
+    val clean = raw.replace(".", "").trim()
+    if (clean.isEmpty() || !clean.all { it.isDigit() }) return null
+    val parsed = clean.toLongOrNull() ?: return null
+    return if (parsed in 1..com.example.data.FinancialRecordRepository.MAX_AMOUNT) parsed else null
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -687,8 +758,10 @@ fun MonthlyBudgetDialog(
                 OutlinedTextField(
                     value = budgetInput,
                     onValueChange = { field ->
-                        val clean = field.text.replace(".", "").filter { it.isDigit() }
-                        if (clean.length <= 11) {
+                        // M12: sama seperti field transaksi — hanya digit + pemisah ribuan
+                        // yang boleh masuk; huruf/koma ditolak, bukan ditampilkan apa adanya.
+                        val clean = field.text.replace(".", "")
+                        if (clean.length <= 11 && (clean.isEmpty() || clean.all { it.isDigit() })) {
                             budgetInput = FormatUtils.formatInputNumberPreserveCursor(field)
                         }
                         budgetError = null
@@ -1032,8 +1105,9 @@ fun MonthlyBudgetDialog(
                                     OutlinedTextField(
                                         value = localState.value,
                                         onValueChange = { field ->
-                                            val clean = field.text.replace(".", "").filter { it.isDigit() }
-                                            if (clean.length <= 11) {
+                                            // M12: hanya digit; huruf/koma tidak pernah tampil.
+                                            val clean = field.text.replace(".", "")
+                                            if (clean.length <= 11 && (clean.isEmpty() || clean.all { it.isDigit() })) {
                                                 localState.value = FormatUtils.formatInputNumberPreserveCursor(field)
                                                 localCategoryBudgets[category] = clean
                                             }
@@ -1106,32 +1180,27 @@ fun MonthlyBudgetDialog(
                     isActive = false,
                     testTag = "cancel_budget_button"
                 )
+                val parsedBudget = parseBudgetInput(budgetInput.text)
                  PremiumButton(
                     text = "Simpan",
+                    enabled = parsedBudget != null,
                     onClick = {
-                        val cleanDigits = budgetInput.text.filter { it.isDigit() }
-                        if (cleanDigits.isEmpty()) {
-                            budgetError = "Harap masukkan nilai anggaran"
+                        if (parsedBudget == null) {
+                            budgetError = "Nilai anggaran tidak valid"
                         } else {
-                            val parsed = cleanDigits.toLongOrNull()
-                            if (parsed == null || parsed < 0L) {
-                                budgetError = "Nilai harus berupa angka positif"
-                            } else {
-                                val resultBudgets = mutableMapOf<String, Long>()
-                                selectedEnabledCategories.forEach { cat ->
-                                    val valStr = localCategoryBudgets[cat] ?: ""
-                                    val cleanVal = valStr.filter { it.isDigit() }
-                                    val parsedVal = cleanVal.toLongOrNull()
-                                    if (parsedVal != null && parsedVal > 0L) {
-                                        resultBudgets[cat] = parsedVal
-                                    }
+                            budgetError = null
+                            val resultBudgets = mutableMapOf<String, Long>()
+                            selectedEnabledCategories.forEach { cat ->
+                                val parsedVal = (localCategoryBudgets[cat] ?: "").toLongOrNull()
+                                if (parsedVal != null && parsedVal > 0L) {
+                                    resultBudgets[cat] = parsedVal
                                 }
-                                onConfirm(parsed, resultBudgets)
                             }
+                            onConfirm(parsedBudget, resultBudgets)
                         }
                     },
                     modifier = Modifier.weight(1f),
-                    isActive = true,
+                    isActive = parsedBudget != null,
                     testTag = "save_budget_button"
                 )
             }
@@ -1361,8 +1430,9 @@ fun RecurringTransactionManagementDialog(
                     OutlinedTextField(
                         value = amountInput,
                         onValueChange = { field ->
-                            val clean = field.text.replace(".", "").filter { it.isDigit() }
-                            if (clean.length <= 11) {
+                            // M12: hanya digit + pemisah ribuan; huruf/koma ditolak sejak awal.
+                            val clean = field.text.replace(".", "")
+                            if (clean.length <= 11 && (clean.isEmpty() || clean.all { it.isDigit() })) {
                                 amountInput = FormatUtils.formatInputNumberPreserveCursor(field)
                             }
                             amountError = null
@@ -1592,6 +1662,15 @@ fun RecurringTransactionManagementDialog(
             }
             Spacer(modifier = Modifier.height(16.dp))
             if (isAddingNew) {
+                // M12: validasi live; tombol simpan nonaktif sampai semua nilai valid.
+                val recurringAmount = amountInput.text.replace(".", "").trim().toLongOrNull()
+                val recurringDay = dayInput.trim().toIntOrNull()
+                val recurringFormValid = descInput.trim().isNotEmpty() &&
+                    recurringAmount != null &&
+                    recurringAmount in 1..com.example.data.FinancialRecordRepository.MAX_AMOUNT &&
+                    recurringDay != null && recurringDay in 1..31 &&
+                    categoryInput.isNotBlank()
+
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -1605,29 +1684,13 @@ fun RecurringTransactionManagementDialog(
                     PremiumButton(
                         text = "Simpan",
                         onClick = {
-                            var valid = true
-                            if (descInput.trim().isEmpty()) {
-                                descError = "Harap masukkan deskripsi"
-                                valid = false
-                            }
-                            val amt = amountInput.text.replace(".", "").trim().toLongOrNull()
-                            if (amt == null || amt <= 0L) {
-                                amountError = "Nilai harus berupa angka positif"
-                                valid = false
-                            }
-                            val day = dayInput.trim().toIntOrNull()
-                            if (day == null || day < 1 || day > 31) {
-                                dayError = "Tanggal harus antara 1-31"
-                                valid = false
-                            }
-
-                            if (valid && amt != null && day != null) {
+                            if (recurringFormValid && recurringAmount != null && recurringDay != null) {
                                 onAddRecurring(
                                     descInput.trim(),
-                                    amt,
+                                    recurringAmount,
                                     typeInput,
                                     categoryInput,
-                                    day,
+                                    recurringDay,
                                     notesInput.trim()
                                 )
                                 // Clear fields & go back to list
@@ -1639,8 +1702,17 @@ fun RecurringTransactionManagementDialog(
                             }
                         },
                         modifier = Modifier.weight(1f),
-                        isActive = true,
+                        isActive = recurringFormValid,
+                        enabled = recurringFormValid,
                         testTag = "recurring_save_submit"
+                    )
+                }
+                if (!recurringFormValid) {
+                    Text(
+                        text = "Lengkapi deskripsi, jumlah, kategori, dan tanggal (1-31) sebelum menyimpan.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = GhostWhite.copy(alpha = 0.5f),
+                        modifier = Modifier.padding(top = 8.dp)
                     )
                 }
             } else {

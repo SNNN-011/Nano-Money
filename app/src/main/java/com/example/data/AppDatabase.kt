@@ -18,7 +18,7 @@ import com.example.util.DatabaseKeyManager
         CategoryBudget::class,
         AppSetting::class
     ],
-    version = 7,
+    version = 8,
     exportSchema = true
 )
 @TypeConverters(AppDatabase.Converters::class)
@@ -151,48 +151,133 @@ abstract class AppDatabase : RoomDatabase() {
          * dobel di aplikasi. Migrasi ini mengembalikan kunci aslinya: "t:legacy:<id>"
          * menjadi "<id>".
          *
-         * Kalau baris "<id>" sudah ada (diambil dari cloud), isi baris "t:legacy:" yang
-         * dipertahankan karena itu versi lokal terbaru, dan baris "<id>" dihapus.
-         * Hasilnya tepat satu baris per transaksi, tidak ada yang hilang.
+         * M3: kalau baris "<id>" sudah ada (diambil dari cloud), pemenangnya dipilih
+         * lewat updatedAt terbesar, bukan buta-buta membuang baris tujuan. Data
+         * duplikat murni (syncKey identik) dibersihkan lebih dulu supaya pembuatan
+         * UNIQUE INDEX di akhir migrasi tidak pernah gagal karena data kotor.
          */
         val MIGRATION_6_7 = object : androidx.room.migration.Migration(6, 7) {
             override fun migrate(database: androidx.sqlite.db.SupportSQLiteDatabase) {
-                repairLegacyKeys(database, "financial_records", "t:legacy:", now = null)
-                repairLegacyKeys(database, "recurring_transactions", "t:legacy:", now = null)
+                repairLegacyKeys(database, "financial_records", "t:legacy:")
+                repairLegacyKeys(database, "recurring_transactions", "t:legacy:")
             }
         }
 
         /**
-         * Menamai ulang syncKey berawalan [prefix] menjadi bagian setelah prefix,
-         * menghapus baris lama yang bertabrakan dengan kunci tujuan.
+         * v7 -> v8: indeks kolom panas (audit M1). Nama indeks harus persis sama
+         * dengan default Room untuk @Index di [FinancialRecord], karena Room
+         * memvalidasi skema hasil migrasi terhadap anotasi entity.
+         */
+        val MIGRATION_7_8 = object : androidx.room.migration.Migration(7, 8) {
+            override fun migrate(database: androidx.sqlite.db.SupportSQLiteDatabase) {
+                database.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_financial_records_isDeleted_date` " +
+                        "ON `financial_records` (`isDeleted`, `date`)"
+                )
+                database.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_financial_records_categoryId` " +
+                        "ON `financial_records` (`categoryId`)"
+                )
+                database.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_financial_records_syncStatus` " +
+                        "ON `financial_records` (`syncStatus`)"
+                )
+            }
+        }
+
+        /** Satu baris ringkas untuk keputusan dedupe saat migrasi. */
+        private data class KeyRow(
+            val id: Long,
+            val key: String,
+            val updatedAt: Long,
+            val isDeleted: Long
+        )
+
+        private fun readKeyRows(
+            db: androidx.sqlite.db.SupportSQLiteDatabase,
+            table: String,
+            where: String,
+            args: Array<out Any?>
+        ): List<KeyRow> {
+            val rows = mutableListOf<KeyRow>()
+            db.query("SELECT `id`, `syncKey`, `updatedAt`, `isDeleted` FROM `$table` $where", args).use { c ->
+                while (c.moveToNext()) {
+                    rows += KeyRow(c.getLong(0), c.getString(1), c.getLong(2), c.getLong(3))
+                }
+            }
+            return rows
+        }
+
+        /** Pemenang: updatedAt terbesar; seri -> baris tidak terhapus; seri -> id terbesar. */
+        private fun winnerOf(rows: List<KeyRow>): KeyRow? =
+            rows.maxWithOrNull(compareBy({ it.updatedAt }, { if (it.isDeleted == 0L) 1 else 0 }, { it.id }))
+
+        private fun deleteKeyRows(db: androidx.sqlite.db.SupportSQLiteDatabase, table: String, ids: List<Long>) {
+            if (ids.isEmpty()) return
+            db.execSQL("DELETE FROM `$table` WHERE `id` IN (${ids.joinToString(",")})")
+        }
+
+        /**
+         * Menamai ulang syncKey berawalan [prefix] menjadi bagian setelah prefix.
+         *
+         * Urutannya: (1) buang duplikat syncKey murni (kalau ada, dari lineage
+         * yang indeks uniknya hilang), (2) selesaikan konflik "t:legacy:<id>" vs
+         * "<id>" dengan membandingkan updatedAt — baris terbaru menang, seri penuh
+         * dimenangkan baris lokal lama seperti perilaku migrasi sebelumnya,
+         * (3) baru rename sisanya, (4) pastikan UNIQUE INDEX ada.
          */
         private fun repairLegacyKeys(
             db: androidx.sqlite.db.SupportSQLiteDatabase,
             table: String,
-            prefix: String,
-            now: Long?
+            prefix: String
         ) {
             if (!tableExists(db, table)) return
-            val updatedAt = if (now != null) "$now" else "`updatedAt`"
+            val cols = columnsOf(db, table)
+            if ("syncKey" !in cols || "updatedAt" !in cols || "isDeleted" !in cols) return
 
-            // Baris tujuan yang sudah ada dibuang lebih dulu; isinya digantikan baris
-            // "t:legacy:" karena itu versi lokal terbaru.
-            db.execSQL(
-                """
-                DELETE FROM `$table`
-                WHERE `syncKey` IN (
-                    SELECT substr(`syncKey`, ${prefix.length + 1}) FROM `$table` WHERE `syncKey` LIKE '${prefix}%'
-                ) AND `syncKey` NOT LIKE '${prefix}%'
-                """.trimIndent()
-            )
+            // 1) syncKey identik: sisakan satu baris terbaik dulu supaya rename di
+            //    langkah 3 dan UNIQUE INDEX di langkah 4 tidak pernah menabrak.
+            val duplicateKeys = mutableListOf<String>()
+            db.query("SELECT `syncKey` FROM `$table` GROUP BY `syncKey` HAVING COUNT(*) > 1").use { c ->
+                while (c.moveToNext()) duplicateKeys += c.getString(0)
+            }
+            for (key in duplicateKeys) {
+                val rows = readKeyRows(db, table, "WHERE `syncKey` = ?", arrayOf(key))
+                val winner = winnerOf(rows) ?: continue
+                deleteKeyRows(db, table, rows.filter { it.id != winner.id }.map { it.id })
+            }
+
+            // 2) Konflik kunci lama vs kunci tujuan: SIMPAN yang updatedAt-nya
+            //    terbesar, jangan buang baris tujuan tanpa perbandingan.
+            val legacyRows = readKeyRows(db, table, "WHERE `syncKey` LIKE ?", arrayOf("$prefix%"))
+            for (legacy in legacyRows) {
+                val destination = readKeyRows(
+                    db, table, "WHERE `syncKey` = ?", arrayOf(legacy.key.removePrefix(prefix))
+                ).firstOrNull { !it.key.startsWith(prefix) } ?: continue
+
+                val destinationWins = destination.updatedAt > legacy.updatedAt ||
+                    (destination.updatedAt == legacy.updatedAt && destination.isDeleted < legacy.isDeleted)
+                if (destinationWins) {
+                    deleteKeyRows(db, table, listOf(legacy.id))
+                } else {
+                    deleteKeyRows(db, table, listOf(destination.id))
+                }
+            }
+
+            // 3) Sisa kunci lama memakai kunci aslinya. Kunci kosong dilewati karena
+            //    bukan id dokumen yang sah.
             db.execSQL(
                 """
                 UPDATE `$table`
                 SET `syncKey` = substr(`syncKey`, ${prefix.length + 1}),
-                    `syncStatus` = 1,
-                    `updatedAt` = $updatedAt
-                WHERE `syncKey` LIKE '${prefix}%'
+                    `syncStatus` = 1
+                WHERE `syncKey` LIKE '${prefix}%' AND length(`syncKey`) > ${prefix.length}
                 """.trimIndent()
+            )
+
+            // 4) Unique index dipastikan ada setelah data bersih (M3).
+            db.execSQL(
+                "CREATE UNIQUE INDEX IF NOT EXISTS `index_${table}_syncKey` ON `$table` (`syncKey`)"
             )
         }
 
@@ -571,7 +656,8 @@ abstract class AppDatabase : RoomDatabase() {
                     MIGRATION_3_4,
                     MIGRATION_4_5,
                     MIGRATION_5_6,
-                    MIGRATION_6_7
+                    MIGRATION_6_7,
+                    MIGRATION_7_8
                 )
                 // Sengaja TIDAK memakai fallbackToDestructiveMigration(): kalau ada
                 // versi DB tanpa migrasi, aplikasi harus error dengan jelas, bukan

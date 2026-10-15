@@ -8,7 +8,14 @@ import java.io.Serializable
 
 @Entity(
     tableName = "financial_records",
-    indices = [Index(value = ["syncKey"], unique = true)]
+    indices = [
+        Index(value = ["syncKey"], unique = true),
+        // M1: kolom panas. Daftar utama & agregat bulanan memfilter isDeleted + date,
+        // pemindahan kategori memfilter categoryId, dan antrean sinkron syncStatus = 1.
+        Index(value = ["isDeleted", "date"]),
+        Index(value = ["categoryId"]),
+        Index(value = ["syncStatus"])
+    ]
 )
 data class FinancialRecord(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
