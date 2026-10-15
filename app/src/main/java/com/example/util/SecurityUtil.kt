@@ -14,7 +14,9 @@ object SecurityUtil {
 
     /**
      * Detects dynamic instrumentation (e.g., Frida, Xposed) and active debuggers.
-     * If detected, immediately terminates the application.
+     * L3: tidak lagi memanggil exitProcess — penutupan paksa menyamarkan diri sebagai
+     * keluar normal, rawan false-positive, dan menghilangkan kesempatan user menyelamatkan
+     * data. Cukup catat peringatan; pemanggil menjalankan cek ini di Dispatchers.IO.
      */
     private fun checkDebuggingAndHooks() {
         try {
@@ -25,8 +27,7 @@ object SecurityUtil {
                     if (line.startsWith("TracerPid:")) {
                         val pid = line.substringAfter("TracerPid:").trim().toIntOrNull()
                         if (pid != null && pid > 0) {
-                            SecureLog.e(TAG, "Debugger detected! TracerPid: $pid")
-                            kotlin.system.exitProcess(0)
+                            SecureLog.w(TAG, "Debugger detected! TracerPid: $pid")
                         }
                     }
                 }
@@ -42,8 +43,7 @@ object SecurityUtil {
                         lowerLine.contains("edxposed") ||
                         lowerLine.contains("lsposed") ||
                         lowerLine.contains("substrate")) {
-                        SecureLog.e(TAG, "Hooking framework detected via memory map scan")
-                        kotlin.system.exitProcess(0) // Forcefully exit
+                        SecureLog.w(TAG, "Hooking framework detected via memory map scan")
                     }
                 }
             }
@@ -90,9 +90,10 @@ object SecurityUtil {
     }
 
     /**
-     * Determines whether the app should block execution based on security policies:
-     * - If device is rooted, block access.
-     * - If device is an emulator and this is a release build (not DEBUG), block access.
+     * Determines the device security posture.
+     * L3: keputusan TIDAK lagi memblokir eksekusi app; hasilnya dipakai untuk peringatan
+     * (fail-open terkendali). Cek berat (exec `su`, scan file) harus dipanggil dari
+     * Dispatchers.IO oleh pemanggil agar main thread tidak ANR.
      */
     fun checkSecurityStatus(context: Context): SecurityStatus {
         checkDebuggingAndHooks()
@@ -103,9 +104,9 @@ object SecurityUtil {
 
         if (isEmulator(context)) {
             // Under normal developer conditions (DEBUG build), emulator is allowed.
-            // On Release builds, emulator execution is strictly forbidden.
+            // On Release builds, emulator execution is flagged for warning.
             if (!BuildConfig.DEBUG) {
-                SecureLog.w(TAG, "Security Violation: Running on emulator in release build.")
+                SecureLog.w(TAG, "Security Warning: Running on emulator in release build.")
                 return SecurityStatus.EMULATOR_RELEASE
             }
         }

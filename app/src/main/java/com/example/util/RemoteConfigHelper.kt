@@ -22,7 +22,7 @@ object RemoteConfigHelper {
     private val _showNewFeature = MutableStateFlow(false)
     val showNewFeature: StateFlow<Boolean> = _showNewFeature.asStateFlow()
 
-    private val _enableTelemetry = MutableStateFlow(true)
+    private val _enableTelemetry = MutableStateFlow(false) // M15: default OFF (opt-in lokal)
     val enableTelemetry: StateFlow<Boolean> = _enableTelemetry.asStateFlow()
 
     private val _preventScreenshot = MutableStateFlow(true)
@@ -41,7 +41,7 @@ object RemoteConfigHelper {
             "welcome_message" to "Selamat Datang!",
             "welcome_message_color" to "#4682B4",
             "show_new_feature" to false,
-            "enable_telemetry" to true,
+            "enable_telemetry" to false, // M15: remote tidak boleh menyalakan telemetri
             "prevent_screenshot" to true
         )
         remoteConfig.setDefaultsAsync(defaultValues)
@@ -91,10 +91,12 @@ object RemoteConfigHelper {
         
         _showNewFeature.value = remoteConfig.getBoolean("show_new_feature")
 
-        val telemetryEnabled = remoteConfig.getBoolean("enable_telemetry")
-        _enableTelemetry.value = telemetryEnabled
-        TelemetryHelper.setTelemetryEnabled(telemetryEnabled)
+        // M15: telemetri murni opt-in lokal user (default OFF) — Remote Config tidak bisa
+        // menyalakan maupun mematikan. Flow ini hanya mencerminkan status lokal yang nyata.
+        _enableTelemetry.value = TelemetryHelper.isOptedInLocally()
 
+        // M16: remote hanya boleh memperkuat proteksi screenshot; penggabungan dengan
+        // pref lokal user dilakukan di MainActivity (efektif = lokal OR remote).
         _preventScreenshot.value = remoteConfig.getBoolean("prevent_screenshot")
     }
 }

@@ -5,8 +5,15 @@
 # For more details, see
 #   http://developer.android.com/guide/developing/tools/proguard.html
 
-# Preserve annotations, signatures, and line numbers of stack traces for debugging
--keepattributes *Annotation*,Signature,InnerClasses,EnclosingMethod,SourceFile,LineNumberTable
+# Preserve annotations, signatures, and inner-class metadata needed at runtime.
+# L2: SourceFile & LineNumberTable SENGAJA tidak dipertahankan — nama file dan nomor baris
+# tidak boleh bocor di stack trace rilis (deobfuscation tetap pakai mapping.txt).
+-keepattributes *Annotation*,Signature,InnerClasses,EnclosingMethod
+
+# L2: aturan keep konservatif untuk kelas yang diinstansiasi via refleksi oleh framework.
+# WorkManager membangun ulang Worker berdasarkan nama kelas (bukan referensi langsung runtime),
+# jadi paket worker dijaga utuh.
+-keep class com.example.worker.** { *; }
 
 # Keep only standard non-sensitive BuildConfig fields needed at runtime
 -keep class com.example.BuildConfig {

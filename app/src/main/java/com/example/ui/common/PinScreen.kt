@@ -53,6 +53,18 @@ fun PinScreen(
     var currentInput by remember { mutableStateOf("") }
     var error by remember { mutableStateOf<String?>(null) }
     var isVerifying by remember { mutableStateOf(false) }
+    // H3: lockout PIN — sisa waktu terkunci (ms); 5 gagal → 30 dtk, 10 → 5 mnt, 15 → 30 mnt
+    var lockRemainingMs by remember { mutableStateOf(0L) }
+    LaunchedEffect(Unit) {
+        lockRemainingMs = PinUtils.lockoutRemainingMillis(context)
+    }
+    // hitung mundur sampai lockout berakhir (tick 1 detik)
+    LaunchedEffect(lockRemainingMs) {
+        if (lockRemainingMs > 0) {
+            kotlinx.coroutines.delay(1000)
+            lockRemainingMs = PinUtils.lockoutRemainingMillis(context)
+        }
+    }
     // Shake animation for wrong PIN
     val shakeOffset = remember { Animatable(0f) }
     // Pulse animation for verifying state
@@ -199,19 +211,30 @@ fun PinScreen(
                 }
             }
 
+            // H3: info sisa waktu lockout
+            if (lockRemainingMs > 0) {
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(
+                    text = "Terlalu banyak percobaan PIN. Coba lagi dalam ${formatLockRemaining(lockRemainingMs)}",
+                    color = ErrorRed,
+                    fontSize = 13.sp,
+                    textAlign = TextAlign.Center
+                )
+            }
+
             Spacer(modifier = Modifier.height(40.dp))
 
             // --- Numeric Keypad ---
             PinNumericKeypad(
                 onDigit = { digit ->
-                    if (isVerifying) return@PinNumericKeypad
+                    if (isVerifying || lockRemainingMs > 0) return@PinNumericKeypad
                     if (error != null) error = null
                     if (currentInput.length < 6) {
                         currentInput += digit
                     }
                 },
                 onDelete = {
-                    if (isVerifying) return@PinNumericKeypad
+                    if (isVerifying || lockRemainingMs > 0) return@PinNumericKeypad
                     if (error != null) error = null
                     if (currentInput.isNotEmpty()) {
                         currentInput = currentInput.dropLast(1)
@@ -222,7 +245,7 @@ fun PinScreen(
             Spacer(modifier = Modifier.height(20.dp))
 
             // --- Konfirmasi / Submit Button ---
-            val canSubmit = currentInput.length in 4..6 && !isVerifying
+            val canSubmit = currentInput.length in 4..6 && !isVerifying && lockRemainingMs <= 0
             val coroutineScope = rememberCoroutineScope()
 
             GlassSubmitButton(
@@ -250,6 +273,8 @@ fun PinScreen(
                                 } else {
                                     error = "PIN salah"
                                     currentInput = ""
+                                    // H3: refresh sisa waktu lockout setelah gagal
+                                    lockRemainingMs = PinUtils.lockoutRemainingMillis(context)
                                     triggerShake()
                                 }
                             }
@@ -535,4 +560,62 @@ fun PinUnlockScreen(
         onSuccess = { onUnlocked() },
         onBack = onExit
     )
+}
+
+/** H3: format sisa lockout jadi mm:ss (pembulatan ke atas). */
+private fun formatLockRemaining(ms: Long): String {
+    val totalSeconds = (ms + 999L) / 1000L
+    return "%02d:%02d".format(totalSeconds / 60L, totalSeconds % 60L)
+}
+
+/**
+ * H4a: dialog mematikan PIN — wajib verifikasi PIN lama dulu.
+ * Memakai ulang PinScreen CHANGE_OLD supaya aturan lockout H3 ikut berlaku.
+ */
+@Composable
+fun PinDisableDialog(
+    onDismiss: () -> Unit,
+    onPinDisabled: () -> Unit
+) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .fillMaxHeight(0.85f)
+                .padding(12.dp),
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = MidnightAbyss),
+            border = BorderStroke(
+                width = 1.dp,
+                brush = Brush.verticalGradient(
+                    colors = listOf(GhostWhite.copy(alpha = 0.15f), GhostWhite.copy(alpha = 0.02f))
+                )
+            ),
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(TranslucentGlass)
+            ) {
+                PinScreen(
+                    mode = PinMode.CHANGE_OLD,
+                    subtitle = "Verifikasi PIN lama untuk menonaktifkan PIN",
+                    onSuccess = { pin ->
+                        // PinScreen sudah memverifikasi; disablePinIfVerified adalah pagar kedua
+                        // di PinUtils. Dijalankan di IO agar hash PBKDF2 tidak nge-jank main thread.
+                        scope.launch {
+                            val disabled = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                                PinUtils.disablePinIfVerified(context, pin)
+                            }
+                            if (disabled) onPinDisabled() else onDismiss()
+                        }
+                    },
+                    onBack = onDismiss
+                )
+            }
+        }
+    }
 }

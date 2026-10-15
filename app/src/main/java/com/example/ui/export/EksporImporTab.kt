@@ -310,6 +310,8 @@ fun EksporImporTabContent(
             // daripada memulihkan transaksi yang terlanjung dihapus.
             // DIALOGS & OVERLAYS
             var showPinDialog by remember { mutableStateOf(false) }
+            // H4a: mematikan PIN wajib verifikasi PIN lama dulu
+            var showDisablePinDialog by remember { mutableStateOf(false) }
             var pinEnabled by remember { mutableStateOf(com.example.util.PinUtils.isPinEnabled(context)) }
 
             Card(
@@ -362,8 +364,8 @@ Row(
                                 if (enabled) {
                                     showPinDialog = true
                                 } else {
-                                    com.example.util.PinUtils.disablePin(context)
-                                    pinEnabled = false
+                                    // H4a: jangan matikan langsung — minta verifikasi PIN lama
+                                    showDisablePinDialog = true
                                 }
                             },
                             colors = SwitchDefaults.colors(
@@ -436,6 +438,17 @@ Row(
                     onPinSet = {
                         showPinDialog = false
                         pinEnabled = com.example.util.PinUtils.isPinEnabled(context)
+                    }
+                )
+            }
+
+            // H4a: konfirmasi nonaktifkan PIN (verifikasi PIN lama di dalam dialog)
+            if (showDisablePinDialog) {
+                com.example.ui.common.PinDisableDialog(
+                    onDismiss = { showDisablePinDialog = false },
+                    onPinDisabled = {
+                        showDisablePinDialog = false
+                        pinEnabled = false
                     }
                 )
             }
