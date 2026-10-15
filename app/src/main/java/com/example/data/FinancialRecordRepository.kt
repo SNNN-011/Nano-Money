@@ -4,6 +4,15 @@ import kotlinx.coroutines.flow.Flow
 import java.time.LocalDate
 
 /**
+ * Mode impor baris dari file Excel/CSV.
+ *
+ * [MERGE] menambahkan baris baru tanpa menyentuh data lama, [REPLACE] memindahkan
+ * data aktif ke Sampah (soft delete, masih bisa dipulihkan) lalu memasukkan baris
+ * impor. Tidak ada mode yang menghapus data secara permanen.
+ */
+enum class ImportMode { MERGE, REPLACE }
+
+/**
  * Satu-satunya pintu tulis transaksi ke Room.
  *
  * Semua tulis lokal WAJIB membubuhkan updatedAt = sekarang dan syncStatus = PENDING
@@ -132,10 +141,30 @@ class FinancialRecordRepository(
      */
     suspend fun moveAllActiveToTrash() = dao.softDeleteAllActiveRecords(System.currentTimeMillis())
 
-    suspend fun replaceAll(records: List<FinancialRecord>) {
+    /**
+     * Gabungkan baris hasil impor dengan data yang sudah ada.
+     * Baris lama tidak disentuh sama sekali.
+     */
+    suspend fun mergeAll(records: List<FinancialRecord>) = insertImported(records)
+
+    /**
+     * Ganti seluruh data aktif dengan baris hasil impor.
+     *
+     * Baris lama TIDAK dihapus permanen: dipindah ke Sampah supaya masih bisa
+     * dipulihkan, dan isi Sampah yang lama tidak ikut terhapus. Baris impor selalu
+     * dapat syncKey baru sehingga terkirim ke cloud, sedangkan dokumen cloud milik
+     * data lama ditutup oleh status isDeleted = 1.
+     */
+    suspend fun replaceAllSoft(records: List<FinancialRecord>) {
+        moveAllActiveToTrash()
+        insertImported(records)
+    }
+
+    /** Validasi + stempel baris impor (syncKey/categoryId/updatedAt/syncStatus). */
+    private suspend fun insertImported(records: List<FinancialRecord>) {
         records.forEach { validateRecord(it) }
         val now = System.currentTimeMillis()
-        dao.replaceAllRecords(
+        dao.insertAll(
             records.map {
                 it.copy(
                     syncKey = SyncKeys.newTransactionKey(),
@@ -146,6 +175,13 @@ class FinancialRecordRepository(
             }
         )
     }
+
+    /**
+     * Alias lama untuk [replaceAllSoft] agar pemanggil yang sudah ada (impor JSON)
+     * tetap berjalan. Sejak perbaikan ini alias ini juga tidak pernah hard delete.
+     */
+    @Deprecated("Gunakan mergeAll() atau replaceAllSoft() supaya mode impor eksplisit.")
+    suspend fun replaceAll(records: List<FinancialRecord>) = replaceAllSoft(records)
 
     // ---- Jalur sinkronisasi ----
 

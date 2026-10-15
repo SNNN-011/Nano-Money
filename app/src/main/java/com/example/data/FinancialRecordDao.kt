@@ -4,7 +4,6 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
-import androidx.room.Transaction
 import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
 import java.time.LocalDate
@@ -61,9 +60,6 @@ interface FinancialRecordDao {
     @Update
     suspend fun updateRecord(record: FinancialRecord)
 
-    @Query("DELETE FROM financial_records")
-    suspend fun deleteAllRecords()
-
     // Hapus semua transaksi yang masih aktif (tidak termasuk isi Sampah).
     @Query("UPDATE financial_records SET isDeleted = 1, updatedAt = :now, syncStatus = 1 WHERE isDeleted = 0")
     suspend fun softDeleteAllActiveRecords(now: Long)
@@ -104,12 +100,6 @@ interface FinancialRecordDao {
         newName: String,
         now: Long
     ): Int
-
-    @Transaction
-    suspend fun replaceAllRecords(records: List<FinancialRecord>) {
-        deleteAllRecords()
-        insertAll(records)
-    }
 
     // ---- Backfill referensi kategori ----
 

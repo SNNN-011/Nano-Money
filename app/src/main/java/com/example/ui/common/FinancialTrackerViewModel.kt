@@ -13,11 +13,14 @@ import com.example.data.CategoryCascadeService
 import com.example.data.CategoryRepository
 import com.example.data.FinancialRecord
 import com.example.data.FinancialRecordRepository
+import com.example.data.ImportMode
 import com.example.data.RecurringTransaction
 import com.example.data.RecurringTransactionRepository
 import com.example.data.SyncableSettings
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 import android.content.Context
@@ -826,31 +829,58 @@ class FinancialTrackerViewModel(
         return sb.toString()
     }
 
-    // Import from spreadsheet Excel / CSV
-    fun importFromCsvString(csvStr: String): Boolean {
-        try {
-            val parsedList = com.example.domain.CsvImportUseCase().parseCsvString(csvStr)
-            viewModelScope.launch {
-                try {
-                    repository.replaceAll(parsedList)
-                    importCategoriesFromRecords(parsedList)
-                    uiEvent.emit(UiEvent.ShowToast("Berhasil mengimpor ${parsedList.size} data transaksi dari Excel/CSV!"))
-                } catch (e: Exception) {
-                    uiEvent.emit(UiEvent.ShowAlert("Impor Gagal", "Gagal menyimpan data ke database: ${e.localizedMessage}"))
+    /**
+     * Impor baris dari file Excel/CSV.
+     *
+     * [mode] menentukan nasib data lama: [ImportMode.MERGE] hanya menambahkan baris
+     * baru, sedangkan [ImportMode.REPLACE] memindahkan semua transaksi aktif ke
+     * Sampah (masih bisa dipulihkan) lalu memasukkan baris impor. Tidak ada jalur
+     * yang menghapus data secara permanen.
+     *
+     * Parsing dan tulis database dijalankan di [Dispatchers.IO] karena file bisa besar.
+     * Hasil sukses/gagal dilaporkan lewat uiEvent, bukan lewat nilai balik.
+     */
+    fun importFromCsvString(csvStr: String, mode: ImportMode): Boolean {
+        viewModelScope.launch {
+            val parsedList = try {
+                withContext(Dispatchers.IO) {
+                    com.example.domain.CsvImportUseCase().parseCsvString(csvStr)
                 }
-            }
-            return true
-        } catch (e: Exception) {
-            viewModelScope.launch {
+            } catch (e: Exception) {
                 uiEvent.emit(
                     UiEvent.ShowAlert(
                         title = "Impor Gagal",
                         message = "Gagal memproses file Excel/CSV: ${e.localizedMessage ?: "Format tidak valid"}"
                     )
                 )
+                return@launch
             }
-            return false
+
+            try {
+                withContext(Dispatchers.IO) {
+                    if (mode == ImportMode.REPLACE) {
+                        repository.replaceAllSoft(parsedList)
+                    } else {
+                        repository.mergeAll(parsedList)
+                    }
+                }
+                importCategoriesFromRecords(parsedList)
+                pushPendingToCloud()
+                uiEvent.emit(
+                    UiEvent.ShowToast(
+                        if (mode == ImportMode.REPLACE) {
+                            "Berhasil mengganti data aktif dengan ${parsedList.size} transaksi dari Excel/CSV. Data lama dipindah ke Sampah dan masih bisa dipulihkan."
+                        } else {
+                            "Berhasil menambahkan ${parsedList.size} transaksi dari Excel/CSV ke data yang ada."
+                        }
+                    )
+                )
+            } catch (e: Exception) {
+                uiEvent.emit(UiEvent.ShowAlert("Impor Gagal", "Gagal menyimpan data ke database: ${e.localizedMessage ?: "kesalahan database"}"))
+            }
         }
+        // Proses berjalan asinkron; hasilnya hanya dilaporkan lewat uiEvent.
+        return true
     }
 
     // Generate Monthly PDF Report
