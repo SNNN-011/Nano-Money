@@ -24,38 +24,33 @@ object SecurePrefsHelper {
             prefs.all // paksa baca sekarang, supaya error Keystore ketahuan di sini, bukan nanti
             return prefs
         } catch (e: Exception) {
-            SecureLog.e(TAG, "EncryptedSharedPreferences '$name' corrupt (${e.javaClass.simpleName}), melakukan reset paksa.", e)
-            // Cleanup: hapus file corrupt, Keystore alias, dan plain prefs sisa migrasi
-            // Tidak backup PIN dari XML — nilai di encrypted XML sudah terenkripsi,
-            // restore ke encrypted baru = double-encryption = verify gagal.
-            // User perlu set ulang PIN setelah recovery.
-            try {
-                context.applicationContext.getSharedPreferences(name, Context.MODE_PRIVATE)
-                    .edit().clear().commit()
-                val prefsFile = java.io.File(context.applicationContext.filesDir.parentFile, "shared_prefs/$name.xml")
-                if (prefsFile.exists()) prefsFile.delete()
-            } catch (cleanupError: Exception) {
-                SecureLog.e(TAG, "Gagal cleanup file corrupt: ${cleanupError.message}", cleanupError)
-            }
-            try {
-                val keyStore = java.security.KeyStore.getInstance("AndroidKeyStore")
-                keyStore.load(null)
-                keyStore.deleteEntry(MasterKey.DEFAULT_MASTER_KEY_ALIAS)
-            } catch (ksError: Exception) {
-                SecureLog.e(TAG, "Gagal hapus Keystore alias: ${ksError.message}", ksError)
-            }
-            // Hapus plain prefs sisa migrasi lama — hindari window plaintext
-            try {
-                context.applicationContext.getSharedPreferences(name, Context.MODE_PRIVATE)
-                    .edit().clear().commit()
-            } catch (_: Exception) {}
-            return try {
-                val newPrefs = buildEncryptedPrefs(context, name)
-                SecureLog.w(TAG, "EncryptedPrefs '$name' berhasil di-rebuild. PIN perlu di-set ulang.")
-                newPrefs
-            } catch (e2: Exception) {
-                SecureLog.e(TAG, "Gagal total membuat ulang encrypted prefs '$name'.", e2)
-                throw IllegalStateException("Cannot create encrypted prefs '$name' after recovery", e2)
+            SecureLog.e(TAG, "EncryptedSharedPreferences '$name' corrupt (${e.javaClass.simpleName}), melakukan reset file ini saja.", e)
+            // M19: perbaikan dijalankan di Dispatchers.IO (I/O file + generate kunci tidak di main
+            // thread) dan HANYA menyentuh file prefs '$name'. Master key global TIDAK dihapus agar
+            // EncryptedSharedPreferences lain (security_prefs, financial_tracker_prefs, dst.) tetap bisa dibuka.
+            // Nilai di prefs ini memang tidak bisa diselamatkan (file sudah korup) — user perlu set ulang
+            // pengaturan di dalamnya, bukan dihapus seluruh app data.
+            return kotlinx.coroutines.runBlocking(kotlinx.coroutines.Dispatchers.IO) {
+                try {
+                    // Bersihkan isi mentah file korup (cache SharedPreferences ikut kosong) lalu
+                    // hapus file-nya — rebuild benar-benar dari nol, hanya untuk prefs INI.
+                    context.applicationContext.getSharedPreferences(name, Context.MODE_PRIVATE)
+                        .edit().clear().commit()
+                    val prefsFile = java.io.File(context.applicationContext.filesDir.parentFile, "shared_prefs/$name.xml")
+                    if (prefsFile.exists() && !prefsFile.delete()) {
+                        SecureLog.w(TAG, "Gagal menghapus file korup '$name', rebuild tetap dilanjutkan")
+                    }
+                } catch (cleanupError: Exception) {
+                    SecureLog.e(TAG, "Gagal cleanup file corrupt: ${cleanupError.message}", cleanupError)
+                }
+                try {
+                    val newPrefs = buildEncryptedPrefs(context, name)
+                    SecureLog.w(TAG, "EncryptedPrefs '$name' berhasil di-rebuild kosong.")
+                    newPrefs
+                } catch (e2: Exception) {
+                    SecureLog.e(TAG, "Gagal total membuat ulang encrypted prefs '$name'.", e2)
+                    throw IllegalStateException("Cannot create encrypted prefs '$name' after recovery", e2)
+                }
             }
         }
     }
@@ -96,7 +91,13 @@ object SecurePrefsHelper {
                 }
                 editor.putBoolean(migrationKey, true)
                 editor.apply()
-                plainPrefs.edit().clear().apply()
+                // M19: hapus HANYA key plain yang sudah dimigrasikan. clear() penuh di file yang
+                // sama berisiko ikut menghapus entri keyset EncryptedSharedPreferences.
+                val cleanup = plainPrefs.edit()
+                for (key in allEntries.keys) {
+                    cleanup.remove(key)
+                }
+                cleanup.apply()
             } else {
                 encryptedPrefs.edit().putBoolean(migrationKey, true).apply()
             }

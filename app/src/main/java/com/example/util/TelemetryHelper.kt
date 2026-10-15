@@ -7,29 +7,52 @@ import com.google.firebase.crashlytics.FirebaseCrashlytics
 
 object TelemetryHelper {
 
+    private const val PREFS_NAME = "telemetry_prefs"
+    private const val KEY_ENABLED = "telemetry_enabled"
+
     private var firebaseAnalytics: FirebaseAnalytics? = null
     private var firebaseCrashlytics: FirebaseCrashlytics? = null
+
+    // M15: telemetri default OFF + pref lokal otoritatif. Remote Config TIDAK boleh menyalakan.
+    private var telemetryOptedInLocally = false
 
     fun initialize(context: Context) {
         try {
             firebaseAnalytics = FirebaseAnalytics.getInstance(context)
             firebaseCrashlytics = FirebaseCrashlytics.getInstance()
-            
+
             val isDebug = (context.applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0
-            firebaseCrashlytics?.setCrashlyticsCollectionEnabled(false)
-            firebaseAnalytics?.setAnalyticsCollectionEnabled(false)
-            
-            logCrashlytics("TelemetryHelper initialized successfully. IsDebug: $isDebug")
+
+            // M15: baca opt-in lokal (default false). Belum ada toggle UI — lihat laporan refactor.
+            telemetryOptedInLocally = context.applicationContext
+                .getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                .getBoolean(KEY_ENABLED, false)
+            applyCollectionEnabled(telemetryOptedInLocally)
+
+            logCrashlytics("TelemetryHelper initialized successfully. IsDebug: $isDebug, optedIn: $telemetryOptedInLocally")
         } catch (e: Exception) {
             e.printStackTrace()
         }
     }
 
-    fun setTelemetryEnabled(enabled: Boolean) {
+    /** M15: status opt-in lokal — dipakai RemoteConfigHelper untuk mencerminkan keadaan nyata. */
+    fun isOptedInLocally(): Boolean = telemetryOptedInLocally
+
+    /**
+     * M15: satu-satunya jalur menyalakan telemetri adalah opt-in lokal user.
+     * Remote Config tidak boleh memanggil ini untuk menyalakan.
+     */
+    fun setLocalOptIn(context: Context, enabled: Boolean) {
+        telemetryOptedInLocally = enabled
+        context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+            .edit().putBoolean(KEY_ENABLED, enabled).apply()
+        applyCollectionEnabled(enabled)
+    }
+
+    private fun applyCollectionEnabled(enabled: Boolean) {
         try {
             firebaseAnalytics?.setAnalyticsCollectionEnabled(enabled)
             firebaseCrashlytics?.setCrashlyticsCollectionEnabled(enabled)
-            logCrashlytics("Telemetry dynamic status changed: enabled=$enabled")
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -37,15 +60,8 @@ object TelemetryHelper {
 
     fun logEvent(eventName: String, params: Bundle? = null) {
         try {
+            // L14: event tidak lagi digandakan sebagai log Crashlytics (biaya + duplikasi data)
             firebaseAnalytics?.logEvent(eventName, params)
-            
-            params?.let { bundle ->
-                val keys = bundle.keySet()
-                val paramPairs = keys.map { "$it=${bundle.get(it)}" }.joinToString(", ")
-                logCrashlytics("Event Logged: $eventName { $paramPairs }")
-            } ?: run {
-                logCrashlytics("Event Logged: $eventName")
-            }
         } catch (e: Exception) {
             logNonFatal(e, "Gagal mencatat event: $eventName")
         }
@@ -108,11 +124,18 @@ object TelemetryHelper {
     }
 
     fun trackTransactionAction(action: String, type: String, category: String, amount: Long) {
-        val amountTier = if (amount < 100000L) "KECIL" else "BESAR"
+        // M15: kirim bucket kasar saja — tanpa teks kategori mentah / nominal mentah
+        val amountTier = when {
+            amount < 10_000L -> "LT10K"
+            amount < 100_000L -> "LT100K"
+            amount < 1_000_000L -> "LT1M"
+            amount < 10_000_000L -> "LT10M"
+            else -> "GTE10M"
+        }
         val bundle = Bundle().apply {
             putString("transaction_action", action)
             putString("transaction_type", type)
-            putString("transaction_category", category)
+            putBoolean("transaction_category_present", category.isNotBlank())
             putString("transaction_amount_tier", amountTier)
         }
         logEvent("transaction_management", bundle)
@@ -130,8 +153,20 @@ object TelemetryHelper {
         val bundle = Bundle().apply {
             putString("backup_action_type", action)
             putBoolean("backup_success", success)
-            errorMessage?.let { putString("backup_error", it) }
+            // M15: jangan kirim pesan mentah (bisa memuat path absolut) — cukup kode kasar
+            errorMessage?.let { putString("backup_error_code", backupErrorCode(it)) }
         }
         logEvent("backup_operation", bundle)
+    }
+
+    /** M15: ringkas pesan error backup jadi kode kasar tanpa path/info sensitif. */
+    private fun backupErrorCode(message: String): String = when {
+        message.contains("space", ignoreCase = true) || message.contains("ENOSPC", ignoreCase = true) -> "STORAGE"
+        message.contains("permission", ignoreCase = true) || message.contains("EACCES", ignoreCase = true) -> "PERMISSION"
+        message.contains("network", ignoreCase = true) || message.contains("timeout", ignoreCase = true) ||
+            message.contains("connect", ignoreCase = true) -> "NETWORK"
+        message.contains("transaction", ignoreCase = true) -> "DB_BUSY"
+        message.contains("does not exist", ignoreCase = true) -> "DB_MISSING"
+        else -> "OTHER"
     }
 }
