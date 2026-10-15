@@ -1,4 +1,5 @@
 import { createRemoteJWKSet, jwtVerify } from 'jose';
+import { checkAndIncrement, isAllowedToken, validateRequest } from './ratelimit.js';
 
 // Endpoint resmi JWKS dari Google untuk memverifikasi token Firebase Auth
 const FIREBASE_JWKS_URI = 'https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com';
@@ -15,6 +16,17 @@ const MAX_ATTEMPTS_PER_MODEL = 2;
 // Batas waktu per panggilan ke Gemini. Tanpa ini satu request bisa menggantung
 // 40 detik (terukur), dan seluruh rantai ikut tertahan.
 const ATTEMPT_TIMEOUT_MS = 8000;
+
+// Batas ukuran body yang diterima Worker. Dicek dari header Content-Length
+// SEBELUM body ditampung di memori.
+const MAX_BODY_BYTES = 8_000_000;
+
+// Kuota default request per uid per hari (UTC) kalau RATE_LIMIT_PER_DAY tidak diset.
+const DEFAULT_RATE_LIMIT_PER_DAY = 100;
+
+// Supaya peringatan "KV belum di-bind" hanya tercetak sekali per isolate,
+// bukan di setiap request.
+let kvMissingWarned = false;
 
 /**
  * Model yang dipakai aplikasi, dipetakan ke urutan percobaan.
@@ -87,14 +99,57 @@ export default {
     }
     const uid = decodedToken.sub;
 
-    const url = new URL(request.url);
-    const match = url.pathname.match(/^\/v1beta\/models\/([^:/?]+)(?::([^/?]+))?/);
-    if (!match) {
-      return jsonResponse({ error: 'Bad Request: Endpoint harus /v1beta/models/<model>:<action>' }, 400);
+    // Hanya token dari login Google dengan email terverifikasi yang boleh memakai
+    // proxy ini. ALLOW_ANY_PROVIDER=true adalah escape hatch (mis. akun testing
+    // non-Google); default tetap Google-only.
+    if (!isAllowedToken(decodedToken, env.ALLOW_ANY_PROVIDER === 'true')) {
+      return jsonResponse({ error: 'Forbidden: Token harus dari login Google dengan email terverifikasi' }, 403);
     }
 
-    const requestedModel = match[1];
-    const action = match[2] || 'generateContent';
+    const url = new URL(request.url);
+    const validation = validateRequest(
+      request.method,
+      url.pathname,
+      request.headers.get('Content-Length'),
+      MAX_BODY_BYTES
+    );
+    if (!validation.ok) {
+      return jsonResponse({ error: validation.error }, validation.status);
+    }
+
+    const requestedModel = validation.model;
+    const action = validation.action;
+
+    // Rate limit harian per uid, diperiksa SEBELUM Gemini dipanggil supaya kuota
+    // API tidak ikut terbakar oleh request yang sudah pasti ditolak.
+    //
+    // Fail-open kalau binding KV belum ada: deployment lama (sebelum namespace
+    // KV dibuat di wrangler.toml) tetap melayani request tanpa limit, hanya
+    // dengan satu console.warn — lebih baik begitu daripada seluruh fitur mati.
+    if (env.RATE_LIMIT) {
+      const parsedLimit = Number.parseInt(env.RATE_LIMIT_PER_DAY, 10);
+      const limitPerDay = Number.isInteger(parsedLimit) && parsedLimit > 0
+        ? parsedLimit
+        : DEFAULT_RATE_LIMIT_PER_DAY;
+
+      const rl = await checkAndIncrement(env.RATE_LIMIT, uid, limitPerDay, Date.now());
+      if (rl.degraded) {
+        console.warn(`[uid:${uid}] Rate limit degraded (KV error); request diloloskan`);
+      } else if (!rl.allowed) {
+        return jsonResponse(
+          {
+            error: 'Kuota harian habis. Coba lagi besok (kuota dihitung per hari UTC).',
+            limit: rl.limit,
+            count: rl.count,
+          },
+          429
+        );
+      }
+    } else if (!kvMissingWarned) {
+      kvMissingWarned = true;
+      console.warn('RATE_LIMIT (KV) belum di-bind; rate limit dilewati. Lihat instruksi di wrangler.toml.');
+    }
+
     const chain = MODEL_CHAINS[requestedModel] || DEFAULT_CHAIN;
 
     const requestBlob = await request.blob();
