@@ -1,6 +1,7 @@
 package com.example.util
 
 import android.content.Context
+import android.util.Log
 import com.example.data.FinancialRecord
 import com.example.data.sync.CollectionSync
 import com.example.data.sync.SyncManager
@@ -72,8 +73,11 @@ object FirebaseSyncHelper {
      *
      * Dipakai saat Sampah dikosongkan. Kalau hanya isDeleted yang diubah, dokumennya
      * masih tertinggal di cloud dan sync akan menariknya kembali.
-     * Dokumen dihapus berdasarkan syncKey; id numerik lama tetap ditangani agar
-     * dokumen dari skema sebelumnya ikut bersih.
+     *
+     * H2: dokumen HANYA dihapus berdasarkan syncKey-nya sendiri (fallback: id lokal
+     * untuk dokumen skema lama yang memang dinamai id baris). Id lokal numerik milik
+     * record ini bisa kebetulan sama dengan id dokumen legacy milik transaksi LAIN,
+     * jadi id itu tidak boleh ikut dihapus.
      */
     suspend fun purgeRecordsFromFirestore(records: List<FinancialRecord>) {
         val uid = getCurrentUid() ?: return
@@ -84,11 +88,12 @@ object FirebaseSyncHelper {
         records.chunked(CollectionSync.BATCH_LIMIT).forEach { chunk ->
             val batch = db.batch()
             chunk.forEach { record ->
-                // Dokumen versi lama memakai id numerik sebagai id dokumen.
-                batch.delete(collection.document(record.syncKey.ifBlank { record.id.toString() }))
-                if (record.syncKey.isNotBlank()) {
-                    batch.delete(collection.document(record.id.toString()))
+                val docId = record.syncKey.ifBlank { record.id.toString() }
+                if (docId.contains('/')) {
+                    Log.w("FirebaseSyncHelper", "Id dokumen '$docId' tidak valid, dilewati.")
+                    return@forEach
                 }
+                batch.delete(collection.document(docId))
             }
             withTimeout(CollectionSync.OP_TIMEOUT_MS) { batch.commit().await() }
         }

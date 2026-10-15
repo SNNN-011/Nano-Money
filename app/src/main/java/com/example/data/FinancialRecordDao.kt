@@ -78,6 +78,18 @@ interface FinancialRecordDao {
     @Query("UPDATE financial_records SET syncStatus = 0 WHERE syncKey IN (:syncKeys)")
     suspend fun markSynced(syncKeys: List<String>)
 
+    /**
+     * H1: hanya tandai SYNCED bila baris belum berubah sejak dibaca untuk push.
+     * Kalau user mengedit di tengah push, updatedAt sudah bergerak dan baris tetap
+     * PENDING supaya edit barunya ikut terkirim di push berikutnya.
+     */
+    @Query("UPDATE financial_records SET syncStatus = 0 WHERE syncKey = :syncKey AND updatedAt = :pushedUpdatedAt")
+    suspend fun markSyncedIfUnchanged(syncKey: String, pushedUpdatedAt: Long)
+
+    /** Ganti akun (K5): kosongkan tabel; hanya isi yang dibuang, bukan skema/DB-nya. */
+    @Query("DELETE FROM financial_records")
+    suspend fun deleteAllHard()
+
     /** Restore backup: seluruh baris dianggap perubahan terbaru (menang atas versi cloud). */
     @Query("UPDATE financial_records SET syncStatus = 1, updatedAt = :now")
     suspend fun markAllPendingForRestore(now: Long)
@@ -112,4 +124,19 @@ interface FinancialRecordDao {
 
     @Query("UPDATE financial_records SET categoryId = :categoryId WHERE id = :id")
     suspend fun setCategoryId(id: Int, categoryId: String)
+
+    /**
+     * M20: isi categoryId satu statement SQL, bukan satu UPDATE per baris.
+     * Cocokkan lewat type + nama (case-insensitive) ke kategori aktif.
+     * Mengembalikan jumlah baris yang benar-benar terisi.
+     */
+    @Query(
+        "UPDATE financial_records SET categoryId = (" +
+            "SELECT c.id FROM categories c WHERE c.type = financial_records.type " +
+            "AND c.name = financial_records.category COLLATE NOCASE AND c.isDeleted = 0 LIMIT 1" +
+            ") WHERE categoryId = '' AND EXISTS (" +
+            "SELECT 1 FROM categories c WHERE c.type = financial_records.type " +
+            "AND c.name = financial_records.category COLLATE NOCASE AND c.isDeleted = 0)"
+    )
+    suspend fun backfillCategoryIdsFromCategories(): Int
 }

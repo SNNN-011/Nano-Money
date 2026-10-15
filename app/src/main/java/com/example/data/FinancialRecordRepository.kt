@@ -1,5 +1,6 @@
 package com.example.data
 
+import android.util.Log
 import kotlinx.coroutines.flow.Flow
 import java.time.LocalDate
 
@@ -33,6 +34,15 @@ class FinancialRecordRepository(
         const val MAX_AMOUNT = 999_999_999_999L // 1 Triliun Rupiah
         const val MAX_DESC_LENGTH = 500
         const val MAX_CATEGORY_LENGTH = 100
+
+        private const val TAG = "FinancialRecordRepository"
+
+        /** Normalisasi tipe dari dokumen lama/bandel supaya DB hanya berisi income/expense. */
+        fun normalizeType(type: String): String = when (type.trim().lowercase()) {
+            "pemasukan" -> "income"
+            "pengeluaran" -> "expense"
+            else -> type.trim().lowercase()
+        }
 
         /**
          * Repository transaksi yang categoryId-nya selalu terisi.
@@ -192,17 +202,41 @@ class FinancialRecordRepository(
     suspend fun markSynced(syncKeys: List<String>) = dao.markSynced(syncKeys)
 
     /**
+     * H1: tandai SYNCED hanya untuk baris yang updatedAt-nya masih sama dengan saat
+     * dikirim. Edit yang mendarat di tengah push otomatis tetap PENDING.
+     */
+    suspend fun markSyncedIfUnchanged(items: List<Pair<String, Long>>) {
+        items.forEach { (syncKey, pushedUpdatedAt) ->
+            dao.markSyncedIfUnchanged(syncKey, pushedUpdatedAt)
+        }
+    }
+
+    /**
      * Menerapkan versi remote. Baris lokal dicocokkan lewat syncKey (bukan id lokal),
      * jadi id Room milik masing-masing perangkat tidak pernah saling menimpa.
      * updatedAt milik remote dipertahankan.
+     *
+     * H8: data cloud yang rusak/kacau divalidasi dulu; baris tidak valid dilewati
+     * (bukan membuat aplikasi crash atau mengotori agregat).
+     * Mengembalikan true bila baris benar-benar diterapkan.
      */
-    suspend fun applyRemote(remote: FinancialRecord) {
-        val existing = dao.findBySyncKey(remote.syncKey)
-        if (existing == null) {
-            dao.insertRecord(remote)
-        } else {
-            dao.updateRecord(remote.copy(id = existing.id))
+    suspend fun applyRemote(remote: FinancialRecord): Boolean {
+        if (remote.syncKey.isBlank()) {
+            Log.w(TAG, "Baris remote tanpa syncKey dilewati.")
+            return false
         }
+        val normalized = remote.copy(type = normalizeType(remote.type))
+        runCatching { validateRecord(normalized) }
+            .onFailure { Log.w(TAG, "Baris remote tidak valid dilewati: ${it.message}") }
+            .getOrElse { return false }
+
+        val existing = dao.findBySyncKey(normalized.syncKey)
+        if (existing == null) {
+            dao.insertRecord(normalized)
+        } else {
+            dao.updateRecord(normalized.copy(id = existing.id))
+        }
+        return true
     }
 
     private suspend fun resolveCategoryId(type: String, name: String): String =
@@ -214,19 +248,9 @@ class FinancialRecordRepository(
      * Transaksi hasil migrasi v5 hanya punya nama kategori, sedangkan kategori kini
      * punya id stabil. Tanpa pengisian ini, rename/hapus kategori tidak bisa efek ke
      * transaksi lama. Idempoten: hanya baris dengan categoryId kosong yang disentuh.
+     * M20: satu statement SQL, bukan satu UPDATE per baris.
      */
-    suspend fun backfillCategoryIds(): Int {
-        val orphans = dao.getRecordsWithoutCategoryId()
-        var filled = 0
-        orphans.forEach { record ->
-            val id = resolveCategoryId(record.type, record.category)
-            if (id.isNotBlank()) {
-                dao.setCategoryId(record.id, id)
-                filled++
-            }
-        }
-        return filled
-    }
+    suspend fun backfillCategoryIds(): Int = dao.backfillCategoryIdsFromCategories()
 
     fun getTransactionsByMonth(year: Int, month: Int): Flow<List<FinancialRecord>> = dao.getTransactionsByMonth(year, month)
 

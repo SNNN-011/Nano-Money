@@ -1,6 +1,7 @@
 package com.example.data.sync
 
 import com.example.data.CategoryMigration
+import com.example.data.SyncableSettings
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -129,8 +130,31 @@ class LegacySettingsImportTest {
         assertTrue(LegacySettingsImport.isAllowedField(CategoryMigration.PREF_INCOME_LIST))
         assertTrue(LegacySettingsImport.isAllowedField(CategoryMigration.PREF_EXPENSE_LIST))
         assertTrue(LegacySettingsImport.isAllowedField("category_budget_Makanan"))
+        assertTrue("M5: anggaran bulanan ikut diimpor", LegacySettingsImport.isAllowedField(SyncableSettings.MONTHLY_BUDGET_LIMIT))
         assertFalse(LegacySettingsImport.isAllowedField("saved_pin"))
-        assertFalse(LegacySettingsImport.isAllowedField("monthly_budget_limit"))
+        assertFalse(LegacySettingsImport.isAllowedField("auto_backup_interval"))
+    }
+
+    @Test
+    fun `anggaran_bulanan_dari_dokumen_lama_ikut_diimpor`() {
+        val imported = LegacySettingsImport.parse(
+            docData = mapOf(SyncableSettings.MONTHLY_BUDGET_LIMIT to 1_500_000L),
+            existingCategoryIds = emptySet(),
+            now = now
+        )
+
+        assertEquals(1_500_000L, imported.monthlyBudgetLimit)
+    }
+
+    @Test
+    fun `anggaran_bulanan_hilang_bukan_dianggap_nol`() {
+        val imported = LegacySettingsImport.parse(
+            docData = mapOf("expense_categories_list" to "Makanan"),
+            existingCategoryIds = emptySet(),
+            now = now
+        )
+
+        assertEquals(null, imported.monthlyBudgetLimit)
     }
 
     @Test

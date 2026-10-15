@@ -9,6 +9,7 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -210,6 +211,64 @@ class FinancialRecordRepositoryTest {
         val saved = db.financialRecordDao().findById(id)!!
         assertEquals("", saved.categoryId)
         assertFalse("nama kategori tetap disimpan sebagai cache", saved.category.isBlank())
+    }
+
+    @Test
+    fun apply_remote_menormalisasi_tipe_pemasukan() = runBlocking {
+        val applied = repo.applyRemote(
+            FinancialRecord(
+                id = 0,
+                description = "Gaji",
+                amount = 5_000_000L,
+                type = "pemasukan",
+                category = "Makanan",
+                date = 1_700_000_000_000L,
+                notes = "",
+                updatedAt = 1L,
+                syncKey = "t:remote-pemasukan",
+                syncStatus = SyncStatus.SYNCED
+            )
+        )
+
+        assertTrue(applied)
+        assertEquals("income", db.financialRecordDao().findBySyncKey("t:remote-pemasukan")!!.type)
+    }
+
+    @Test
+    fun apply_remote_menolak_baris_rusak() = runBlocking {
+        val applied = repo.applyRemote(
+            FinancialRecord(
+                id = 0,
+                description = "Nominal nol dari cloud",
+                amount = 0L,
+                type = "expense",
+                category = "Makanan",
+                date = 1L,
+                notes = "",
+                updatedAt = 1L,
+                syncKey = "t:rusak",
+                syncStatus = SyncStatus.SYNCED
+            )
+        )
+
+        assertFalse(applied)
+        assertNull("baris rusak tidak boleh masuk", db.financialRecordDao().findBySyncKey("t:rusak"))
+    }
+
+    @Test
+    fun mark_synced_hanya_untuk_baris_yang_belum_berubah() = runBlocking {
+        val id = repo.insert(draft("Makanan")).toInt()
+        val pushed = db.financialRecordDao().findById(id)!!
+
+        repo.markSyncedIfUnchanged(listOf(pushed.syncKey to pushed.updatedAt))
+        assertEquals(SyncStatus.SYNCED, db.financialRecordDao().findById(id)!!.syncStatus)
+
+        // Baris berubah setelah dibaca untuk push: stempel lama tidak boleh menandainya.
+        db.financialRecordDao().updateRecord(
+            pushed.copy(description = "Bakso edit", updatedAt = pushed.updatedAt + 1, syncStatus = SyncStatus.PENDING)
+        )
+        repo.markSyncedIfUnchanged(listOf(pushed.syncKey to pushed.updatedAt))
+        assertEquals(SyncStatus.PENDING, db.financialRecordDao().findById(id)!!.syncStatus)
     }
 }
 

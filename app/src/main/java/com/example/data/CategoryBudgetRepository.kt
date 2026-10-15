@@ -1,5 +1,6 @@
 package com.example.data
 
+import android.util.Log
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -53,5 +54,32 @@ class CategoryBudgetRepository(private val dao: CategoryBudgetDao) {
 
     suspend fun markSynced(syncKeys: List<String>) = dao.markSynced(syncKeys)
 
-    suspend fun applyRemote(remote: CategoryBudget) = dao.upsertRemote(listOf(remote))
+    /**
+     * H1: tandai SYNCED hanya untuk baris yang updatedAt-nya belum berubah sejak push.
+     */
+    suspend fun markSyncedIfUnchanged(items: List<Pair<String, Long>>) {
+        items.forEach { (syncKey, pushedUpdatedAt) ->
+            dao.markSyncedIfUnchanged(syncKey, pushedUpdatedAt)
+        }
+    }
+
+    /**
+     * Menerapkan versi remote (updatedAt remote dipertahankan).
+     * H8: anggaran dengan limit di luar rentang wajar atau tanpa categoryId dilewati.
+     */
+    suspend fun applyRemote(remote: CategoryBudget) {
+        if (remote.categoryId.isBlank() || remote.syncKey.isBlank()) {
+            Log.w(TAG, "Anggaran remote tanpa categoryId/syncKey dilewati.")
+            return
+        }
+        if (remote.budgetLimit < 0L || remote.budgetLimit > FinancialRecordRepository.MAX_AMOUNT) {
+            Log.w(TAG, "Limit anggaran remote di luar rentang, dilewati.")
+            return
+        }
+        dao.upsertRemote(listOf(remote))
+    }
+
+    companion object {
+        private const val TAG = "CategoryBudgetRepository"
+    }
 }

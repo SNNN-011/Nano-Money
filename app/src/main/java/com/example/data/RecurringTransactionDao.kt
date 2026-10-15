@@ -33,6 +33,14 @@ interface RecurringTransactionDao {
     @Query("UPDATE recurring_transactions SET syncStatus = 0 WHERE syncKey IN (:syncKeys)")
     suspend fun markSynced(syncKeys: List<String>)
 
+    /** H1: tandai SYNCED hanya bila updatedAt baris belum berubah sejak dibaca untuk push. */
+    @Query("UPDATE recurring_transactions SET syncStatus = 0 WHERE syncKey = :syncKey AND updatedAt = :pushedUpdatedAt")
+    suspend fun markSyncedIfUnchanged(syncKey: String, pushedUpdatedAt: Long)
+
+    /** Ganti akun (K5): kosongkan tabel; hanya isi yang dibuang, bukan skema/DB-nya. */
+    @Query("DELETE FROM recurring_transactions")
+    suspend fun deleteAllHard()
+
     /** Restore backup: seluruh baris dianggap perubahan terbaru (menang atas versi cloud). */
     @Query("UPDATE recurring_transactions SET syncStatus = 1, updatedAt = :now")
     suspend fun markAllPendingForRestore(now: Long)

@@ -46,10 +46,28 @@ class AppSettingsRepository(private val dao: AppSettingDao) {
 
     suspend fun markSynced(syncKeys: List<String>) = dao.markSynced(syncKeys)
 
-    /** Menerapkan versi remote; key terlarang diabaikan. updatedAt remote dipertahankan. */
+    /**
+     * H1: tandai SYNCED hanya untuk baris yang updatedAt-nya belum berubah sejak push.
+     */
+    suspend fun markSyncedIfUnchanged(items: List<Pair<String, Long>>) {
+        items.forEach { (syncKey, pushedUpdatedAt) ->
+            dao.markSyncedIfUnchanged(syncKey, pushedUpdatedAt)
+        }
+    }
+
+    /** Menerapkan versi remote; key terlarang/data rusak diabaikan. updatedAt remote dipertahankan. */
     suspend fun applyRemote(remote: AppSetting) {
         if (!SyncableSettings.isSyncable(remote.key)) {
             Log.w("AppSettingsRepository", "Key '${remote.key}' di luar allow-list, diabaikan.")
+            return
+        }
+        if (remote.syncKey.isBlank()) {
+            Log.w("AppSettingsRepository", "Setting remote tanpa syncKey diabaikan.")
+            return
+        }
+        val valueLong = remote.valueLong
+        if (valueLong != null && (valueLong < 0L || valueLong > FinancialRecordRepository.MAX_AMOUNT)) {
+            Log.w("AppSettingsRepository", "Nilai numerik remote di luar rentang, diabaikan.")
             return
         }
         dao.upsertRemote(listOf(remote))
