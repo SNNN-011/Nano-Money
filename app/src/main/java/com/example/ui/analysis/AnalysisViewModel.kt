@@ -11,7 +11,6 @@ import com.example.data.CategoryAggregation
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import java.time.LocalDate
 import java.time.ZoneId
 import java.time.YearMonth
 import java.time.temporal.WeekFields
@@ -145,15 +144,6 @@ class AnalysisViewModel(
         }
     }.stateIn(viewModelScope, SharingStarted.Lazily, 0L)
 
-    val averageDailyExpense: StateFlow<Double> = combine(
-        totalExpense,
-        combine(_selectedPeriod, _calendarMonth) { p, m -> Pair(p, m) },
-        repository.getOldestExpenseDate()
-    ) { total, (period, calendarMonth), oldestDateMs ->
-        val days = getDaysInPeriod(period, calendarMonth, oldestDateMs)
-        if (days > 0) total.toDouble() / days else 0.0
-    }.stateIn(viewModelScope, SharingStarted.Lazily, 0.0)
-    
     val topCategory: StateFlow<CategoryAggregation?> = categoryAggregations.map { list ->
         list.maxByOrNull { it.totalAmount }
     }.stateIn(viewModelScope, SharingStarted.Lazily, null)
@@ -166,23 +156,8 @@ class AnalysisViewModel(
         _selectedPeriod.value = period
     }
 
-    private fun getDaysInPeriod(period: PeriodFilter, calendarMonth: YearMonth, oldestDateMs: Long?): Int {
-        val now = LocalDate.now()
-        val zoneId = ZoneId.systemDefault()
-        return when (period) {
-            PeriodFilter.THIS_MONTH -> calendarMonth.lengthOfMonth()
-            PeriodFilter.ALL_TIME -> {
-                if (oldestDateMs == null) return 1
-                val oldest = java.time.Instant.ofEpochMilli(oldestDateMs)
-                    .atZone(zoneId).toLocalDate()
-                java.time.temporal.ChronoUnit.DAYS.between(oldest, now).toInt().coerceAtLeast(1)
-            }
-        }
-    }
-
     private fun getStatsTimeRange(period: PeriodFilter, calendarMonth: YearMonth): Pair<Long?, Long?> {
         val zoneId = ZoneId.systemDefault()
-        val now = LocalDate.now()
 
         return when (period) {
             PeriodFilter.THIS_MONTH -> {

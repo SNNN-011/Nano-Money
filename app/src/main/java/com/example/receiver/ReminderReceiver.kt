@@ -13,6 +13,17 @@ import com.example.util.NotificationScheduler
 
 class ReminderReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
+        // Aksi sistem (reboot / ganti zona waktu / ganti tanggal): cukup pasang
+        // ulang alarm dari prefs, jangan munculkan notifikasi.
+        when (intent.action) {
+            Intent.ACTION_BOOT_COMPLETED,
+            Intent.ACTION_TIMEZONE_CHANGED,
+            Intent.ACTION_DATE_CHANGED -> {
+                NotificationScheduler.scheduleDailyAlarm(context)
+                return
+            }
+        }
+
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         val channelId = "daily_financial_reminder"
         

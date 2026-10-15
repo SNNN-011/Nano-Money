@@ -79,18 +79,19 @@ object FormatUtils {
     }
 
     fun formatRupiahCompact(amount: Long): String {
-        if (amount >= 1_000_000_000) {
-            val formatted = String.format(ID_LOCALE, "%.1f", amount / 1_000_000_000.0)
-            return "Rp ${formatted.removeSuffix(".0")} M"
+        // Locale id-ID memakai koma sebagai pemisah desimal, jadi angka bulat
+        // menghasilkan "5,0" — sisa ",0" (bukan ".0") yang harus dibuang supaya
+        // kartu anggaran tidak menampilkan "Rp 5,0 jt". Keduanya tetap dibuang
+        // untuk jaga-jaga bila data locale berubah.
+        fun formatSatuan(value: Double, satuan: String): String {
+            val formatted = String.format(ID_LOCALE, "%.1f", value)
+                .removeSuffix(",0")
+                .removeSuffix(".0")
+            return "Rp $formatted $satuan"
         }
-        if (amount >= 1_000_000) {
-            val formatted = String.format(ID_LOCALE, "%.1f", amount / 1_000_000.0)
-            return "Rp ${formatted.removeSuffix(".0")} jt"
-        }
-        if (amount >= 1_000) {
-            val formatted = String.format(ID_LOCALE, "%.1f", amount / 1_000.0)
-            return "Rp ${formatted.removeSuffix(".0")} rb"
-        }
+        if (amount >= 1_000_000_000) return formatSatuan(amount / 1_000_000_000.0, "M")
+        if (amount >= 1_000_000) return formatSatuan(amount / 1_000_000.0, "jt")
+        if (amount >= 1_000) return formatSatuan(amount / 1_000.0, "rb")
         return formatRupiah(amount)
     }
 
