@@ -17,6 +17,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.text.font.FontWeight
@@ -326,6 +327,101 @@ fun UnifiedExportCard(
             )
         ) {
             content()
+        }
+    }
+}
+
+/**
+ * Konfirmasi sebelum impor Excel/CSV dijalankan.
+ *
+ * Impor lama langsung mengganti seluruh data (hard delete), jadi user harus memilih
+ * mode dulu: "Gabung" hanya menambah baris baru, "Ganti Semua" memindahkan transaksi
+ * aktif ke Sampah (masih bisa dipulihkan) sebelum baris impor dimasukkan.
+ *
+ * [rowCount] = jumlah baris valid di file, [activeCount] = jumlah transaksi aktif saat ini.
+ */
+@Composable
+fun ImportCsvConfirmDialog(
+    rowCount: Int,
+    activeCount: Int,
+    onMerge: () -> Unit,
+    onReplace: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            shape = RoundedCornerShape(24.dp),
+            colors = CardDefaults.cardColors(containerColor = MidnightAbyss),
+            border = BorderStroke(
+                width = 1.dp,
+                brush = Brush.verticalGradient(
+                    colors = listOf(
+                        GhostWhite.copy(alpha = 0.2f),
+                        GhostWhite.copy(alpha = 0.02f)
+                    )
+                )
+            ),
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+        ) {
+            Box(modifier = Modifier.background(TranslucentGlass)) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(24.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(
+                        text = "Impor Data Excel/CSV",
+                        color = GhostWhite,
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "$rowCount baris siap diimpor. Saat ini ada $activeCount transaksi aktif.",
+                        color = GhostWhite.copy(alpha = 0.8f),
+                        style = MaterialTheme.typography.bodyMedium,
+                        lineHeight = 20.sp
+                    )
+                    Text(
+                        text = "Gabung (aman): $rowCount baris ditambahkan ke data yang ada. Data lama tidak diubah.",
+                        color = GhostWhite.copy(alpha = 0.7f),
+                        style = MaterialTheme.typography.bodySmall,
+                        lineHeight = 18.sp
+                    )
+                    Text(
+                        text = "Ganti semua: $activeCount transaksi aktif dipindah ke Sampah (masih bisa dipulihkan), lalu $rowCount baris dari file dimasukkan.",
+                        color = GhostWhite.copy(alpha = 0.7f),
+                        style = MaterialTheme.typography.bodySmall,
+                        lineHeight = 18.sp
+                    )
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    PremiumButton(
+                        text = "Gabung (Aman)",
+                        onClick = onMerge,
+                        isActive = true,
+                        modifier = Modifier.fillMaxWidth(),
+                        testTag = "import_confirm_merge"
+                    )
+                    PremiumButton(
+                        text = "Ganti Semua",
+                        onClick = onReplace,
+                        isActive = true,
+                        gradientColors = listOf(Color.Red.copy(alpha = 0.85f), Color.Red.copy(alpha = 0.55f)),
+                        modifier = Modifier.fillMaxWidth(),
+                        testTag = "import_confirm_replace"
+                    )
+                    PremiumButton(
+                        text = "Batal",
+                        onClick = onDismiss,
+                        isActive = false,
+                        modifier = Modifier.fillMaxWidth(),
+                        testTag = "import_confirm_cancel"
+                    )
+                }
+            }
         }
     }
 }

@@ -39,6 +39,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.data.FinancialRecord
+import com.example.data.ImportMode
 import com.example.ui.theme.*
 import com.example.ui.components.GlassCard
 import com.example.ui.chat.ChatScreen
@@ -50,6 +51,7 @@ import com.example.ui.calendar.CalendarTabContent
 import com.example.ui.calendar.CalendarViewModel
 import com.example.ui.analysis.AnalysisViewModel
 import com.example.ui.export.EksporImporTabContent
+import com.example.ui.export.ImportCsvConfirmDialog
 import com.example.R
 import java.util.*
 import androidx.compose.animation.core.*
@@ -140,6 +142,11 @@ fun FinancialTrackerScreen(
 
     // Dialog Hapus Semua Transaksi, dipicu dari ikon sampah di tab Beranda.
     var showDeleteAllDialog by remember { mutableStateOf(false) }
+
+    // Impor Excel/CSV: isi file disimpan dulu, impor baru jalan setelah user
+    // memilih mode (gabung / ganti semua) di dialog konfirmasi.
+    var pendingImportCsv by remember { mutableStateOf<String?>(null) }
+    var pendingImportRowCount by remember { mutableStateOf(0) }
 
     // Handle alert states
     var alertTitle by remember { mutableStateOf<String?>(null) }
@@ -244,13 +251,30 @@ fun FinancialTrackerScreen(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri ->
         if (uri != null) {
-            try {
-                context.contentResolver.openInputStream(uri)?.use { inputStream ->
-                    val csvString = inputStream.bufferedReader().use { it.readText() }
-                    viewModel.importFromCsvString(csvString)
+            exportScope.launch {
+                try {
+                    // Baca file + hitung baris di IO supaya UI tidak freeze.
+                    // Isi file disimpan dulu; impor baru dijalankan setelah user
+                    // memilih mode lewat dialog konfirmasi.
+                    val csvString = withContext(Dispatchers.IO) {
+                        context.contentResolver.openInputStream(uri)?.use { inputStream ->
+                            inputStream.bufferedReader().use { it.readText() }
+                        }
+                    }
+                    if (csvString.isNullOrBlank()) {
+                        Toast.makeText(context, "Gagal mengimpor file Excel: file kosong atau tidak dapat dibaca.", Toast.LENGTH_LONG).show()
+                        return@launch
+                    }
+                    // ponytail: baris dihitung dengan parsing ulang di ViewModel saat impor;
+                    // file CSV pribadi kecil jadi aman dihitung dua kali.
+                    val rowCount = withContext(Dispatchers.IO) {
+                        com.example.domain.CsvImportUseCase().parseCsvString(csvString).size
+                    }
+                    pendingImportCsv = csvString
+                    pendingImportRowCount = rowCount
+                } catch (e: Exception) {
+                    Toast.makeText(context, "Gagal mengimpor file Excel: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
                 }
-            } catch (e: Exception) {
-                Toast.makeText(context, "Gagal mengimpor file Excel: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
             }
         }
     }
@@ -294,6 +318,24 @@ fun FinancialTrackerScreen(
             activeCount = viewModel.allRecords.collectAsState().value.size,
             onConfirm = { viewModel.deleteAllRecords() },
             onDismiss = { showDeleteAllDialog = false }
+        )
+    }
+
+    // Konfirmasi impor: file sudah dibaca, data baru disentuh setelah user memilih mode.
+    val pendingImportData = pendingImportCsv
+    if (pendingImportData != null) {
+        ImportCsvConfirmDialog(
+            rowCount = pendingImportRowCount,
+            activeCount = allRecords.size,
+            onMerge = {
+                viewModel.importFromCsvString(pendingImportData, ImportMode.MERGE)
+                pendingImportCsv = null
+            },
+            onReplace = {
+                viewModel.importFromCsvString(pendingImportData, ImportMode.REPLACE)
+                pendingImportCsv = null
+            },
+            onDismiss = { pendingImportCsv = null }
         )
     }
 
