@@ -14,13 +14,9 @@ FIREBASE_PROJECT_ID = "nano-money-a44b0"
 
 # --- Rate limit harian (Cloudflare KV) ---
 # Worker memakai binding KV bernama RATE_LIMIT untuk kuota harian per uid.
-# Binding ini TIDAK otomatis ada; pemilik akun Cloudflare harus membuatnya dulu:
-#   wrangler kv namespace create RATE_LIMIT
-# lalu salin nilai `id = "..."` yang dicetak ke blok di bawah, hapus tanda
-# komentar, dan deploy ulang.
-# Selama blok ini belum aktif, Worker tetap berjalan TANPA rate limit (fail-open)
+# Blok di bawah sudah aktif; kuota default 100 request/uid/hari (UTC).
+# Kalau binding ini dihapus, Worker tetap jalan TANPA rate limit (fail-open)
 # supaya deployment lama tidak mati; hanya ada satu console.warn per isolate.
-# Isi <KV_NAMESPACE_ID> dengan id asli dari perintah di atas — jangan dikira-kira.
-# [[kv_namespaces]]
-# binding = "RATE_LIMIT"
-# id = "<KV_NAMESPACE_ID>"
+[[kv_namespaces]]
+binding = "RATE_LIMIT"
+id = "e6ccf967168b4aabbcc0beef28b8bfb5"
