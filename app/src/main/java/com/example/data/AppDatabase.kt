@@ -608,6 +608,12 @@ abstract class AppDatabase : RoomDatabase() {
             val tempFile = java.io.File(context.cacheDir, "encrypted_temp.db")
             if (tempFile.exists()) tempFile.delete()
 
+            // Cadangan diletakkan di direktori yang sama dengan database asli supaya
+            // renameTo dijamin satu filesystem. File asli TIDAK PERNAH dihapus langsung;
+            // ia hanya dipindahkan, dan dikembalikan ke posisi semula bila penggantian gagal.
+            val backupFile = java.io.File(dbFile.parentFile, "$dbName.pre_encrypt.bak")
+            if (backupFile.exists()) backupFile.delete()
+
             try {
                 net.sqlcipher.database.SQLiteDatabase.loadLibs(context)
 
@@ -617,6 +623,9 @@ abstract class AppDatabase : RoomDatabase() {
                     null,
                     net.sqlcipher.database.SQLiteDatabase.OPEN_READWRITE
                 )
+
+                // Jumlah tabel database asli (masih plaintext), pembanding verifikasi di bawah.
+                val originalTableCount = countTables(database)
 
                 val hexChars = CharArray(passphraseBytes.size * 2)
                 val hexDigits = "0123456789abcdef".toCharArray()
@@ -628,24 +637,85 @@ abstract class AppDatabase : RoomDatabase() {
                 val passphraseHex = String(hexChars)
                 java.util.Arrays.fill(hexChars, '0')
 
+                // TODO(K1-audit): Bukti pada net.zetetic:android-database-sqlcipher:4.5.4 —
+                // byte[] password runtime diteruskan apa adanya ke sqlite3_key (native_key JNI),
+                // dan SQLCipher hanya memperlakukan "raw key tanpa KDF" bila nilainya berbentuk
+                // x'<64 hex>' (67 byte); passphrase runtime (32 byte biner) TIDAK memenuhi pola itu
+                // sehingga diolah lewat PBKDF2. Akibatnya KEY x'...' di baris ATTACH ini memakai
+                // kunci yang BEDA dari jalur buka SupportFactory(passphraseBytes). Format kunci
+                // sengaja tidak diubah di sini (berisiko mematahkan jalur buka yang sudah ada);
+                // verifikasi di bawah akan menangkap ketidakcocokan dan mempertahankan DB lama.
+                // Perbaikan sebenarnya harus mengubah jalur ekspor DAN jalur buka secara bersamaan.
                 database.rawExecSQL("ATTACH DATABASE '${tempFile.absolutePath}' AS encrypted KEY x'${passphraseHex}'")
                 database.rawExecSQL("SELECT sqlcipher_export('encrypted')")
                 database.rawExecSQL("DETACH DATABASE encrypted")
                 database.close()
 
-                if (tempFile.exists() && tempFile.length() > 0) {
-                    dbFile.delete()
-                    val moved = tempFile.renameTo(dbFile)
-                    if (!moved) {
-                        throw IllegalStateException("Gagal memindahkan file database terenkripsi")
+                // Verifikasi file hasil ekspor lewat API yang sama seperti jalur runtime
+                // (byte[] passphrase). Gagal membuka/membaca dianggap verifikasi gagal.
+                val tempTableCount = try {
+                    val verifyDatabase = net.sqlcipher.database.SQLiteDatabase.openDatabase(
+                        tempFile.absolutePath,
+                        passphraseBytes,
+                        null,
+                        net.sqlcipher.database.SQLiteDatabase.OPEN_READONLY,
+                        null,
+                        null
+                    )
+                    try {
+                        countTables(verifyDatabase)
+                    } finally {
+                        verifyDatabase.close()
                     }
+                } catch (e: Exception) {
+                    com.example.util.SecureLog.e("AppDatabase", "Verifikasi file hasil konversi gagal dibuka: ${e.message}", e)
+                    -1
+                }
+
+                if (tempTableCount < originalTableCount || tempTableCount <= 0) {
+                    throw IllegalStateException(
+                        "Konversi database ke bentuk terenkripsi gagal diverifikasi; database lama dipertahankan."
+                    )
+                }
+
+                // Ganti file secara aman: asli -> .bak, temp -> asli, lalu .bak dihapus.
+                if (!dbFile.renameTo(backupFile)) {
+                    throw IllegalStateException(
+                        "Gagal memindahkan database lama ke file cadangan; database lama dipertahankan."
+                    )
+                }
+                if (!tempFile.renameTo(dbFile)) {
+                    if (!backupFile.renameTo(dbFile)) {
+                        throw IllegalStateException(
+                            "Gagal memindahkan file database terenkripsi dan gagal memulihkan database lama " +
+                                "dari cadangan (${backupFile.absolutePath})."
+                        )
+                    }
+                    throw IllegalStateException("Gagal memindahkan file database terenkripsi; database lama dipulihkan.")
+                }
+                if (!backupFile.delete()) {
+                    com.example.util.SecureLog.e(
+                        "AppDatabase",
+                        "Gagal menghapus salinan plaintext ${backupFile.absolutePath} setelah konversi."
+                    )
                 }
             } catch (e: Exception) {
+                // Sengaja TIDAK ditelan: kalau konversi gagal, jalur buka Room berikutnya pasti
+                // ikut gagal; lebih baik error terlihat daripada database kosong secara senyap.
                 com.example.util.SecureLog.e("AppDatabase", "Gagal memigrasi database menjadi terenkripsi: ${e.message}", e)
+                throw e
             } finally {
+                // Hanya file temp yang boleh dihapus di sini. File asli maupun .bak tidak boleh
+                // disentuh di jalur gagal agar data pengguna tetap utuh.
                 if (tempFile.exists()) {
                     tempFile.delete()
                 }
+            }
+        }
+
+        private fun countTables(database: net.sqlcipher.database.SQLiteDatabase): Int {
+            database.rawQuery("SELECT count(*) FROM sqlite_master WHERE type='table'", null).use { cursor ->
+                return if (cursor.moveToFirst()) cursor.getInt(0) else 0
             }
         }
 
