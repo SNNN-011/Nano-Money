@@ -2,10 +2,12 @@
   "name": "gemini-firebase-proxy",
   "version": "1.0.0",
   "description": "Cloudflare Worker proxy for Gemini API with Firebase Auth",
+  "type": "module",
   "main": "src/worker.js",
   "scripts": {
     "dev": "wrangler dev",
-    "deploy": "wrangler deploy"
+    "deploy": "wrangler deploy",
+    "test": "node --test \"test/**/*.test.mjs\""
   },
   "dependencies": {
     "jose": "^5.2.2"
