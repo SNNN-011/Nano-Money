@@ -17,6 +17,14 @@ const MAX_ATTEMPTS_PER_MODEL = 2;
 // 40 detik (terukur), dan seluruh rantai ikut tertahan.
 const ATTEMPT_TIMEOUT_MS = 8000;
 
+// Batas total waktu seluruh rantai fallback. App Android memutus request di
+// ~20 detik, jadi seluruh percobaan + jeda retry harus selesai sebelum itu.
+const TOTAL_BUDGET_MS = 16_000;
+
+// Batas maksimum tidur saat menghormati header Retry-After dari Gemini;
+// Retry-After besar tidak boleh menahan request sampai app timeout.
+const MAX_RETRY_AFTER_MS = 2000;
+
 // Batas ukuran body yang diterima Worker. Dicek dari header Content-Length
 // SEBELUM body ditampung di memori.
 const MAX_BODY_BYTES = 8_000_000;
@@ -79,6 +87,24 @@ function jsonResponse(body, status) {
 /** Sanggup menunggu sedikit sebelum mencoba ulang model yang sedang sibuk. */
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Mengubah header Retry-After menjadi milidetik. Gemini mengirim jumlah detik
+ * ("12"), tapi spesifikasi HTTP juga mengizinkan tanggal; kalau tidak bisa
+ * diParse, kembalikan null supaya pemanggil memakai backoff default.
+ * @param {string|null|undefined} value
+ * @returns {number|null}
+ */
+export function parseRetryAfterMs(value) {
+  if (!value) return null;
+  const seconds = Number(value);
+  // Angka negatif ditolak di sini; kalau jatuh ke Date.parse, string seperti
+  // "-5" malah dianggap tahun dan menghasilkan nilai besar yang salah.
+  if (Number.isFinite(seconds)) return seconds >= 0 ? Math.round(seconds * 1000) : null;
+  const dateMs = Date.parse(value);
+  if (Number.isNaN(dateMs)) return null;
+  return Math.max(0, dateMs - Date.now());
 }
 
 export default {
@@ -155,7 +181,7 @@ export default {
     const requestBlob = await request.blob();
     const contentType = request.headers.get('Content-Type');
 
-    const callGemini = async (modelName) => {
+    const callGemini = async (modelName, timeoutMs) => {
       const targetUrl = new URL(`${GEMINI_BASE}/v1beta/models/${modelName}:${action}`);
       targetUrl.searchParams.set('key', env.GEMINI_API_KEY);
 
@@ -168,7 +194,7 @@ export default {
           headers,
           body: requestBlob,
         }),
-        { signal: AbortSignal.timeout(ATTEMPT_TIMEOUT_MS) }
+        { signal: AbortSignal.timeout(timeoutMs) }
       );
     };
 
@@ -177,12 +203,19 @@ export default {
     // dikembalikan adalah yang paling informatif, bukan sekadar respons terakhir.
     const attempts = [];
     let lastResponse = null;
+    const startMs = Date.now();
 
+    modelLoop:
     for (const modelName of chain) {
       for (let attempt = 1; attempt <= MAX_ATTEMPTS_PER_MODEL; attempt++) {
+        // Sisa anggaran waktu; kalau habis, berhenti daripada menahan request
+        // sampai app menyerah duluan.
+        const remaining = TOTAL_BUDGET_MS - (Date.now() - startMs);
+        if (remaining <= 0) break modelLoop;
+
         let response;
         try {
-          response = await callGemini(modelName);
+          response = await callGemini(modelName, Math.max(1, Math.min(ATTEMPT_TIMEOUT_MS, remaining)));
         } catch (err) {
           console.error(`[uid:${uid}] ${modelName} gagal terhubung: ${err.message}`);
           attempts.push(`${modelName}: network error`);
@@ -198,7 +231,17 @@ export default {
 
         if (!RETRYABLE_STATUS.has(status)) break;
 
-        if (attempt < MAX_ATTEMPTS_PER_MODEL) await sleep(300 * attempt);
+        if (attempt < MAX_ATTEMPTS_PER_MODEL) {
+          // Hormati Retry-After kalau ada, tapi jangan lebih lama dari sisa
+          // anggaran waktu dan batas maksimum.
+          const retryAfterMs = parseRetryAfterMs(response.headers?.get?.('Retry-After'));
+          const sleepMs = Math.min(
+            retryAfterMs ?? 300 * attempt,
+            MAX_RETRY_AFTER_MS,
+            Math.max(0, TOTAL_BUDGET_MS - (Date.now() - startMs))
+          );
+          if (sleepMs > 0) await sleep(sleepMs);
+        }
       }
     }
 

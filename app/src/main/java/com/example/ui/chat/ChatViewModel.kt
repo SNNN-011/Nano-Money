@@ -10,6 +10,7 @@ import com.example.data.CategoryMigration
 import com.example.data.CategoryRepository
 import com.example.data.FinancialRecord
 import com.example.data.FinancialRecordRepository
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -134,7 +135,12 @@ class ChatViewModel(
 
     fun cancelPendingTransaction() {
         _pendingConfirmation.value = null
-        
+
+        // Konteks klarifikasi ikut dibuang: kalau tidak, pesan berikutnya masih
+        // dibaca AI sebagai lanjutan percakapan lama yang sudah dibatalkan user.
+        _pendingClarificationContext.value = null
+        _clarificationAttempts.value = 0
+
         // Add user-like message to maintain conversational flow history
         val currentList = _messages.value.toMutableList()
         currentList.add(ChatMessage.UserMessage("Batal"))
@@ -154,6 +160,43 @@ class ChatViewModel(
     private val _isAiProcessing = MutableStateFlow(false)
     val isAiProcessing: StateFlow<Boolean> = _isAiProcessing.asStateFlow()
 
+    /** Job AI yang sedang berjalan; disimpan supaya bisa dibatalkan user. */
+    private var aiJob: Job? = null
+
+    /**
+     * Membatalkan permintaan AI yang sedang berjalan (tombol "Batalkan" di layar chat).
+     * Pembatalan menjalar lewat CancellationException sampai panggilan HTTP.
+     */
+    fun cancelAiProcessing() {
+        if (!_isAiProcessing.value) return
+        aiJob?.cancel()
+        aiJob = null
+        _isAiProcessing.value = false
+        lastRequestTime = 0L
+        removeTypingIndicator()
+        addAiMessage("Permintaan AI dibatalkan.")
+    }
+
+    /** Thumbnail kecil untuk bubble chat; bitmap asli tidak boleh ikut tersimpan. */
+    private fun createThumbnail(source: Bitmap): Bitmap {
+        val maxDimension = 160
+        val scale = minOf(
+            maxDimension / source.width.toFloat(),
+            maxDimension / source.height.toFloat(),
+            1f
+        )
+        return if (scale < 1f) {
+            Bitmap.createScaledBitmap(
+                source,
+                (source.width * scale).toInt().coerceAtLeast(1),
+                (source.height * scale).toInt().coerceAtLeast(1),
+                true
+            )
+        } else {
+            source
+        }
+    }
+
     private val receiptUseCase = com.example.domain.ReceiptParserUseCase()
 
     fun scanReceipt(bitmap: Bitmap) {
@@ -162,16 +205,21 @@ class ChatViewModel(
         lastRequestTime = now
         _isAiProcessing.value = true
 
+        // Bubble chat hanya menyimpan thumbnail: chatViewModel ber-scope Activity,
+        // sedangkan bitmap struk ≤2048x2048 ARGB_8888 bisa 12–16 MB per foto dan
+        // dulu menumpuk sampai OOM.
+        val thumbnail = createThumbnail(bitmap)
+
         // Tampilkan scanning receipt indicator
         val currentList = _messages.value.toMutableList()
-        currentList.add(ChatMessage.UserImageMessage(bitmap))
+        currentList.add(ChatMessage.UserImageMessage(thumbnail))
         _messages.value = currentList
 
         val listWithTyping = _messages.value.toMutableList()
         listWithTyping.add(ChatMessage.ScanningReceiptIndicator)
         _messages.value = listWithTyping
 
-        viewModelScope.launch {
+        aiJob = viewModelScope.launch {
             try {
                 val apiKeyRaw = try { BuildConfig.GEMINI_API_KEY } catch (e: Throwable) { "" } ?: ""
                 val apiKey = if (apiKeyRaw.isEmpty() || apiKeyRaw == "MY_GEMINI_API_KEY" || apiKeyRaw == "GEMINI_API_KEY") {
@@ -208,6 +256,11 @@ class ChatViewModel(
                 }
             } finally {
                 _isAiProcessing.value = false
+                // Bitmap besar selesai dipakai (compress+base64 terjadi di dalam
+                // parseReceipt); lepaskan sekarang, jangan menunggu GC.
+                if (bitmap !== thumbnail && !bitmap.isRecycled) {
+                    bitmap.recycle()
+                }
             }
         }
     }
@@ -328,7 +381,7 @@ class ChatViewModel(
         listWithTyping.add(ChatMessage.TypingIndicator)
         _messages.value = listWithTyping
 
-        viewModelScope.launch {
+        aiJob = viewModelScope.launch {
             try {
             val apiKeyRaw = try { BuildConfig.GEMINI_API_KEY } catch (e: Throwable) { "" } ?: ""
             val apiKey = if (apiKeyRaw.isEmpty() || apiKeyRaw == "MY_GEMINI_API_KEY" || apiKeyRaw == "GEMINI_API_KEY") {

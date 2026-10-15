@@ -47,7 +47,6 @@ fun AnalysisTabContent(
     val selectedPeriod by viewModel.selectedPeriod.collectAsState()
     val categoryAggregations by viewModel.categoryAggregations.collectAsState()
     val totalExpense by viewModel.totalExpense.collectAsState()
-    val averageDailyExpense by viewModel.averageDailyExpense.collectAsState()
     val totalIncome by viewModel.totalIncome.collectAsState()
     val topCategory by viewModel.topCategory.collectAsState()
     val totalTransactions by viewModel.totalTransactions.collectAsState()
@@ -71,7 +70,6 @@ fun AnalysisTabContent(
         SummaryStatsCard(
             totalIncome = totalIncome,
             totalExpense = totalExpense,
-            averageDailyExpense = averageDailyExpense,
             topCategoryName = topCategory?.category ?: "-",
             totalTransactions = totalTransactions,
             aggregations = categoryAggregations,
@@ -148,7 +146,6 @@ fun PeriodFilterRow(
 fun SummaryStatsCard(
     totalIncome: Long,
     totalExpense: Long,
-    averageDailyExpense: Double,
     topCategoryName: String,
     totalTransactions: Int,
     aggregations: List<CategoryAggregation> = emptyList(),

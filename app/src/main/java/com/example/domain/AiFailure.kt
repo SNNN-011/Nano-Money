@@ -1,6 +1,7 @@
 package com.example.domain
 
 import kotlinx.coroutines.TimeoutCancellationException
+import org.json.JSONObject
 import retrofit2.HttpException
 
 /**
@@ -22,3 +23,38 @@ internal fun describeAiFailure(e: Throwable?): String = when {
     }
     else -> "Gagal menghubungi server AI. Periksa koneksi internet Anda."
 }
+
+/** Batas nominal transaksi yang diterima, sama dengan gate validasi di repository. */
+internal const val AI_MAX_AMOUNT = 999_999_999_999L
+
+/** Jendela tanggal dari AI: 10 tahun ke belakang. */
+internal const val AI_MAX_DATE_PAST_MS = 10L * 365 * 24 * 60 * 60 * 1000
+
+/** Jendela tanggal dari AI: 36 jam ke depan (toleransi zona waktu/format). */
+internal const val AI_MAX_DATE_FUTURE_MS = 36L * 60 * 60 * 1000
+
+/**
+ * Membaca angka dari JSON hasil AI tanpa memotong desimal seperti `optLong`.
+ *
+ * Model kadang mengirim `15000.0` atau `"15000"`; nilai yang tidak bisa dibaca
+ * mengembalikan [default] supaya pemanggil bisa menolak/menggantinya sendiri.
+ */
+internal fun JSONObject.optAmountLong(key: String, default: Long): Long {
+    val raw = opt(key)
+    val value = when (raw) {
+        is Number -> raw.toDouble()
+        is String -> raw.trim().toDoubleOrNull() ?: Double.NaN
+        else -> Double.NaN
+    }
+    if (!value.isFinite()) return default
+    return kotlin.math.round(value).toLong()
+}
+
+/**
+ * Benar bila tanggal dari AI masih masuk akal.
+ *
+ * Tanpa jendela ini, jawaban seperti `0` atau tahun jauh di masa lalu/lalu bisa
+ * membuat transaksi "menyusup" ke bulan yang salah di Beranda/Kalender.
+ */
+internal fun isPlausibleAiDate(ms: Long, nowMs: Long): Boolean =
+    ms in (nowMs - AI_MAX_DATE_PAST_MS)..(nowMs + AI_MAX_DATE_FUTURE_MS)

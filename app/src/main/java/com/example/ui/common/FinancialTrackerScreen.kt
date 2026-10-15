@@ -15,6 +15,8 @@ import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.listSaver
+import androidx.compose.runtime.saveable.rememberSaveable
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -66,6 +68,17 @@ enum class TrackerTab {
     CHAT,
     EKSPOR_IMPOR
 }
+
+// Batas ukuran file CSV yang boleh diimpor (20 MB) supaya proses baca
+// tidak menghabiskan memori perangkat.
+private const val IMPORT_CSV_MAX_BYTES = 20L * 1024 * 1024
+
+// YearMonth tidak bisa disimpan langsung ke Bundle, jadi di-encode
+// menjadi year * 100 + month (mis. 202610) saat rotasi proses.
+private val YearsMonthsSaver = listSaver<List<java.time.YearMonth>, Int>(
+    save = { months -> months.map { it.year * 100 + it.monthValue } },
+    restore = { encoded -> encoded.map { java.time.YearMonth.of(it / 100, it % 100) } }
+)
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -130,18 +143,20 @@ fun FinancialTrackerScreen(
     val selectedBudgetOffset by viewModel.selectedBudgetOffset.collectAsState()
     val categoryBudgets by viewModel.categoryBudgets.collectAsState()
     val categorySpending by viewModel.categorySpending.collectAsState()
+    val editingRecordId by viewModel.editingRecordId.collectAsState()
+    val categoryRecordCounts by viewModel.categoryRecordCounts.collectAsState()
 
     val welcomeMessage by com.example.util.RemoteConfigHelper.welcomeMessage.collectAsState()
     val welcomeMessageColor by com.example.util.RemoteConfigHelper.welcomeMessageColor.collectAsState()
     val showNewFeature by com.example.util.RemoteConfigHelper.showNewFeature.collectAsState()
 
-    var showBudgetDialog by remember { mutableStateOf(false) }
+    var showBudgetDialog by rememberSaveable { mutableStateOf(false) }
 
-    var showCategoryDialog by remember { mutableStateOf(false) }
+    var showCategoryDialog by rememberSaveable { mutableStateOf(false) }
     var recordToDelete by remember { mutableStateOf<FinancialRecord?>(null) }
 
     // Dialog Hapus Semua Transaksi, dipicu dari ikon sampah di tab Beranda.
-    var showDeleteAllDialog by remember { mutableStateOf(false) }
+    var showDeleteAllDialog by rememberSaveable { mutableStateOf(false) }
 
     // Impor Excel/CSV: isi file disimpan dulu, impor baru jalan setelah user
     // memilih mode (gabung / ganti semua) di dialog konfirmasi.
@@ -149,8 +164,8 @@ fun FinancialTrackerScreen(
     var pendingImportRowCount by remember { mutableStateOf(0) }
 
     // Handle alert states
-    var alertTitle by remember { mutableStateOf<String?>(null) }
-    var alertMessage by remember { mutableStateOf<String?>(null) }
+    var alertTitle by rememberSaveable { mutableStateOf<String?>(null) }
+    var alertMessage by rememberSaveable { mutableStateOf<String?>(null) }
 
     // UI Events observation
     LaunchedEffect(Unit) {
@@ -184,7 +199,7 @@ fun FinancialTrackerScreen(
     }
 
     // Interactive Date Picker state
-    var showDatePickerDialog by remember { mutableStateOf(false) }
+    var showDatePickerDialog by rememberSaveable { mutableStateOf(false) }
 
     // Tab navigation state
     val navController = rememberNavController()
@@ -200,7 +215,9 @@ fun FinancialTrackerScreen(
         }
     }
 
-    var monthsToExport by remember { mutableStateOf<List<java.time.YearMonth>>(emptyList()) }
+    var monthsToExport by rememberSaveable(stateSaver = YearsMonthsSaver) {
+        mutableStateOf<List<java.time.YearMonth>>(emptyList())
+    }
     val exportScope = rememberCoroutineScope()
 
     val exportPdfLauncher = rememberLauncherForActivityResult(
@@ -235,14 +252,28 @@ fun FinancialTrackerScreen(
         contract = ActivityResultContracts.CreateDocument("text/comma-separated-values")
     ) { uri ->
         if (uri != null) {
-            try {
-                context.contentResolver.openOutputStream(uri)?.use { outputStream ->
-                    val csvString = viewModel.getExportCsvString(monthsToExport)
-                    outputStream.write(csvString.toByteArray())
+            exportScope.launch {
+                try {
+                    // Susun CSV dan tulis file di IO agar UI tidak freeze.
+                    val csvString = withContext(Dispatchers.IO) {
+                        viewModel.getExportCsvString(monthsToExport)
+                    }
+                    // openOutputStream bisa null untuk sebagian provider — jangan
+                    // tampilkan toast sukses kalau file tidak pernah dibuat.
+                    val saved = withContext(Dispatchers.IO) {
+                        context.contentResolver.openOutputStream(uri)?.use { outputStream ->
+                            outputStream.write(csvString.toByteArray())
+                            true
+                        } ?: false
+                    }
+                    if (saved) {
+                        Toast.makeText(context, "Data berhasil diekspor ke Excel (CSV)!", Toast.LENGTH_SHORT).show()
+                    } else {
+                        Toast.makeText(context, "Gagal mengekspor Excel: lokasi penyimpanan tidak dapat dibuka.", Toast.LENGTH_LONG).show()
+                    }
+                } catch (e: Exception) {
+                    Toast.makeText(context, "Ekspor Excel gagal: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
                 }
-                Toast.makeText(context, "Data berhasil diekspor ke Excel (CSV)!", Toast.LENGTH_SHORT).show()
-            } catch (e: Exception) {
-                Toast.makeText(context, "Ekspor Excel gagal: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
             }
         }
     }
@@ -253,6 +284,15 @@ fun FinancialTrackerScreen(
         if (uri != null) {
             exportScope.launch {
                 try {
+                    // Tolak file besar sebelum dibaca ke memori. statSize = -1
+                    // artinya provider tidak memberi info ukuran -> tetap dicoba.
+                    val sizeBytes = withContext(Dispatchers.IO) {
+                        context.contentResolver.openFileDescriptor(uri, "r")?.use { it.statSize } ?: -1L
+                    }
+                    if (sizeBytes > IMPORT_CSV_MAX_BYTES) {
+                        Toast.makeText(context, "Gagal mengimpor: ukuran file melebihi 20 MB.", Toast.LENGTH_LONG).show()
+                        return@launch
+                    }
                     // Baca file + hitung baris di IO supaya UI tidak freeze.
                     // Isi file disimpan dulu; impor baru dijalankan setelah user
                     // memilih mode lewat dialog konfirmasi.
@@ -315,7 +355,7 @@ fun FinancialTrackerScreen(
 
     if (showDeleteAllDialog) {
         com.example.ui.export.DeleteAllRecordsDialog(
-            activeCount = viewModel.allRecords.collectAsState().value.size,
+            activeCount = allRecords.size,
             onConfirm = { viewModel.deleteAllRecords() },
             onDismiss = { showDeleteAllDialog = false }
         )
@@ -349,6 +389,7 @@ fun FinancialTrackerScreen(
             onRenameCategory = { oldName, newName ->
                 viewModel.renameCategory(formType, oldName, newName)
             },
+            categoryRecordCounts = categoryRecordCounts,
             onDismissRequest = { showCategoryDialog = false }
         )
     }
@@ -440,7 +481,7 @@ fun FinancialTrackerScreen(
                                     Text(
                                         text = when (route) {
                                             TrackerTab.BERANDA.name -> "DASHBOARD"
-                                            TrackerTab.TRANSAKSI_BARU.name -> if (viewModel.editingRecordId != null) "EDIT TRANSAKSI" else "TRANSAKSI BARU"
+                                            TrackerTab.TRANSAKSI_BARU.name -> if (editingRecordId != null) "EDIT TRANSAKSI" else "TRANSAKSI BARU"
                                             TrackerTab.KALENDER.name -> "KALENDER"
                                             TrackerTab.CHAT.name -> "AI CHATBOT"
                                             TrackerTab.EKSPOR_IMPOR.name -> "CADANGKAN & PEMULIHAN"
@@ -516,7 +557,7 @@ fun FinancialTrackerScreen(
                         selected = currentRoute == TrackerTab.TRANSAKSI_BARU.name,
                         onClick = {
                             focusManager.clearFocus()
-                            if (viewModel.editingRecordId == null) {
+                            if (editingRecordId == null) {
                                 viewModel.resetForm()
                             }
                             navController.navigate(TrackerTab.TRANSAKSI_BARU.name) {
@@ -647,7 +688,7 @@ fun FinancialTrackerScreen(
                             descriptionError = descriptionError,
                             amountError = amountError,
                             dateError = dateError,
-                            isEditing = viewModel.editingRecordId != null,
+                            isEditing = editingRecordId != null,
                             categoriesState = if (formType == "income") incomeCategoriesState else expenseCategoriesState,
                             onManageCategoriesClick = { showCategoryDialog = true },
                             onDescriptionChanged = { viewModel.formDescription.value = it },

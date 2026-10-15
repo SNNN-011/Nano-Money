@@ -5,22 +5,18 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * Chat memakai satu model dengan cadangan berurutan.
+ * App mengirim SATU model saja; fallback berantai adalah tugas Worker.
  *
- * Nama model di sini dibaca apa adanya oleh proxy Worker (lihat `modelMapping` di
- * `cloudflare-worker/src/worker.js`), jadi aplikasi tidak boleh memetakannya ulang ke
- * id model lain. Worker juga sudah punya fallback sendiri; ladder di aplikasi
- * ada sebagai jaring pengaman kedua.
- *exists sebagai jaring pengaman kedua.
+ * Nama model dibaca apa adanya oleh proxy Worker (lihat `MODEL_CHAINS` di
+ * `cloudflare-worker/src/worker.js`), jadi aplikasi tidak boleh memetakannya ulang
+ * ke id model lain.
  */
 class AiModelConfigTest {
 
     @Test
-    fun `urutan_pencobaan_sesuai_yang_diminta`() {
-        assertEquals(
-            listOf("gemini-3.1-flash-lite", "gemma-4-31b-it", "gemini-3.5-flash-lite"),
-            AiModelConfig.modelsToTry()
-        )
+    fun `app_hanya_mengirim_satu_model_sisanya_diserahkan_ke_worker`() {
+        assertEquals(listOf(AiModelConfig.PRIMARY_MODEL), AiModelConfig.modelsToTry())
+        assertEquals(1, AiModelConfig.modelsToTry().size)
     }
 
     @Test

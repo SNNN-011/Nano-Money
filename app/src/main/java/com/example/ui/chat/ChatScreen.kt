@@ -498,6 +498,27 @@ fun ChatScreen(
                 contentPadding = PaddingValues(top = 16.dp, bottom = 16.dp),
                 reverseLayout = true
             ) {
+                // reverseLayout: item pertama tampil paling bawah. Tombol batal
+                // ditaruh paling bawah supaya selalu terlihat saat AI memproses.
+                if (isAiProcessing) {
+                    item(key = "cancel_ai_request") {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            TextButton(
+                                onClick = { viewModel.cancelAiProcessing() },
+                                modifier = Modifier.testTag("cancel_ai_request_button")
+                            ) {
+                                Text(
+                                    "Batalkan permintaan AI",
+                                    color = GhostWhite.copy(alpha = 0.7f),
+                                    fontSize = 12.sp
+                                )
+                            }
+                        }
+                    }
+                }
                 items(messages.asReversed()) { message ->
                     when (message) {
                         is ChatMessage.UserMessage -> {

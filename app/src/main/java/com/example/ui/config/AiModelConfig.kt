@@ -3,20 +3,14 @@ package com.example.ui.config
 /**
  * Model AI untuk chat.
  *
- * Rantai di bawah dipakai aplikasi, TIDAK hanya urutan preferensi: `parseTransaction`
- * dan reader struk memang meng-loop daftar ini. Lapisan ini hanya berjalan setelah
- * proxy Worker selesai mencoba rantainya sendiri dan tetap gagal, jadi bukan dua
- * ladder yang berebutan.
+ * Aplikasi HANYA mengirim satu model ([PRIMARY_MODEL]); proxy Worker punya rantai
+ * fallback sendiri (`MODEL_CHAINS` di `worker.js`). Sebelumnya kedua sisi
+ * masing-masing me-loop semua model, sehingga satu tap user bisa memicu sampai
+ * ~18 panggilan Gemini (3 model di app x 6 percobaan di Worker) yang hampir
+ * semuanya hanya membakar kuota.
  *
- * Kenapa tidak dihapus: Worker memakai nama model sebagai kunci chain-nya sendiri,
- * dan kedua daftar harus tetap sinkron supaya permintaan tidak menyebut nama yang
- * tidak dikenal Worker.
- *
- * Urutan di bawah hanya urutan preferensi. Angkanya berasal dari pengukuran latency
- * nyata ke /v1beta/models dengan kunci API, bukan tebakan nama model.
- *
- * Nama model di sini adalah format yang dibaca proxy Worker (lihat `MODEL_CHAINS` di
- * `cloudflare-worker/src/worker.js`), yang juga sudah punya fallback sendiri.
+ * Nama model di sini adalah format yang dibaca proxy Worker, jadi daftar ini
+ * harus tetap sinkron dengan `MODEL_CHAINS` di `cloudflare-worker/src/worker.js`.
  */
 object AiModelConfig {
 
@@ -38,17 +32,20 @@ object AiModelConfig {
     /**
      * Batas waktu satu percobaan di sisi aplikasi.
      *
-     * Dulu 30 detik per model, jadi dengan beberapa model dalam ladder layar bisa
-     * menggantung hampir semenit. Sekarang cukup sedikit di atas batas per-panggilan
-     * Worker (8 detik x 2 percobaan + waktu perpindahan model).
+     * Worker membatasi total rantainya sendiri (~16 detik, lihat TOTAL_BUDGET_MS),
+     * jadi batas ini hanya jaring pengaman agar layar tidak menggantung.
      */
     const val ATTEMPT_TIMEOUT_MS = 20_000L
 
-    /** Urutan percobaan: utama dulu, lalu cadangan. */
+    /** Daftar model yang dikenal Worker; urutannya urutan preferensi lama. */
     val CHAT_MODELS: List<String> = listOf(PRIMARY_MODEL, FALLBACK_MODEL_1, FALLBACK_MODEL_2)
 
     /** Model untuk pembaca struk, diurut dari yang paling andal. */
     val RECEIPT_MODELS: List<String> = listOf(PRIMARY_MODEL, FALLBACK_MODEL_2, FALLBACK_MODEL_1)
 
-    fun modelsToTry(): List<String> = CHAT_MODELS.distinct()
+    /**
+     * Model yang benar-benar dikirim aplikasi: satu saja.
+     * Worker yang mencoba model lain bila model ini gagal.
+     */
+    fun modelsToTry(): List<String> = listOf(PRIMARY_MODEL)
 }
