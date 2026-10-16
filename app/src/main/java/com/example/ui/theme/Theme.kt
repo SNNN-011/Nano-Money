@@ -94,8 +94,23 @@ fun PremiumButton(
     fillMaxWidth: Boolean = true,
     horizontalPadding: Dp = 16.dp,
     verticalPadding: Dp = 10.dp,
-    gradientColors: List<Color> = listOf(SteelBlue, SteelBlue.copy(alpha = 0.7f))
+    gradientColors: List<Color> = listOf(SteelBlue, SteelBlue.copy(alpha = 0.7f)),
+    /**
+     * Tombol bahaya (hapus / ganti semua). Tombol jenis ini selalu tampil
+     * terisi dengan gradien merah tanpa perlu mengeset [isActive] -- dulu
+     * pemanggil harus mengirim gradien merah sendiri sambil mengeset
+     * isActive = false, dan hasilnya tombol destruktif justru tampil pucat.
+     */
+    isDestructive: Boolean = false
 ) {
+    // Tombol destruktif selalu terisi supaya beda jelas dari tombol netral.
+    val isFilled = isActive || isDestructive
+    val resolvedGradient = if (isDestructive) {
+        listOf(NeonRed, NeonRed.copy(alpha = 0.72f))
+    } else {
+        gradientColors
+    }
+
     Card(
         modifier = modifier.then(if (!enabled) Modifier.alpha(0.5f) else Modifier),
         shape = RoundedCornerShape(CornerRadius.xl),
@@ -115,10 +130,10 @@ fun PremiumButton(
                 .padding(4.dp)
                 .clip(RoundedCornerShape(CornerRadius.lg))
                 .then(
-                    if (isActive) {
+                    if (isFilled) {
                         Modifier.background(
                             brush = Brush.verticalGradient(
-                                colors = gradientColors
+                                colors = resolvedGradient
                             ),
                             shape = RoundedCornerShape(CornerRadius.lg)
                         )
@@ -140,13 +155,13 @@ fun PremiumButton(
                     Icon(
                         imageVector = icon,
                         contentDescription = null,
-                        tint = if (isActive) MidnightAbyss else GhostWhite.copy(alpha = 0.8f),
+                        tint = if (isFilled) MidnightAbyss else GhostWhite.copy(alpha = 0.8f),
                         modifier = Modifier.padding(end = 6.dp).size(16.dp)
                     )
                 }
                 Text(
                     text = text,
-                    color = if (isActive) MidnightAbyss else GhostWhite.copy(alpha = 0.8f),
+                    color = if (isFilled) MidnightAbyss else GhostWhite.copy(alpha = 0.8f),
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Bold,
                     style = MaterialTheme.typography.labelLarge,
