@@ -28,27 +28,15 @@ object GoogleDriveHelper {
     private const val DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file"
 
     /**
-     * Nama berkas cadangan di Google Drive.
-     *
-     * Sengaja satu nama tetap: backup berikutnya menimpa yang lama, jadi folder Drive
-     * tidak menumpuk berkas yang isinya hampir identik. Konsekuensinya hanya ada satu
-     * versi cadangan yang bisa dipulihkan, bukan riwayat.
+     * Nama berkas cadangan lama (satu nama tetap, isi saling menimpa).
+     * Hanya dipertahankan supaya cadangan lama tetap muncul di daftar.
+     * Cadangan baru memakai nama bertanggal `NanoMoney_backup_<stamp>.zip`
+     * sehingga tiap unggahan menyimpan versi tersendiri (riwayat 5 terbaru).
      */
-    const val BACKUP_FILE_NAME = "Cadangan_Data_NanoMoney.db"
+    private const val LEGACY_BACKUP_FILE_NAME = "Cadangan_Data_NanoMoney.db"
 
     /** Nama folder tujuan di Drive. */
     const val BACKUP_FOLDER_NAME = "Backup Nano Money"
-
-    /**
-     * Berkas yang dianggap milik aplikasi ini.
-     *
-     * Mencakup nama lama (manual_DataNanoMoney_*, backup_*) supaya cadangan yang
-     * sudah terlanjung terunggah tetap muncul di daftar.
-     */
-    private fun isAppBackupName(name: String): Boolean =
-        name == BACKUP_FILE_NAME ||
-            name.contains("DataNanoMoney_") ||
-            name.contains("backup_")
 
     data class DriveBackupFile(
         val id: String,
@@ -264,7 +252,7 @@ object GoogleDriveHelper {
             // Step 1: Create the file metadata in Google Drive inside the directory
             val metadataJson = JSONObject().apply {
                 put("name", driveFileName)
-                put("mimeType", "application/x-sqlite3")
+                put("mimeType", "application/zip")
                 if (!folderId.isNullOrEmpty()) {
                     put("parents", JSONArray().apply { put(folderId) })
                 }
@@ -322,19 +310,22 @@ object GoogleDriveHelper {
 
         SecureLog.d(TAG, "Berkas berhasil diunggah/diperbarui ke Google Drive: $fileIdToUpload")
 
-        // Jaga agar tidak menumpuk. Tanpa ini folder Drive akan penuh file backup
-        // bertanggal yang isinya identik, dan memilih yang mana jadi membingungkan.
-        tryCleanOldDriveBackups(token)
+        // Jaga riwayat: sisakan 5 cadangan terbaru saja.
+        // H11: berkas yang baru saja diunggah tidak boleh ikut terhapus —
+        // berkas yang ditimpa (mode overwrite) mempertahankan createdTime lama,
+        // sehingga bisa tampak paling tua di daftar.
+        tryCleanOldDriveBackups(token, fileIdToUpload)
 
         return DriveResult.Success(fileIdToUpload)
     }
 
-    private fun tryCleanOldDriveBackups(token: String) {
+    private fun tryCleanOldDriveBackups(token: String, protectedFileId: String?) {
         try {
             val driveFiles = listBackupsFromDriveInternal(token)
             if (driveFiles.size > 5) {
                 for (i in 5 until driveFiles.size) {
                     val fileToDelete = driveFiles[i]
+                    if (fileToDelete.id == protectedFileId) continue
                     deleteBackupFromDriveInternal(token, fileToDelete.id)
                     SecureLog.i(TAG, "Menghapus cadangan Drive lama untuk membatasi maksimal 5: ${fileToDelete.name} (${fileToDelete.id})")
                 }
@@ -345,9 +336,16 @@ object GoogleDriveHelper {
     }
 
     /**
-     * Upload backup database (.db) file to Google Drive.
+     * Unggah ZIP cadangan ke Google Drive.
+     *
+     * @param driveFileName nama berkas di Drive; default = nama berkas lokal
+     *   (bertanggal) supaya setiap unggahan menjadi versi tersendiri.
      */
-    suspend fun uploadBackupToDrive(context: Context, backupFile: File): DriveResult<String> = withContext(Dispatchers.IO) {
+    suspend fun uploadBackupToDrive(
+        context: Context,
+        backupFile: File,
+        driveFileName: String = backupFile.name
+    ): DriveResult<String> = withContext(Dispatchers.IO) {
         if (!backupFile.exists()) {
             return@withContext DriveResult.Error("Berkas cadangan tidak ditemukan lokal.")
         }
@@ -360,11 +358,7 @@ object GoogleDriveHelper {
 
         try {
             val folderId = getOrCreateFolderId(token)
-            val result = uploadBackupToDriveInternal(token, backupFile, BACKUP_FILE_NAME, folderId)
-            if (result is DriveResult.Success) {
-                tryCleanOldDriveBackups(token)
-            }
-            result
+            uploadBackupToDriveInternal(token, backupFile, driveFileName, folderId)
         } catch (unauthorized: UnauthorizedException) {
             SecureLog.w(TAG, "Koneksi Google Drive unauthorized (token expired). Mencoba menyegarkan token...")
             tokenResult = fetchAccessToken(context, forceRefresh = true)
@@ -374,11 +368,7 @@ object GoogleDriveHelper {
             token = (tokenResult as DriveResult.Success).data
             try {
                 val folderId = getOrCreateFolderId(token)
-                val result = uploadBackupToDriveInternal(token, backupFile, BACKUP_FILE_NAME, folderId)
-                if (result is DriveResult.Success) {
-                    tryCleanOldDriveBackups(token)
-                }
-                result
+                uploadBackupToDriveInternal(token, backupFile, driveFileName, folderId)
             } catch (e: Exception) {
                 SecureLog.e(TAG, "Gagal mengunggah cadangan setelah penyeleksian ulang token: ${e.message}", e)
                 DriveResult.Error("Gagal mengunggah berkas ke Google Drive: ${e.localizedMessage ?: "Kesalahan tidak diketahui."}")
@@ -397,11 +387,11 @@ object GoogleDriveHelper {
         
         // Nama baru dan nama lama ikut dicakup supaya cadangan yang sudah
         // pernah terunggah tidak hilang dari daftar.
-        val nameFilter = "name = '$BACKUP_FILE_NAME' or name contains 'DataNanoMoney_' or name contains 'backup_'"
+        val nameFilter = "name = '$LEGACY_BACKUP_FILE_NAME' or name contains 'NanoMoney_backup_' or name contains 'DataNanoMoney_' or name contains 'backup_'"
         val query = if (!folderId.isNullOrEmpty()) {
-            "($nameFilter) and name contains '.db' and '$folderId' in parents and trashed = false"
+            "($nameFilter) and (name contains '.db' or name contains '.zip') and '$folderId' in parents and trashed = false"
         } else {
-            "($nameFilter) and name contains '.db' and trashed = false"
+            "($nameFilter) and (name contains '.db' or name contains '.zip') and trashed = false"
         }
         val url = "https://www.googleapis.com/drive/v3/files?q=${java.net.URLEncoder.encode(query, "UTF-8")}&fields=files(id,name,createdTime,size)&orderBy=createdTime desc"
 
