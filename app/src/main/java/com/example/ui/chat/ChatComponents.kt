@@ -108,11 +108,15 @@ fun UserImageMessageBubble(bitmap: Bitmap) {
                 Image(
                     bitmap = bitmap.asImageBitmap(),
                     contentDescription = "Struk Belanjaan",
-                    // Gambar struk memakai lebar penuh gelenbung (85% lebar layar).
-                    // Sebelumnya dibatasi 160dp sehingga struk tidak terbaca.
+                    // Ukuran harus ditentukan aspectRatio, bukan fillMaxWidth saja:
+                    // Image di Compose itu Spacer + drawBehind, dan Spacer hanya
+                    // mengambil maxWidth kalau lebarnya fixed. Dengan fillMaxWidth
+                    // saja tingginya tetap 0, jadi struk tampil gepeng memanjang.
                     modifier = Modifier
                         .fillMaxWidth()
-                        .heightIn(max = 480.dp)
+                        .aspectRatio(
+                            if (bitmap.height > 0) bitmap.width.toFloat() / bitmap.height.toFloat() else 1f
+                        )
                         .clip(RoundedCornerShape(CornerRadius.md)),
                     contentScale = ContentScale.Fit
                 )
