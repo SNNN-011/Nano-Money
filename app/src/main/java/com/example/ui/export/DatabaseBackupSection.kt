@@ -43,6 +43,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.util.BackupHelper
 import com.example.util.BackupScheduler
+import com.example.data.sync.SyncCursors
+import com.example.data.sync.SyncManager
 import com.example.util.GoogleDriveHelper
 import com.example.util.NotificationScheduler
 import androidx.work.WorkManager
@@ -101,6 +103,10 @@ fun DatabaseBackupSection(
     var showDisconnectConfirmation by remember { mutableStateOf(false) }
     var driveBackupFileToDelete by remember { mutableStateOf<GoogleDriveHelper.DriveBackupFile?>(null) }
     var isRestoring by remember { mutableStateOf(false) }
+    var firestoreSyncEnabled by remember { mutableStateOf(SyncCursors.isSyncEnabled(context)) }
+    var showSyncWarning by remember { mutableStateOf(false) }
+    var showDeleteCloudConfirm by remember { mutableStateOf(false) }
+    var isDeletingCloud by remember { mutableStateOf(false) }
     var tempBackupHour by remember(autoBackupHour) { mutableStateOf(autoBackupHour) }
     var tempBackupMinute by remember(autoBackupMinute) { mutableStateOf(autoBackupMinute) }
     var tempBackupDayOfWeek by remember(autoBackupDayOfWeek) { mutableStateOf(autoBackupDayOfWeek) }
@@ -275,6 +281,58 @@ fun DatabaseBackupSection(
                         }
                     }
 
+                    // Toggle sinkronisasi: default MATI. Saat mati tidak ada data
+                    // lokal yang dikirim ke cloud; menyalakan butuh konfirmasi.
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(TranslucentForm.copy(alpha = 0.35f), shape = RoundedCornerShape(12.dp))
+                            .padding(horizontal = 12.dp, vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Sinkronisasi Firestore",
+                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                                color = GhostWhite
+                            )
+                            Text(
+                                text = if (firestoreSyncEnabled) {
+                                    "Aktif — data terkirim & tersinkron ke cloud"
+                                } else {
+                                    "Nonaktif — data tetap hanya di HP ini"
+                                },
+                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
+                                color = GhostWhite.copy(alpha = 0.5f)
+                            )
+                        }
+                        Switch(
+                            checked = firestoreSyncEnabled,
+                            onCheckedChange = { enabled ->
+                                if (enabled) {
+                                    showSyncWarning = true
+                                } else {
+                                    firestoreSyncEnabled = false
+                                    SyncManager.disableSync(context)
+                                    Toast.makeText(context, "Sinkronisasi dimatikan. Data di HP tidak dihapus.", Toast.LENGTH_SHORT).show()
+                                }
+                            },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = NeonViolet,
+                                checkedTrackColor = NeonViolet.copy(alpha = 0.4f)
+                            ),
+                            modifier = Modifier.testTag("firestore_sync_toggle")
+                        )
+                    }
+
+                    PremiumButton(
+                        text = if (isDeletingCloud) "MENGHAPUS DATA CLOUD..." else "HAPUS DATA CLOUD",
+                        onClick = { showDeleteCloudConfirm = true },
+                        isActive = !isDeletingCloud,
+                        modifier = Modifier.fillMaxWidth().testTag("delete_cloud_data_button")
+                    )
+
                     val workManager = remember { WorkManager.getInstance(context) }
                     val liveData = remember { workManager.getWorkInfosForUniqueWorkLiveData("SyncUniqueWork") }
                     var workInfos by remember { mutableStateOf<List<WorkInfo>>(emptyList()) }
@@ -326,7 +384,7 @@ fun DatabaseBackupSection(
                                 syncWorkRequest
                             )
                         },
-                        isActive = !isSyncingByFirebase,
+                        isActive = !isSyncingByFirebase && firestoreSyncEnabled,
                         icon = Icons.Default.Sync,
                         modifier = Modifier.fillMaxWidth().testTag("sync_firestore_button")
                     )
@@ -647,6 +705,9 @@ fun DatabaseBackupSection(
                                         showDisconnectConfirmation = false
                                         GoogleDriveHelper.signOut(context) {
                                             com.example.util.FirebaseSyncHelper.signOut()
+                                            // Sinkronisasi wajib mati saat akun diputus.
+                                            SyncManager.disableSync(context)
+                                            firestoreSyncEnabled = false
                                             onConnectedGoogleAccountChanged(null)
                                             onDriveBackupListChanged(emptyList())
                                             Toast.makeText(context, "Akses Google & penyelarasan cloud terputus.", Toast.LENGTH_SHORT).show()
@@ -741,6 +802,183 @@ fun DatabaseBackupSection(
                                 isActive = true,
                                 modifier = Modifier.weight(1.3f),
                                 testTag = "confirm_delete_drive_backup"
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // --- Dialog peringatan menyalakan sinkronisasi Firestore ---
+    if (showSyncWarning) {
+        Dialog(onDismissRequest = { showSyncWarning = false }) {
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(containerColor = MidnightAbyss),
+                border = BorderStroke(
+                    width = 1.dp,
+                    brush = Brush.verticalGradient(
+                        colors = listOf(
+                            GhostWhite.copy(alpha = 0.2f),
+                            GhostWhite.copy(alpha = 0.02f)
+                        )
+                    )
+                ),
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+            ) {
+                Box(modifier = Modifier.background(TranslucentGlass)) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(24.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Text(
+                            text = "Nyalakan Sinkronisasi Cloud?",
+                            color = GhostWhite,
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "Seluruh data di HP ini (transaksi, transaksi berulang, kategori, anggaran, dan pengaturan) akan DIUNGGAH PENUH ke cloud Firestore milik akun " +
+                                "${connectedGoogleAccount?.email ?: "Google"} lalu disinkronkan otomatis antar perangkat.\n\n" +
+                                "Catatan: isi cloud tidak dienkripsi khusus oleh aplikasi — data tersimpan dalam bentuk yang terbaca oleh layanan cloud. Jangan nyalakan kalau Anda tidak nyaman dengan hal itu.\n\n" +
+                                "Data di HP tetap utuh. Mematikan kembali sinkronisasi tidak menghapus data apa pun.",
+                            color = GhostWhite.copy(alpha = 0.8f),
+                            style = MaterialTheme.typography.bodyMedium,
+                            lineHeight = 20.sp
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            PremiumButton(
+                                text = "Batal",
+                                onClick = { showSyncWarning = false },
+                                isActive = true,
+                                modifier = Modifier.weight(1f),
+                                testTag = "cancel_enable_sync"
+                            )
+                            PremiumButton(
+                                text = "PAHAM, KONFIRMASI",
+                                onClick = {
+                                    showSyncWarning = false
+                                    firestoreSyncEnabled = true
+                                    coroutineScope.launch {
+                                        SyncManager.enableSync(context)
+                                        val result = com.example.util.FirebaseSyncHelper.syncFinancialRecordsWithFirestore(context)
+                                        Toast.makeText(
+                                            context,
+                                            result.getOrElse { "Sinkronisasi awal gagal: ${it.localizedMessage}" },
+                                            Toast.LENGTH_LONG
+                                        ).show()
+                                    }
+                                },
+                                isActive = true,
+                                modifier = Modifier.weight(1.3f),
+                                testTag = "confirm_enable_sync"
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // --- Dialog konfirmasi hapus data cloud ---
+    if (showDeleteCloudConfirm) {
+        Dialog(onDismissRequest = { if (!isDeletingCloud) showDeleteCloudConfirm = false }) {
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(containerColor = MidnightAbyss),
+                border = BorderStroke(
+                    width = 1.dp,
+                    brush = Brush.verticalGradient(
+                        colors = listOf(
+                            GhostWhite.copy(alpha = 0.2f),
+                            GhostWhite.copy(alpha = 0.02f)
+                        )
+                    )
+                ),
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+            ) {
+                Box(modifier = Modifier.background(TranslucentGlass)) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(24.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Text(
+                            text = "Hapus Data Cloud?",
+                            color = GhostWhite,
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "Seluruh data milik akun ${connectedGoogleAccount?.email ?: "Google"} yang tersimpan di cloud Firestore akan DIHAPUS PERMANEN.\n\n" +
+                                "Data di HP ini TIDAK dihapus dan tetap bisa dipakai. Sinkronisasi akan dimatikan otomatis setelah selesai. " +
+                                "Kalau dinyalakan lagi nanti, seluruh isi HP akan diunggah ulang dari awal.",
+                            color = GhostWhite.copy(alpha = 0.8f),
+                            style = MaterialTheme.typography.bodyMedium,
+                            lineHeight = 20.sp
+                        )
+                        if (isDeletingCloud) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(18.dp),
+                                    strokeWidth = 2.dp,
+                                    color = NeonRed
+                                )
+                                Text(
+                                    text = "Menghapus data cloud...",
+                                    color = GhostWhite.copy(alpha = 0.7f),
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            PremiumButton(
+                                text = "Batal",
+                                onClick = { showDeleteCloudConfirm = false },
+                                isActive = !isDeletingCloud,
+                                modifier = Modifier.weight(1f),
+                                testTag = "cancel_delete_cloud_data"
+                            )
+                            PremiumButton(
+                                text = "PAHAM, KONFIRMASI",
+                                onClick = {
+                                    coroutineScope.launch {
+                                        isDeletingCloud = true
+                                        val report = SyncManager.deleteAllCloudData(context)
+                                        isDeletingCloud = false
+                                        showDeleteCloudConfirm = false
+                                        firestoreSyncEnabled = false
+                                        Toast.makeText(
+                                            context,
+                                            if (report.errors.isEmpty()) {
+                                                "Data cloud dihapus. Data di HP tidak disentuh."
+                                            } else {
+                                                "Sebagian data cloud gagal dihapus: ${report.errors.joinToString("; ")}"
+                                            },
+                                            Toast.LENGTH_LONG
+                                        ).show()
+                                    }
+                                },
+                                isActive = !isDeletingCloud,
+                                modifier = Modifier.weight(1.3f),
+                                testTag = "confirm_delete_cloud_data"
                             )
                         }
                     }

@@ -17,11 +17,14 @@ class SyncWorker(
     override suspend fun doWork(): Result {
         SecureLog.d("SyncWorker", "Memulai sinkronisasi via WorkManager... Attempt: $runAttemptCount")
 
-        // L6: tanpa akun tersambung, sinkronisasi periodik tidak ada gunanya.
-        // Pekerjaan periodiknya dibatalkan supaya tidak bangun tiap jam; akan
-        // dipasang ulang otomatis oleh SyncManager.startRealtime saat login berikutnya.
-        if (!FirebaseSyncHelper.isUserSignedIn()) {
-            SecureLog.d("SyncWorker", "Tidak ada akun tersambung, sinkronisasi periodik dihentikan.")
+        // L6: tanpa akun tersambung atau saat toggle sinkronisasi mati, sinkronisasi
+        // periodik tidak ada gunanya. Pekerjaan periodiknya dibatalkan supaya tidak
+        // bangun tiap jam; akan dipasang ulang otomatis oleh SyncManager.startRealtime
+        // (dipanggil saat pengguna menyalakan toggle).
+        if (!FirebaseSyncHelper.isUserSignedIn() ||
+            !com.example.data.sync.SyncCursors.isSyncEnabled(applicationContext)
+        ) {
+            SecureLog.d("SyncWorker", "Akun belum tersambung atau sinkronisasi nonaktif, sinkronisasi periodik dihentikan.")
             runCatching { WorkManager.getInstance(applicationContext).cancelUniqueWork(SyncManager.PERIODIC_SYNC_WORK) }
                 .onFailure { SecureLog.w("SyncWorker", "Gagal membatalkan sync periodik: ${it.message}") }
             return Result.success()

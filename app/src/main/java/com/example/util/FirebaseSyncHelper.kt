@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Log
 import com.example.data.FinancialRecord
 import com.example.data.sync.CollectionSync
+import com.example.data.sync.SyncCursors
 import com.example.data.sync.SyncManager
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount
 import com.google.firebase.auth.FirebaseAuth
@@ -47,7 +48,11 @@ object FirebaseSyncHelper {
             FirebaseAuth.getInstance().signInWithCredential(credential)
                 .addOnCompleteListener { task ->
                     if (task.isSuccessful) {
-                        SyncManager.startRealtime(context)
+                        // Toggle sinkronisasi default MATI: realtime hanya menempel
+                        // kalau pengguna pernah menyalakannya secara eksplisit.
+                        if (SyncCursors.isSyncEnabled(context)) {
+                            SyncManager.startRealtime(context)
+                        }
                         val email = task.result?.user?.email ?: ""
                         continuation.resume(Result.success(email))
                     } else {
