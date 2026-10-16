@@ -143,14 +143,11 @@ fun EksporImporTabContent(
     var autoBackupHour by remember { mutableStateOf(securityPrefs.getInt("auto_backup_hour", 2)) }
     var autoBackupMinute by remember { mutableStateOf(securityPrefs.getInt("auto_backup_minute", 0)) }
     var autoBackupDayOfWeek by remember { mutableStateOf(securityPrefs.getInt("auto_backup_day_of_week", java.util.Calendar.SUNDAY)) }
-    var backupList by remember { mutableStateOf(emptyList<File>()) }
-    var selectedBackupToRestore by remember { mutableStateOf<File?>(null) }
 
     var connectedGoogleAccount by remember { mutableStateOf(GoogleDriveHelper.getSignedInAccount(context)) }
     var isDriveProcessing by remember { mutableStateOf(false) }
     var driveBackupList by remember { mutableStateOf<List<GoogleDriveHelper.DriveBackupFile>>(emptyList()) }
     var selectedDriveBackupToRestore by remember { mutableStateOf<GoogleDriveHelper.DriveBackupFile?>(null) }
-    var selectedLocalBackupToUpload by remember { mutableStateOf<File?>(null) }
     var driveErrorDetailMessage by remember { mutableStateOf<String?>(null) }
 
     // Google SignIn Launcher
@@ -210,11 +207,6 @@ fun EksporImporTabContent(
         }
     }
 
-    // Fetch local backups
-    LaunchedEffect(Unit) {
-        backupList = BackupHelper.getBackups(context)
-    }
-
     // BODY LAYOUT
     val contentBody = @Composable {
         Column(
@@ -268,20 +260,14 @@ fun EksporImporTabContent(
                     autoBackupDayOfWeek = dayOfWeek
                     securityPrefs.edit().putInt("auto_backup_day_of_week", dayOfWeek).commit()
                 },
-                backupList = backupList,
-                onBackupListChanged = { backupList = it },
                 connectedGoogleAccount = connectedGoogleAccount,
                 onConnectedGoogleAccountChanged = { connectedGoogleAccount = it },
                 isDriveProcessing = isDriveProcessing,
                 onIsDriveProcessingChanged = { isDriveProcessing = it },
                 driveBackupList = driveBackupList,
                 onDriveBackupListChanged = { driveBackupList = it },
-                selectedBackupToRestore = selectedBackupToRestore,
-                onSelectedBackupToRestoreChange = { selectedBackupToRestore = it },
                 selectedDriveBackupToRestore = selectedDriveBackupToRestore,
                 onSelectedDriveBackupToRestoreChange = { selectedDriveBackupToRestore = it },
-                selectedLocalBackupToUpload = selectedLocalBackupToUpload,
-                onSelectedLocalBackupToUploadChange = { selectedLocalBackupToUpload = it },
                 driveErrorDetailMessage = driveErrorDetailMessage,
                 onDriveErrorDetailMessageChange = { driveErrorDetailMessage = it },
                 onConnectGoogleDrive = {
