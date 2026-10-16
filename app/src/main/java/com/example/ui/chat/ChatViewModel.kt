@@ -30,7 +30,11 @@ sealed class ChatMessage {
     data class UserImageMessage(val bitmap: Bitmap) : ChatMessage()
     data class AiMessage(
         val text: String,
-        val record: FinancialRecord? = null
+        val record: FinancialRecord? = null,
+        /** True kalau pesan ini pemberitahuan kegagalan, bukan jawaban AI. */
+        val isError: Boolean = false,
+        /** Teks user yang bisa dikirim ulang lewat tombol "Coba Lagi". */
+        val retryText: String? = null
     ) : ChatMessage()
     object TypingIndicator : ChatMessage()
     object ScanningReceiptIndicator : ChatMessage()
@@ -221,7 +225,9 @@ class ChatViewModel(
                         } else {
                             "Gagal memproses struk: ${resultStatus.message}"
                         }
-                        addAiMessage(msg)
+                        // Tanpa retryText: mengulang butuh bitmap struk, dan bitmap
+                        // sudah dilepas di blok finally di bawah.
+                        addAiMessage(msg, isError = true)
                     }
                     is com.example.domain.RequestResult.Success -> {
                         val parsed = resultStatus.data
@@ -347,12 +353,41 @@ class ChatViewModel(
         if (now - lastRequestTime < 600L || _isAiProcessing.value) return
         if (userText.trim().isEmpty()) return
         lastRequestTime = now
-        _isAiProcessing.value = true
 
-        // 1. Tambahkan pesan user ke list
+        // 1. Tambahkan pesan user ke list, lalu minta jawaban AI
         val currentList = _messages.value.toMutableList()
         currentList.add(ChatMessage.UserMessage(userText))
         _messages.value = currentList
+
+        runAiRequest(userText)
+    }
+
+    /**
+     * Mengulang permintaan AI yang gagal memakai teks yang sama.
+     *
+     * Gelembung error dibuang supaya percakapan tidak menumpuk pesan kegagalan,
+     * dan gelembung pesan user TIDAK ditambahkan lagi: teks yang diulang adalah
+     * pesan yang sudah ada di layar.
+     */
+    fun retryMessage(failed: ChatMessage.AiMessage) {
+        val userText = failed.retryText ?: return
+        if (_isAiProcessing.value) return
+
+        val currentList = _messages.value.toMutableList()
+        currentList.remove(failed)
+        _messages.value = currentList
+
+        runAiRequest(userText)
+    }
+
+    /**
+     * Menjalankan permintaan parsing ke AI beserta indikator prosesnya.
+     *
+     * Dipisah dari [sendMessage] supaya jalur "Coba Lagi" memakai kode yang sama
+     * persis tanpa menambah gelembung pesan user baru.
+     */
+    private fun runAiRequest(userText: String) {
+        _isAiProcessing.value = true
 
         // 2. Tampilkan typing indicator
         val listWithTyping = _messages.value.toMutableList()
@@ -394,7 +429,11 @@ class ChatViewModel(
                         }
                     }
                     com.example.util.SecureLog.e("ChatVM", "AI request failed", e)
-                    addAiMessage("$errorMessage\n\n(Catatan: Anda tetap dapat mencatat langsung melalui tab 'Transaksi Baru'.)")
+                    addAiMessage(
+                        text = "$errorMessage\n\n(Catatan: Anda tetap dapat mencatat langsung melalui tab 'Transaksi Baru'.)",
+                        isError = true,
+                        retryText = userText
+                    )
                 }
                 is com.example.domain.RequestResult.Success -> {
                     val result = resultStatus.data
@@ -530,9 +569,14 @@ class ChatViewModel(
         _messages.value = current
     }
 
-    private fun addAiMessage(text: String, record: FinancialRecord? = null) {
+    private fun addAiMessage(
+        text: String,
+        record: FinancialRecord? = null,
+        isError: Boolean = false,
+        retryText: String? = null
+    ) {
         val current = _messages.value.toMutableList()
-        current.add(ChatMessage.AiMessage(text, record))
+        current.add(ChatMessage.AiMessage(text, record, isError, retryText))
         _messages.value = current
     }
 

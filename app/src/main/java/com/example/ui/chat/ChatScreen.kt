@@ -9,15 +9,18 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.automirrored.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -34,7 +37,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.FinancialRecord
 import com.example.ui.theme.*
-import com.example.ui.components.GlassCard
 import com.example.ui.config.AiModelConfig
 import com.example.ui.config.FormatUtils
 
@@ -66,13 +68,15 @@ fun ChatScreen(
     modifier: Modifier = Modifier
 ) {
     val messages by viewModel.messages.collectAsState()
-    val isAiProcessing = messages.any { it is ChatMessage.TypingIndicator || it is ChatMessage.ScanningReceiptIndicator }
+    // Satu sumber kebenaran: bendera dari ViewModel, bukan hasil hitung ulang isi
+    // daftar pesan (dulu keduanya bisa berbeda).
+    val isAiProcessing by viewModel.isAiProcessing.collectAsState()
     val focusManager = LocalFocusManager.current
-    var inputText by remember { mutableStateOf("") }
+    var inputText by rememberSaveable { mutableStateOf("") }
     val listState = rememberLazyListState()
 
     val context = LocalContext.current
-    var isLoggedIn by remember { mutableStateOf(FirebaseSyncHelper.isUserSignedIn()) }
+    var isLoggedIn by rememberSaveable { mutableStateOf(FirebaseSyncHelper.isUserSignedIn()) }
     val coroutineScope = rememberCoroutineScope()
     
     val googleSignInLauncher = rememberLauncherForActivityResult(
@@ -148,10 +152,10 @@ fun ChatScreen(
         return
     }
 
-    var showSourceSelector by remember { mutableStateOf(false) }
-    var showPendingDatePicker by remember { mutableStateOf(false) }
-    var showReceiptDatePicker by remember { mutableStateOf(false) }
-    var showModelInfo by remember { mutableStateOf(false) }
+    var showSourceSelector by rememberSaveable { mutableStateOf(false) }
+    var showPendingDatePicker by rememberSaveable { mutableStateOf(false) }
+    var showReceiptDatePicker by rememberSaveable { mutableStateOf(false) }
+    var showModelInfo by rememberSaveable { mutableStateOf(false) }
 
     val cameraLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.TakePicturePreview()
@@ -423,7 +427,7 @@ fun ChatScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(TranslucentForm)
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                    .padding(horizontal = Spacing.lg, vertical = Spacing.md),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Box(
@@ -440,17 +444,16 @@ fun ChatScreen(
                         modifier = Modifier.size(20.dp)
                     )
                 }
-                Spacer(modifier = Modifier.width(12.dp))
+                Spacer(modifier = Modifier.width(Spacing.md))
                 Column {
                     Text(
                         text = "Nano AI",
-                        fontWeight = FontWeight.Bold,
                         color = GhostWhite,
-                        fontSize = 15.sp
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
                     )
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.xs)
                     ) {
                         Box(
                             modifier = Modifier
@@ -460,8 +463,8 @@ fun ChatScreen(
                         )
                         Text(
                             text = "Aktif & Siap Membantu",
-                            color = GhostWhite.copy(alpha = 0.5f),
-                            fontSize = 11.sp
+                            color = GhostWhite.copy(alpha = 0.7f),
+                            style = MaterialTheme.typography.labelMedium
                         )
                     }
                 }
@@ -471,15 +474,15 @@ fun ChatScreen(
                 // Pilihan model dihapus: chat memakai satu model dengan cadangan
                 // otomatis (lihat AiModelConfig.modelsToTry). Tombol info tetap ada
                 // supaya user tahu model apa yang sedang dipakai.
-                IconButton(
-                    onClick = { showModelInfo = true },
-                    modifier = Modifier.size(24.dp)
-                ) {
+                //
+                // Ukuran bawaan IconButton TIDAK diperkecil: dulu dipaksa 24.dp
+                // sehingga area sentuh ikut mengecil di bawah standar 48dp.
+                IconButton(onClick = { showModelInfo = true }) {
                     Icon(
                         imageVector = Icons.Default.Info,
                         contentDescription = "Info Model",
-                        tint = GhostWhite.copy(alpha = 0.5f),
-                        modifier = Modifier.size(18.dp)
+                        tint = GhostWhite.copy(alpha = 0.7f),
+                        modifier = Modifier.size(20.dp)
                     )
                 }
             }
@@ -492,10 +495,10 @@ fun ChatScreen(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
-                    .padding(horizontal = 12.dp)
+                    .padding(horizontal = Spacing.md)
                     .testTag("chat_messages_list"),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
-                contentPadding = PaddingValues(top = 16.dp, bottom = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(Spacing.md),
+                contentPadding = PaddingValues(top = Spacing.lg, bottom = Spacing.lg),
                 reverseLayout = true
             ) {
                 // reverseLayout: item pertama tampil paling bawah. Tombol batal
@@ -512,8 +515,8 @@ fun ChatScreen(
                             ) {
                                 Text(
                                     "Batalkan permintaan AI",
-                                    color = GhostWhite.copy(alpha = 0.7f),
-                                    fontSize = 12.sp
+                                    color = GhostWhite.copy(alpha = 0.8f),
+                                    style = MaterialTheme.typography.labelMedium
                                 )
                             }
                         }
@@ -530,7 +533,11 @@ fun ChatScreen(
                         is ChatMessage.AiMessage -> {
                             AiMessageBubble(
                                 text = message.text,
-                                record = message.record
+                                record = message.record,
+                                isError = message.isError,
+                                // Tombol "Coba Lagi" hanya untuk kegagalan yang
+                                // teks aslinya masih tersimpan.
+                                onRetry = message.retryText?.let { { viewModel.retryMessage(message) } }
                             )
                         }
                         is ChatMessage.TypingIndicator -> {
@@ -549,26 +556,34 @@ fun ChatScreen(
 
             if (pendingConfirmation != null) {
                 val pending = pendingConfirmation!!
-                var isPendingCardExpanded by remember { mutableStateOf(false) }
+                var isPendingCardExpanded by rememberSaveable { mutableStateOf(false) }
 
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 6.dp)
+                        .padding(horizontal = Spacing.lg, vertical = Spacing.xs)
                         .testTag("inline_edit_transaction_card"),
-                    shape = RoundedCornerShape(16.dp),
+                    shape = RoundedCornerShape(CornerRadius.lg),
                     colors = CardDefaults.cardColors(containerColor = TranslucentGlass),
                     border = BorderStroke(1.dp, GhostWhite.copy(alpha = 0.08f))
                 ) {
                     Column(
-                        modifier = Modifier.padding(12.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                        modifier = Modifier
+                            .padding(Spacing.md)
+                            // Isi kartu dibatasi dan digulir sendiri supaya di layar
+                            // kecil input bar tidak terdorong keluar layar. Tombol
+                            // Ya/Batal ada DI LUAR kartu, jadi tetap terlihat.
+                            .heightIn(max = 320.dp)
+                            .verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(Spacing.sm)
                     ) {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable { isPendingCardExpanded = !isPendingCardExpanded }
-                                .padding(vertical = 4.dp),
+                                .clickable(
+                                    onClickLabel = if (isPendingCardExpanded) "Tutup penyesuaian" else "Ubah penyesuaian"
+                                ) { isPendingCardExpanded = !isPendingCardExpanded }
+                                .padding(vertical = Spacing.xs),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
@@ -835,26 +850,33 @@ fun ChatScreen(
             if (pendingReceiptConfirmation != null) {
                 val receipt = pendingReceiptConfirmation!!
                 var expandedReceiptIndices by remember { mutableStateOf(setOf<Int>()) }
-                var isReceiptCardExpanded by remember { mutableStateOf(false) }
+                var isReceiptCardExpanded by rememberSaveable { mutableStateOf(false) }
 
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 6.dp)
+                        .padding(horizontal = Spacing.lg, vertical = Spacing.xs)
                         .testTag("receipt_edit_card"),
-                    shape = RoundedCornerShape(16.dp),
+                    shape = RoundedCornerShape(CornerRadius.lg),
                     colors = CardDefaults.cardColors(containerColor = TranslucentGlass),
                     border = BorderStroke(1.dp, GhostWhite.copy(alpha = 0.08f))
                 ) {
                     Column(
-                        modifier = Modifier.padding(12.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                        modifier = Modifier
+                            .padding(Spacing.md)
+                            // Alasan sama dengan kartu transaksi: isi dibatasi dan
+                            // digulir sendiri, tombol konfirmasi tetap di luar kartu.
+                            .heightIn(max = 320.dp)
+                            .verticalScroll(rememberScrollState()),
+                        verticalArrangement = Arrangement.spacedBy(Spacing.sm)
                     ) {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .clickable { isReceiptCardExpanded = !isReceiptCardExpanded }
-                                .padding(vertical = 4.dp),
+                                .clickable(
+                                    onClickLabel = if (isReceiptCardExpanded) "Tutup penyesuaian" else "Ubah penyesuaian"
+                                ) { isReceiptCardExpanded = !isReceiptCardExpanded }
+                                .padding(vertical = Spacing.xs),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
@@ -1210,15 +1232,15 @@ fun ChatScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(TranslucentForm)
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                    .padding(horizontal = Spacing.md, vertical = Spacing.sm),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
             ) {
                 IconButton(
                     onClick = { showSourceSelector = true },
                     enabled = !hasPending && !isAiProcessing,
                     modifier = Modifier
-                        .size(46.dp)
+                        .size(48.dp)
                         .clip(CircleShape)
                         .background(GhostWhite.copy(alpha = 0.08f))
                         .testTag("chat_receipt_button")
@@ -1226,7 +1248,7 @@ fun ChatScreen(
                     Icon(
                         imageVector = Icons.Default.AddAPhoto,
                         contentDescription = "Pindai Struk Belanja",
-                        tint = if (hasPending || isAiProcessing) GhostWhite.copy(alpha = 0.2f) else SteelBlue
+                        tint = if (hasPending || isAiProcessing) GhostWhite.copy(alpha = 0.45f) else SteelBlue
                     )
                 }
 
@@ -1244,26 +1266,26 @@ fun ChatScreen(
                         }
                         Text(
                             placeholderText,
-                            color = if (hasPending || isAiProcessing) GhostWhite.copy(alpha = 0.2f) else GhostWhite.copy(alpha = 0.4f),
-                            fontSize = 14.sp
+                            color = if (hasPending || isAiProcessing) GhostWhite.copy(alpha = 0.45f) else GhostWhite.copy(alpha = 0.6f),
+                            style = MaterialTheme.typography.bodyMedium
                         )
                     },
                     modifier = Modifier
                         .weight(1f)
                         .testTag("chat_input_field"),
                     colors = TextFieldDefaults.colors(
-                        focusedContainerColor = Color(0xFF1E1E1E),
-                        unfocusedContainerColor = Color(0xFF1E1E1E),
-                        disabledContainerColor = Color(0xFF0F0F14),
+                        focusedContainerColor = SurfaceElevated,
+                        unfocusedContainerColor = SurfaceElevated,
+                        disabledContainerColor = SurfaceDisabled,
                         focusedIndicatorColor = Color.Transparent,
                         unfocusedIndicatorColor = Color.Transparent,
                         disabledIndicatorColor = Color.Transparent,
                         focusedTextColor = GhostWhite,
                         unfocusedTextColor = GhostWhite,
-                        disabledTextColor = GhostWhite.copy(alpha = 0.2f),
+                        disabledTextColor = GhostWhite.copy(alpha = 0.45f),
                         cursorColor = SteelBlue
                     ),
-                    shape = RoundedCornerShape(12.dp),
+                    shape = RoundedCornerShape(CornerRadius.md),
                     maxLines = 3,
                     keyboardOptions = KeyboardOptions(
                         imeAction = ImeAction.Send
@@ -1288,7 +1310,7 @@ fun ChatScreen(
                         }
                     },
                     modifier = Modifier
-                        .size(46.dp)
+                        .size(48.dp)
                         .clip(CircleShape)
                         .background(
                             if (inputText.trim().isEmpty() || hasPending || isAiProcessing) {
@@ -1304,7 +1326,7 @@ fun ChatScreen(
                         imageVector = Icons.AutoMirrored.Filled.Send,
                         contentDescription = "Kirim",
                         tint = if (inputText.trim().isEmpty() || hasPending || isAiProcessing) {
-                            GhostWhite.copy(alpha = 0.3f)
+                            GhostWhite.copy(alpha = 0.45f)
                         } else {
                             MidnightAbyss
                         }
