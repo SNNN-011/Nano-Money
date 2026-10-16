@@ -286,7 +286,7 @@ fun TrashSection(
                         .height(20.dp)
                         .background(
                             brush = Brush.verticalGradient(
-                                colors = listOf(NeonRed.copy(alpha = 0.8f), NeonRed.copy(alpha = 0.3f))
+                                colors = listOf(NeonRed, NeonRed.copy(alpha = 0.4f))
                             ),
                             shape = RoundedCornerShape(2.dp)
                         )
@@ -294,10 +294,7 @@ fun TrashSection(
                 Spacer(modifier = Modifier.width(10.dp))
                 Text(
                     text = "Sampah",
-                    style = MaterialTheme.typography.titleMedium.copy(
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 0.2.sp
-                    ),
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                     color = GhostWhite
                 )
                 if (deletedRecords.isNotEmpty()) {

@@ -209,9 +209,12 @@ fun EksporImporTabContent(
 
     // BODY LAYOUT
     val contentBody = @Composable {
+        // Jarak antar bagian HANYA dari arrangement ini. Sebelumnya ada Spacer
+        // manual 10.dp di antara kartu, sehingga jaraknya jadi 24+10 = 34.dp dan
+        // tidak seragam dengan bagian lain.
         Column(
             modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(24.dp)
+            verticalArrangement = Arrangement.spacedBy(Spacing.xl)
         ) {
             // Header Description
             Column {
@@ -232,8 +235,21 @@ fun EksporImporTabContent(
                 )
             }
 
-            // Exporter, sinkronisasi realtime, dan cadangan Drive digabung dalam satu card.
-            // Ekspor dirender lewat headerContent supaya tidak jadi card terpisah.
+            // Ekspor & Impor berdiri sebagai kartu sendiri dan diletakkan paling
+            // atas: tab ini dibuka untuk mengunduh laporan. Sinkronisasi realtime
+            // dan cadangan Google Drive menyusul di bawahnya.
+            UnifiedExportCard(
+                isWideScreen = isWideScreen,
+                availableMonths = availableMonths,
+                selectedMonths = selectedMonths,
+                onSelectedMonthsChanged = { selectedMonths = it },
+                isMonthsExpanded = isMonthsExpanded,
+                onIsMonthsExpandedChanged = { isMonthsExpanded = it },
+                onExportPdfFile = onExportPdfFile,
+                onExportCsvFile = onExportCsvFile,
+                onImportCsvFile = onImportCsvFile
+            )
+
             DatabaseBackupSection(
                 isAutoBackupEnabled = isAutoBackupEnabled,
                 onAutoBackupEnabledChanged = { enabled ->
@@ -273,24 +289,8 @@ fun EksporImporTabContent(
                 onConnectGoogleDrive = {
                     val client = GoogleDriveHelper.getGoogleSignInClient(context)
                     googleSignInLauncher.launch(client.signInIntent)
-                },
-                headerContent = {
-                    UnifiedExportCard(
-                        isWideScreen = isWideScreen,
-                        availableMonths = availableMonths,
-                        selectedMonths = selectedMonths,
-                        onSelectedMonthsChanged = { selectedMonths = it },
-                        isMonthsExpanded = isMonthsExpanded,
-                        onIsMonthsExpandedChanged = { isMonthsExpanded = it },
-                        onExportPdfFile = onExportPdfFile,
-                        onExportCsvFile = onExportCsvFile,
-                        onImportCsvFile = onImportCsvFile,
-                        insideCard = true
-                    )
                 }
             )
-
-            Spacer(modifier = Modifier.height(10.dp))
 
             // Keamanan (PIN) di atas Sampah: pengaturan ini lebih sering dibuka
             // daripada memulihkan transaksi yang terlanjung dihapus.
@@ -334,7 +334,7 @@ fun EksporImporTabContent(
                             color = GhostWhite
                         )
                     }
-Row(
+                    Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
@@ -363,8 +363,6 @@ Row(
                             modifier = Modifier.testTag("pin_switch")
                         )
                     }
-
-                    Spacer(modifier = Modifier.height(8.dp))
 
                     Text(
                         text = "Kunci aplikasi dengan PIN untuk melindungi data Anda.",
@@ -438,8 +436,6 @@ Row(
                     }
                 )
             }
-
-            Spacer(modifier = Modifier.height(10.dp))
 
             // Sampah: transaksi yang dihapus masih bisa dipulihkan.
             TrashSection(

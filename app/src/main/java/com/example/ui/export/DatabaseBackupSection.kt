@@ -5,7 +5,6 @@ import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -88,10 +87,7 @@ fun DatabaseBackupSection(
     onSelectedDriveBackupToRestoreChange: (GoogleDriveHelper.DriveBackupFile?) -> Unit,
     driveErrorDetailMessage: String?,
     onDriveErrorDetailMessageChange: (String?) -> Unit,
-    onConnectGoogleDrive: () -> Unit,
-    // Konten tambahan yang dirender di bagian atas card yang sama, supaya ekspor
-    // dan sinkronisasi bisa berada dalam satu kartu, bukan dua kartu bertumpuk.
-    headerContent: (@Composable () -> Unit)? = null
+    onConnectGoogleDrive: () -> Unit
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -107,10 +103,6 @@ fun DatabaseBackupSection(
     var tempBackupHour by remember(autoBackupHour) { mutableStateOf(autoBackupHour) }
     var tempBackupMinute by remember(autoBackupMinute) { mutableStateOf(autoBackupMinute) }
     var tempBackupDayOfWeek by remember(autoBackupDayOfWeek) { mutableStateOf(autoBackupDayOfWeek) }
-
-    // Menu Cadangan Google Drive. Sheet expandable supaya tidak memakan tempat di
-    // halaman Simpan yang juga berisi Sampah dan Keamanan.
-    var showDriveMenu by remember { mutableStateOf(false) }
 
     fun getDayNameIndonesian(dayOfWeek: Int): String {
         return when (dayOfWeek) {
@@ -146,19 +138,6 @@ fun DatabaseBackupSection(
                 verticalArrangement = Arrangement.spacedBy(Spacing.lg)
             ) {
                 var showFirestoreHelpInfo by remember { mutableStateOf(false) }
-
-                headerContent?.let { extra ->
-                    HorizontalDivider(
-                        color = GhostWhite.copy(alpha = 0.1f),
-                        modifier = Modifier.padding(bottom = 4.dp)
-                    )
-                    extra()
-                    HorizontalDivider(
-                        color = GhostWhite.copy(alpha = 0.1f),
-                        modifier = Modifier.padding(top = 4.dp)
-                    )
-                }
-
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -394,11 +373,6 @@ fun DatabaseBackupSection(
             }
 
             // --- Menu Cadangan Google Drive ---
-            HorizontalDivider(
-                color = GhostWhite.copy(alpha = 0.08f),
-                modifier = Modifier.padding(vertical = 16.dp)
-            )
-
             // Card dengan tampilan yang sama persis dengan card sinkronisasi
             // Firestore di atas, supaya keduanya terbaca sebagai satu pasangan.
             Card(
@@ -419,7 +393,6 @@ fun DatabaseBackupSection(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { showDriveMenu = !showDriveMenu }
                     .testTag("drive_menu_header"),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
@@ -431,7 +404,7 @@ fun DatabaseBackupSection(
                             .height(20.dp)
                             .background(
                                 brush = Brush.verticalGradient(
-                                    colors = listOf(SteelBlue, SteelBlue.copy(alpha = 0.4f))
+                                    colors = listOf(NeonViolet, NeonViolet.copy(alpha = 0.4f))
                                 ),
                                 shape = RoundedCornerShape(2.dp)
                             )
@@ -457,11 +430,6 @@ fun DatabaseBackupSection(
                         )
                     }
                 }
-                Icon(
-                    imageVector = if (showDriveMenu) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
-                    contentDescription = if (showDriveMenu) "Tutup menu Drive" else "Buka menu Drive",
-                    tint = GhostWhite.copy(alpha = 0.6f)
-                )
             }
 
             // Kegagalan Drive dulu hanya disimpan di state dan tidak pernah
@@ -501,194 +469,188 @@ fun DatabaseBackupSection(
                 }
             }
 
-            if (showDriveMenu) {
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // Tidak ada lagi cadangan lokal: ZIP dibuat sementara di cache,
-                // diunggah ke Drive, lalu dihapus dari perangkat.
-                if (connectedGoogleAccount != null) {
-                    PremiumButton(
-                        text = if (isDriveProcessing) "MENGUNGGAH..." else "CADANGKAN KE GOOGLE DRIVE",
-                        onClick = {
-                            coroutineScope.launch {
-                                onIsDriveProcessingChanged(true)
-                                when (val backup = BackupHelper.performBackup(context)) {
-                                    is BackupHelper.BackupResult.Success -> {
-                                        try {
-                                            when (val upload = GoogleDriveHelper.uploadBackupToDrive(context, backup.file)) {
-                                                is GoogleDriveHelper.DriveResult.Success -> {
-                                                    Toast.makeText(
-                                                        context,
-                                                        "Cadangan berhasil diunggah ke Google Drive",
-                                                        Toast.LENGTH_LONG
-                                                    ).show()
-                                                    // Pesan gagal sebelumnya sudah tidak berlaku.
-                                                    onDriveErrorDetailMessageChange(null)
-                                                    when (val listRes = GoogleDriveHelper.listBackupsFromDrive(context)) {
-                                                        is GoogleDriveHelper.DriveResult.Success ->
-                                                            onDriveBackupListChanged(listRes.data)
-                                                        is GoogleDriveHelper.DriveResult.Error -> Unit
-                                                    }
-                                                }
-                                                is GoogleDriveHelper.DriveResult.Error -> {
-                                                    onDriveErrorDetailMessageChange(upload.message)
+            // Tidak ada lagi cadangan lokal: ZIP dibuat sementara di cache,
+            // diunggah ke Drive, lalu dihapus dari perangkat.
+            if (connectedGoogleAccount != null) {
+                PremiumButton(
+                    text = if (isDriveProcessing) "MENGUNGGAH..." else "CADANGKAN KE GOOGLE DRIVE",
+                    onClick = {
+                        coroutineScope.launch {
+                            onIsDriveProcessingChanged(true)
+                            when (val backup = BackupHelper.performBackup(context)) {
+                                is BackupHelper.BackupResult.Success -> {
+                                    try {
+                                        when (val upload = GoogleDriveHelper.uploadBackupToDrive(context, backup.file)) {
+                                            is GoogleDriveHelper.DriveResult.Success -> {
+                                                Toast.makeText(
+                                                    context,
+                                                    "Cadangan berhasil diunggah ke Google Drive",
+                                                    Toast.LENGTH_LONG
+                                                ).show()
+                                                // Pesan gagal sebelumnya sudah tidak berlaku.
+                                                onDriveErrorDetailMessageChange(null)
+                                                when (val listRes = GoogleDriveHelper.listBackupsFromDrive(context)) {
+                                                    is GoogleDriveHelper.DriveResult.Success ->
+                                                        onDriveBackupListChanged(listRes.data)
+                                                    is GoogleDriveHelper.DriveResult.Error -> Unit
                                                 }
                                             }
-                                        } finally {
-                                            if (backup.file.exists()) backup.file.delete()
+                                            is GoogleDriveHelper.DriveResult.Error -> {
+                                                onDriveErrorDetailMessageChange(upload.message)
+                                            }
                                         }
-                                    }
-                                    is BackupHelper.BackupResult.Error -> {
-                                        Toast.makeText(
-                                            context,
-                                            "Gagal membuat cadangan: ${backup.message}",
-                                            Toast.LENGTH_LONG
-                                        ).show()
+                                    } finally {
+                                        if (backup.file.exists()) backup.file.delete()
                                     }
                                 }
-                                onIsDriveProcessingChanged(false)
+                                is BackupHelper.BackupResult.Error -> {
+                                    Toast.makeText(
+                                        context,
+                                        "Gagal membuat cadangan: ${backup.message}",
+                                        Toast.LENGTH_LONG
+                                    ).show()
+                                }
                             }
-                        },
-                        isActive = !isDriveProcessing,
-                        icon = Icons.Default.CloudUpload,
-                        modifier = Modifier.fillMaxWidth().testTag("backup_to_drive_now_button")
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    // Pencadangan otomatis hanya berguna kalau Drive terhubung.
-                    // Pengaturan jam/hari tidak ditampilkan di sini; jadwal yang
-                    // tersimpan dari versi sebelumnya tetap dipakai.
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .background(TranslucentForm.copy(alpha = 0.35f), shape = RoundedCornerShape(12.dp))
-                            .padding(horizontal = 12.dp, vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Pencadangan Otomatis",
-                                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
-                                color = GhostWhite
-                            )
-                            Text(
-                                text = "Unggah berkala ke Google Drive",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = GhostWhite.copy(alpha = 0.7f)
-                            )
+                            onIsDriveProcessingChanged(false)
                         }
-                        Switch(
-                            checked = isAutoBackupEnabled,
-                            onCheckedChange = { enabled ->
-                                onAutoBackupEnabledChanged(enabled)
-                                BackupScheduler.schedulePeriodicBackup(
-                                    context = context,
-                                    enabled = enabled,
-                                    interval = autoBackupInterval,
-                                    hour = autoBackupHour,
-                                    minute = autoBackupMinute,
-                                    dayOfWeek = autoBackupDayOfWeek,
-                                    forceUpdate = true
-                                )
-                            },
-                            colors = SwitchDefaults.colors(
-                                checkedThumbColor = SteelBlue,
-                                checkedTrackColor = SteelBlue.copy(alpha = 0.4f)
-                            ),
-                            modifier = Modifier.testTag("auto_backup_drive_switch")
+                    },
+                    isActive = !isDriveProcessing,
+                    icon = Icons.Default.CloudUpload,
+                    modifier = Modifier.fillMaxWidth().testTag("backup_to_drive_now_button")
+                )
+
+                // Pencadangan otomatis hanya berguna kalau Drive terhubung.
+                // Pengaturan jam/hari tidak ditampilkan di sini; jadwal yang
+                // tersimpan dari versi sebelumnya tetap dipakai.
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(TranslucentForm.copy(alpha = 0.35f), shape = RoundedCornerShape(12.dp))
+                        .padding(horizontal = 12.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Pencadangan Otomatis",
+                            style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold),
+                            color = GhostWhite
+                        )
+                        Text(
+                            text = "Unggah berkala ke Google Drive",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = GhostWhite.copy(alpha = 0.7f)
                         )
                     }
-                    Spacer(modifier = Modifier.height(12.dp))
-                }
-
-                if (driveBackupList.isEmpty()) {
-                    Text(
-                        text = if (connectedGoogleAccount == null) {
-                            "Hubungkan akun Google dulu untuk mengaktifkan cadangan cloud."
-                        } else {
-                            "Belum ada cadangan. Tekan tombol di atas untuk mencadangkan ke Google Drive."
+                    Switch(
+                        checked = isAutoBackupEnabled,
+                        onCheckedChange = { enabled ->
+                            onAutoBackupEnabledChanged(enabled)
+                            BackupScheduler.schedulePeriodicBackup(
+                                context = context,
+                                enabled = enabled,
+                                interval = autoBackupInterval,
+                                hour = autoBackupHour,
+                                minute = autoBackupMinute,
+                                dayOfWeek = autoBackupDayOfWeek,
+                                forceUpdate = true
+                            )
                         },
-                        style = MaterialTheme.typography.bodySmall,
-                        color = GhostWhite.copy(alpha = 0.7f)
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = SteelBlue,
+                            checkedTrackColor = SteelBlue.copy(alpha = 0.4f)
+                        ),
+                        modifier = Modifier.testTag("auto_backup_drive_switch")
                     )
-                } else {
-                    Column(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = Icons.Default.Restore,
-                                contentDescription = null,
-                                tint = SteelBlue.copy(alpha = 0.7f),
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = "Pilih cadangan untuk dipulihkan:",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = GhostWhite.copy(alpha = 0.6f)
-                            )
-                        }
+                }
+            }
 
-                        driveBackupList.forEach { driveFile ->
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .background(TranslucentForm.copy(alpha = 0.4f))
-                                    .padding(horizontal = 12.dp, vertical = 10.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = driveFile.name,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = GhostWhite,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
-                                    Text(
-                                        text = FormatUtils.formatDriveTimestamp(driveFile.createdTime) +
-                                            " · " + FormatUtils.formatFileSize(driveFile.sizeBytes),
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = GhostWhite.copy(alpha = 0.6f),
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis
+            if (driveBackupList.isEmpty()) {
+                Text(
+                    text = if (connectedGoogleAccount == null) {
+                        "Hubungkan akun Google dulu untuk mengaktifkan cadangan cloud."
+                    } else {
+                        "Belum ada cadangan. Tekan tombol di atas untuk mencadangkan ke Google Drive."
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = GhostWhite.copy(alpha = 0.7f)
+                )
+            } else {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.Restore,
+                            contentDescription = null,
+                            tint = SteelBlue.copy(alpha = 0.7f),
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "Pilih cadangan untuk dipulihkan:",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = GhostWhite.copy(alpha = 0.6f)
+                        )
+                    }
+
+                    driveBackupList.forEach { driveFile ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(TranslucentForm.copy(alpha = 0.4f))
+                                .padding(horizontal = 12.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = driveFile.name,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = GhostWhite,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    text = FormatUtils.formatDriveTimestamp(driveFile.createdTime) +
+                                        " · " + FormatUtils.formatFileSize(driveFile.sizeBytes),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = GhostWhite.copy(alpha = 0.6f),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                IconButton(
+                                    onClick = { onSelectedDriveBackupToRestoreChange(driveFile) },
+                                    enabled = !isDriveProcessing,
+                                    modifier = Modifier.testTag("restore_drive_backup_${driveFile.id}")
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Restore,
+                                        contentDescription = "Pulihkan dari Drive",
+                                        tint = SteelBlue,
+                                        modifier = Modifier.size(16.dp)
                                     )
                                 }
-                                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                    IconButton(
-                                        onClick = { onSelectedDriveBackupToRestoreChange(driveFile) },
-                                        enabled = !isDriveProcessing,
-                                        modifier = Modifier.testTag("restore_drive_backup_${driveFile.id}")
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Restore,
-                                            contentDescription = "Pulihkan dari Drive",
-                                            tint = SteelBlue,
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                    }
-                                    IconButton(
-                                        onClick = { driveBackupFileToDelete = driveFile },
-                                        enabled = !isDriveProcessing
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Outlined.DeleteOutline,
-                                            contentDescription = "Hapus cadangan Drive",
-                                            tint = NeonRed.copy(alpha = 0.7f),
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                    }
+                                IconButton(
+                                    onClick = { driveBackupFileToDelete = driveFile },
+                                    enabled = !isDriveProcessing
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Outlined.DeleteOutline,
+                                        contentDescription = "Hapus cadangan Drive",
+                                        tint = NeonRed.copy(alpha = 0.7f),
+                                        modifier = Modifier.size(16.dp)
+                                    )
                                 }
                             }
                         }
                     }
                 }
-                }
+            }
             }
         }
         }
