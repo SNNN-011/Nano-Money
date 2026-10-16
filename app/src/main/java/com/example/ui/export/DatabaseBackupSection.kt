@@ -27,7 +27,6 @@ import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.Spring
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -38,7 +37,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import com.example.ui.config.FormatUtils
 import androidx.compose.material.icons.outlined.DeleteOutline
-import com.example.ui.theme.NeonRed
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.util.BackupHelper
@@ -54,7 +52,6 @@ import androidx.work.ExistingWorkPolicy
 import androidx.work.Constraints
 import androidx.work.NetworkType
 import com.example.ui.theme.*
-import com.example.ui.components.GlassCard
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -130,12 +127,12 @@ fun DatabaseBackupSection(
 
     Column(
         modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        verticalArrangement = Arrangement.spacedBy(Spacing.lg)
     ) {
         // --- REALTIME FIRESTORE CARD ---
         Card(
             modifier = Modifier.fillMaxWidth().testTag("realtime_firestore_card"),
-            shape = RoundedCornerShape(20.dp),
+            shape = RoundedCornerShape(CornerRadius.card),
             colors = CardDefaults.cardColors(containerColor = TranslucentForm.copy(alpha = 0.65f)),
             border = BorderStroke(
                 width = 1.dp,
@@ -145,8 +142,8 @@ fun DatabaseBackupSection(
             )
         ) {
             Column(
-                modifier = Modifier.padding(20.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                modifier = Modifier.padding(Spacing.card),
+                verticalArrangement = Arrangement.spacedBy(Spacing.lg)
             ) {
                 var showFirestoreHelpInfo by remember { mutableStateOf(false) }
 
@@ -183,7 +180,7 @@ fun DatabaseBackupSection(
                         Spacer(modifier = Modifier.width(10.dp))
                         Text(
                             text = "Sinkronisasi Realtime",
-                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold, fontSize = 14.sp),
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                             color = GhostWhite
                         )
                     }
@@ -224,7 +221,7 @@ fun DatabaseBackupSection(
                             Box(modifier = Modifier.background(TranslucentGlass)) {
                                 Column(
                                     modifier = Modifier.fillMaxWidth().padding(24.dp),
-                                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                                    verticalArrangement = Arrangement.spacedBy(Spacing.lg)
                                 ) {
                                     Text(
                                         text = "Panduan Sinkronisasi Realtime",
@@ -270,12 +267,12 @@ fun DatabaseBackupSection(
                         )
                         IconButton(
                             onClick = { showDisconnectConfirmation = true },
-                            modifier = Modifier.size(28.dp)
+                            // Tanpa .size(...) agar area sentuh tetap standar 48dp.
                         ) {
                             Icon(
                                 imageVector = Icons.Default.CloudOff,
                                 contentDescription = "Putuskan Akun",
-                                tint = Color.Red.copy(alpha = 0.7f),
+                                tint = NeonRed.copy(alpha = 0.7f),
                                 modifier = Modifier.size(18.dp)
                             )
                         }
@@ -303,8 +300,8 @@ fun DatabaseBackupSection(
                                 } else {
                                     "Nonaktif — data tetap hanya di HP ini"
                                 },
-                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
-                                color = GhostWhite.copy(alpha = 0.5f)
+                                style = MaterialTheme.typography.labelSmall,
+                                color = GhostWhite.copy(alpha = 0.7f)
                             )
                         }
                         Switch(
@@ -330,6 +327,7 @@ fun DatabaseBackupSection(
                         text = if (isDeletingCloud) "MENGHAPUS DATA CLOUD..." else "HAPUS DATA CLOUD",
                         onClick = { showDeleteCloudConfirm = true },
                         isActive = !isDeletingCloud,
+                        isDestructive = true,
                         modifier = Modifier.fillMaxWidth().testTag("delete_cloud_data_button")
                     )
 
@@ -401,7 +399,7 @@ fun DatabaseBackupSection(
             // Firestore di atas, supaya keduanya terbaca sebagai satu pasangan.
             Card(
                 modifier = Modifier.fillMaxWidth().testTag("drive_backup_card"),
-                shape = RoundedCornerShape(20.dp),
+                shape = RoundedCornerShape(CornerRadius.card),
                 colors = CardDefaults.cardColors(containerColor = TranslucentForm.copy(alpha = 0.65f)),
                 border = BorderStroke(
                     width = 1.dp,
@@ -411,8 +409,8 @@ fun DatabaseBackupSection(
                 )
             ) {
                 Column(
-                    modifier = Modifier.padding(20.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                    modifier = Modifier.padding(Spacing.card),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.lg)
                 ) {
             Row(
                 modifier = Modifier
@@ -438,17 +436,20 @@ fun DatabaseBackupSection(
                     Column {
                         Text(
                             text = "Cadangan Google Drive",
-                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold, fontSize = 14.sp),
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                             color = GhostWhite
                         )
                         Text(
                             text = if (driveBackupList.isEmpty()) {
                                 "Belum ada cadangan di cloud"
                             } else {
-                                "${driveBackupList.size} cadangan tersimpan"
+                                "${driveBackupList.size} cadangan tersimpan · terbaru " +
+                                    FormatUtils.formatDriveTimestamp(
+                                        driveBackupList.maxByOrNull { it.createdTime ?: "" }?.createdTime
+                                    )
                             },
                             style = MaterialTheme.typography.bodySmall,
-                            color = GhostWhite.copy(alpha = 0.5f)
+                            color = GhostWhite.copy(alpha = 0.7f)
                         )
                     }
                 }
@@ -457,6 +458,43 @@ fun DatabaseBackupSection(
                     contentDescription = if (showDriveMenu) "Tutup menu Drive" else "Buka menu Drive",
                     tint = GhostWhite.copy(alpha = 0.6f)
                 )
+            }
+
+            // Kegagalan Drive dulu hanya disimpan di state dan tidak pernah
+            // ditampilkan, jadi user tidak tahu backup/restore gagal.
+            if (driveErrorDetailMessage != null) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(CornerRadius.md))
+                        .background(NeonRed.copy(alpha = 0.12f))
+                        .border(1.dp, NeonRed.copy(alpha = 0.35f), RoundedCornerShape(CornerRadius.md))
+                        .padding(horizontal = Spacing.md, vertical = Spacing.sm)
+                        .testTag("drive_error_banner"),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.ErrorOutline,
+                        contentDescription = null,
+                        tint = NeonRed,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(Spacing.sm))
+                    Text(
+                        text = driveErrorDetailMessage ?: "",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = GhostWhite.copy(alpha = 0.85f),
+                        modifier = Modifier.weight(1f)
+                    )
+                    IconButton(onClick = { onDriveErrorDetailMessageChange(null) }) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Tutup pesan kesalahan",
+                            tint = GhostWhite.copy(alpha = 0.7f),
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
             }
 
             if (showDriveMenu) {
@@ -480,6 +518,8 @@ fun DatabaseBackupSection(
                                                         "Cadangan berhasil diunggah ke Google Drive",
                                                         Toast.LENGTH_LONG
                                                     ).show()
+                                                    // Pesan gagal sebelumnya sudah tidak berlaku.
+                                                    onDriveErrorDetailMessageChange(null)
                                                     when (val listRes = GoogleDriveHelper.listBackupsFromDrive(context)) {
                                                         is GoogleDriveHelper.DriveResult.Success ->
                                                             onDriveBackupListChanged(listRes.data)
@@ -530,8 +570,8 @@ fun DatabaseBackupSection(
                             )
                             Text(
                                 text = "Unggah berkala ke Google Drive",
-                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
-                                color = GhostWhite.copy(alpha = 0.5f)
+                                style = MaterialTheme.typography.labelSmall,
+                                color = GhostWhite.copy(alpha = 0.7f)
                             )
                         }
                         Switch(
@@ -566,7 +606,7 @@ fun DatabaseBackupSection(
                             "Belum ada cadangan. Tekan tombol di atas untuk mencadangkan ke Google Drive."
                         },
                         style = MaterialTheme.typography.bodySmall,
-                        color = GhostWhite.copy(alpha = 0.5f)
+                        color = GhostWhite.copy(alpha = 0.7f)
                     )
                 } else {
                     Column(
@@ -610,7 +650,7 @@ fun DatabaseBackupSection(
                                         text = FormatUtils.formatDriveTimestamp(driveFile.createdTime) +
                                             " · " + FormatUtils.formatFileSize(driveFile.sizeBytes),
                                         style = MaterialTheme.typography.labelSmall,
-                                        color = GhostWhite.copy(alpha = 0.45f),
+                                        color = GhostWhite.copy(alpha = 0.6f),
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
                                     )
@@ -619,7 +659,7 @@ fun DatabaseBackupSection(
                                     IconButton(
                                         onClick = { onSelectedDriveBackupToRestoreChange(driveFile) },
                                         enabled = !isDriveProcessing,
-                                        modifier = Modifier.size(28.dp).testTag("restore_drive_backup_${driveFile.id}")
+                                        modifier = Modifier.testTag("restore_drive_backup_${driveFile.id}")
                                     ) {
                                         Icon(
                                             imageVector = Icons.Default.Restore,
@@ -630,8 +670,7 @@ fun DatabaseBackupSection(
                                     }
                                     IconButton(
                                         onClick = { driveBackupFileToDelete = driveFile },
-                                        enabled = !isDriveProcessing,
-                                        modifier = Modifier.size(28.dp)
+                                        enabled = !isDriveProcessing
                                     ) {
                                         Icon(
                                             imageVector = Icons.Outlined.DeleteOutline,
@@ -673,7 +712,7 @@ fun DatabaseBackupSection(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(24.dp),
-                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                            verticalArrangement = Arrangement.spacedBy(Spacing.lg)
                         ) {
                             Text(
                                 text = "Putuskan Akun Google?",
@@ -749,7 +788,7 @@ fun DatabaseBackupSection(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(24.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                        verticalArrangement = Arrangement.spacedBy(Spacing.lg)
                     ) {
                         Text(
                             text = "Hapus Cadangan Google Drive",
@@ -786,6 +825,8 @@ fun DatabaseBackupSection(
                                             when (val delRes = GoogleDriveHelper.deleteBackupFromDrive(context, driveFile.id)) {
                                                 is GoogleDriveHelper.DriveResult.Success -> {
                                                     Toast.makeText(context, "Berhasil menghapus berkas di Google Drive.", Toast.LENGTH_SHORT).show()
+                                                    // Pesan gagal sebelumnya sudah tidak berlaku.
+                                                    onDriveErrorDetailMessageChange(null)
                                                     val syncList = GoogleDriveHelper.listBackupsFromDrive(context)
                                                     if (syncList is GoogleDriveHelper.DriveResult.Success) {
                                                         onDriveBackupListChanged(syncList.data)
@@ -799,7 +840,7 @@ fun DatabaseBackupSection(
                                         }
                                     }
                                 },
-                                isActive = true,
+                                isDestructive = true,
                                 modifier = Modifier.weight(1.3f),
                                 testTag = "confirm_delete_drive_backup"
                             )
@@ -977,6 +1018,7 @@ fun DatabaseBackupSection(
                                     }
                                 },
                                 isActive = !isDeletingCloud,
+                                isDestructive = true,
                                 modifier = Modifier.weight(1.3f),
                                 testTag = "confirm_delete_cloud_data"
                             )
@@ -1029,7 +1071,7 @@ fun DatabaseBackupSection(
                         Text(
                             text = FormatUtils.formatDriveTimestamp(restoreCandidate.createdTime) +
                                 " · " + FormatUtils.formatFileSize(restoreCandidate.sizeBytes),
-                            color = GhostWhite.copy(alpha = 0.5f),
+                            color = GhostWhite.copy(alpha = 0.7f),
                             style = MaterialTheme.typography.labelSmall
                         )
                         Text(

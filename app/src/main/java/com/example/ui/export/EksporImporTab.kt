@@ -44,7 +44,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -56,7 +55,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import android.widget.Toast
 import com.example.ui.theme.*
-import com.example.ui.components.GlassCard
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -304,7 +302,7 @@ fun EksporImporTabContent(
 
             Card(
                 modifier = Modifier.fillMaxWidth().testTag("security_card"),
-                shape = RoundedCornerShape(20.dp),
+                shape = RoundedCornerShape(CornerRadius.card),
                 colors = CardDefaults.cardColors(containerColor = TranslucentForm.copy(alpha = 0.65f)),
                 border = BorderStroke(
                     width = 1.dp,
@@ -314,8 +312,8 @@ fun EksporImporTabContent(
                 )
             ) {
                 Column(
-                    modifier = Modifier.padding(20.dp),
-                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                    modifier = Modifier.padding(Spacing.card),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.md)
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Box(
@@ -332,7 +330,7 @@ fun EksporImporTabContent(
                         Spacer(modifier = Modifier.width(10.dp))
                         Text(
                             text = "Keamanan",
-                            style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.Bold, fontSize = 14.sp),
+                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                             color = GhostWhite
                         )
                     }
@@ -370,8 +368,8 @@ Row(
 
                     Text(
                         text = "Kunci aplikasi dengan PIN untuk melindungi data Anda.",
-                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp, lineHeight = 16.sp),
-                        color = GhostWhite.copy(alpha = 0.55f)
+                        style = MaterialTheme.typography.bodySmall,
+                        color = GhostWhite.copy(alpha = 0.7f)
                     )
 
                     // Ubah PIN hanya muncul kalau PIN sudah aktif.
