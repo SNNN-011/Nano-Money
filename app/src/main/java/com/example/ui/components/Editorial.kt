@@ -30,6 +30,7 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -181,6 +182,13 @@ fun EditorialPill(
     selected: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    /** Gaya teks label; default sama dengan pil nav di referensi. */
+    textStyle: TextStyle? = null,
+    /**
+     * Jarak teks ke tepi pil. Dikecilkan kalau pil dibagi rata selebar baris,
+     * supaya label terpanjang tidak turun baris di layar sempit.
+     */
+    contentPadding: Dp = 14.dp,
     testTag: String = ""
 ) {
     Box(
@@ -192,13 +200,13 @@ fun EditorialPill(
                 else Modifier.border(1.dp, Hairline, RoundedCornerShape(CornerRadius.pill))
             )
             .clickable { onClick() }
-            .padding(horizontal = 14.dp, vertical = 8.dp)
+            .padding(horizontal = contentPadding, vertical = 8.dp)
             .then(if (testTag.isNotEmpty()) Modifier.testTag(testTag) else Modifier),
         contentAlignment = Alignment.Center
     ) {
         Text(
             text = text,
-            style = MaterialTheme.typography.labelMedium,
+            style = textStyle ?: MaterialTheme.typography.labelMedium,
             fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
             color = if (selected) Cream else InkMuted
         )

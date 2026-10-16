@@ -166,7 +166,12 @@ fun DashboardStatsSection(
     }
 }
 
-/** Satu kolom fakta: label mono kecil di atas nilainya (.hero-facts). */
+/**
+ * Satu kolom fakta: label mono kecil di atas nilainya (.hero-facts).
+ *
+ * [horizontalAlignment] dipakai kolom kanan supaya nominalnya nempel ke tepi
+ * kartu, bukan menggantung di tengah antar-kolom.
+ */
 @Composable
 private fun FactCell(
     label: String,
@@ -174,9 +179,13 @@ private fun FactCell(
     valueColor: Color,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     testTag: String,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    horizontalAlignment: Alignment.Horizontal = Alignment.Start
 ) {
-    Column(modifier = modifier.testTag(testTag)) {
+    Column(
+        modifier = modifier.testTag(testTag),
+        horizontalAlignment = horizontalAlignment
+    ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(
                 imageVector = icon,
@@ -312,7 +321,8 @@ private fun BudgetSlip(
                 valueColor = AmountExpenseColor,
                 icon = Icons.Default.ArrowDownward,
                 testTag = "total_expense_card",
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f),
+                horizontalAlignment = Alignment.End
             )
         }
 
@@ -670,7 +680,14 @@ private fun RutinInfoDialog(onDismiss: () -> Unit) {
     }
 }
 
-/** Judul bagian riwayat plus pilihan filter. */
+/**
+ * Judul bagian riwayat plus pilihan filter.
+ *
+ * Ketiga pilihan dibagi rata selebar baris supaya labelnya benar-benar di tengah
+ * dan "Pengeluaran" rata dengan tepi kanan. Padding dalam pil dikecilkan karena
+ * "Pengeluaran" label terpanjang: dengan padding bawaan 14 dp labelnya turun
+ * baris di layar 360 dp saat ikut dibesarkan.
+ */
 @Composable
 fun DashboardHistoryFilter(
     currentFilter: String,
@@ -684,13 +701,17 @@ fun DashboardHistoryFilter(
             modifier = Modifier
                 .fillMaxWidth()
                 .testTag("history_filter_dropdown"),
-            horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
+            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+            verticalAlignment = Alignment.CenterVertically
         ) {
             listOf("Semua", "Pendapatan", "Pengeluaran").forEach { opt ->
                 EditorialPill(
                     text = opt,
                     selected = currentFilter == opt,
-                    onClick = { onFilterSelected(opt) }
+                    onClick = { onFilterSelected(opt) },
+                    modifier = Modifier.weight(1f),
+                    textStyle = MaterialTheme.typography.labelLarge,
+                    contentPadding = Spacing.sm
                 )
             }
         }
