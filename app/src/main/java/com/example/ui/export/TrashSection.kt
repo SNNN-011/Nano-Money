@@ -26,6 +26,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.example.data.FinancialRecord
+import com.example.ui.components.EditorialButton
+import com.example.ui.components.EditorialButtonStyle
 import com.example.ui.config.FormatUtils
 import com.example.ui.theme.*
 import java.util.Locale
@@ -69,20 +71,12 @@ fun DeleteAllRecordsDialog(
         Dialog(onDismissRequest = onDismiss) {
             Card(
                 modifier = Modifier.fillMaxWidth().padding(16.dp),
-                shape = RoundedCornerShape(24.dp),
-                colors = CardDefaults.cardColors(containerColor = MidnightAbyss),
-                border = BorderStroke(
-                    width = 1.dp,
-                    brush = Brush.verticalGradient(
-                        colors = listOf(
-                            NeonRed.copy(alpha = 0.35f),
-                            NeonRed.copy(alpha = 0.05f)
-                        )
-                    )
-                ),
+                shape = RoundedCornerShape(CornerRadius.bezel),
+                colors = CardDefaults.cardColors(containerColor = CreamRaised),
+                border = BorderStroke(1.dp, Hairline),
                 elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
             ) {
-                Box(modifier = Modifier.background(TranslucentGlass)) {
+                Box(modifier = Modifier.background(CreamRaised)) {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -91,13 +85,14 @@ fun DeleteAllRecordsDialog(
                     ) {
                         Text(
                             text = "Yakin Sekali lagi?",
-                            color = GhostWhite,
+                            color = Ink,
                             style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold
+                            fontFamily = SerifFamily,
+                            fontWeight = FontWeight.Medium
                         )
                         Text(
                             text = "Ketik HAPUS untuk mengonfirmasi. $activeCount transaksi akan dipindahkan ke Sampah dan masih bisa dipulihkan.",
-                            color = GhostWhite.copy(alpha = 0.8f),
+                            color = InkMuted,
                             style = MaterialTheme.typography.bodyMedium,
                             lineHeight = 20.sp
                         )
@@ -109,7 +104,7 @@ fun DeleteAllRecordsDialog(
                             placeholder = {
                                 Text(
                                     "HAPUS",
-                                    color = GhostWhite.copy(alpha = 0.55f),
+                                    color = InkMuted,
                                     style = MaterialTheme.typography.bodyMedium
                                 )
                             },
@@ -117,14 +112,14 @@ fun DeleteAllRecordsDialog(
                                 .fillMaxWidth()
                                 .testTag("delete_all_confirm_input"),
                             textStyle = MaterialTheme.typography.bodyMedium.copy(
-                                color = GhostWhite,
+                                color = Ink,
                                 fontWeight = FontWeight.Bold
                             ),
                             shape = RoundedCornerShape(12.dp),
                             colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = NeonRed.copy(alpha = 0.7f),
-                                unfocusedBorderColor = GhostWhite.copy(alpha = 0.15f),
-                                cursorColor = NeonRed
+                                focusedBorderColor = Ink,
+                                unfocusedBorderColor = Hairline,
+                                cursorColor = BurntOrange
                             )
                         )
 
@@ -132,14 +127,15 @@ fun DeleteAllRecordsDialog(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            PremiumButton(
+                            EditorialButton(
                                 text = "Batal",
                                 onClick = onDismiss,
-                                isActive = false,
                                 modifier = Modifier.weight(1f),
+                                style = EditorialButtonStyle.Ghost,
+                                trailingArrow = false,
                                 testTag = "delete_all_step2_cancel"
                             )
-                            PremiumButton(
+                            EditorialButton(
                                 text = "Hapus Semua",
                                 onClick = {
                                     onDismiss()
@@ -147,9 +143,10 @@ fun DeleteAllRecordsDialog(
                                 },
                                 // Nonaktif sampai kata kuncinya diketik benar.
                                 enabled = confirmText == "HAPUS",
-                                // isDestructive membuat tombol langsung tampil
-                                // merah, tidak lagi perlu gradien manual.
-                                isDestructive = true,
+                                // Aksi merusak memakai aksen jingga, sama dengan
+                                // nominal pengeluaran di Dashboard.
+                                accent = BurntOrange,
+                                trailingArrow = false,
                                 modifier = Modifier.weight(1.2f),
                                 testTag = "delete_all_step2_confirm"
                             )
@@ -162,12 +159,12 @@ fun DeleteAllRecordsDialog(
 }
 
 /**
- * Dialog konfirmasi dua tombol dengan gaya yang sama dipakai di tab Simpan
- * (MidnightAbyss + TranslucentGlass + border gradient + PremiumButton).
+ * Dialog konfirmasi dua tombol dengan palet editorial yang sama dengan tab
+ * Dashboard (krem + garis rambut + sudut bezel + tombol pil).
  *
  * Untuk aksi yang tidak bisa dibatalkan, gunakan isDestructive = true supaya
- * tombol konfirmasi tampil merah. Bila aksi sangat berisiko, tambahkan lagi
- * langkah kedua yang meminta pengguna mengetik kata kunci.
+ * tombol konfirmasi memakai aksen jingga. Bila aksi sangat berisiko, tambahkan
+ * lagi langkah kedua yang meminta pengguna mengetik kata kunci.
  */
 @Composable
 fun AppConfirmDialog(
@@ -184,21 +181,12 @@ fun AppConfirmDialog(
     Dialog(onDismissRequest = onDismiss) {
         Card(
             modifier = Modifier.fillMaxWidth().padding(16.dp),
-            shape = RoundedCornerShape(24.dp),
-            colors = CardDefaults.cardColors(containerColor = MidnightAbyss),
-            border = BorderStroke(
-                width = 1.dp,
-                brush = Brush.verticalGradient(
-                    colors = if (isDestructive) {
-                        listOf(NeonRed.copy(alpha = 0.3f), NeonRed.copy(alpha = 0.05f))
-                    } else {
-                        listOf(GhostWhite.copy(alpha = 0.2f), GhostWhite.copy(alpha = 0.02f))
-                    }
-                )
-            ),
+            shape = RoundedCornerShape(CornerRadius.bezel),
+            colors = CardDefaults.cardColors(containerColor = CreamRaised),
+            border = BorderStroke(1.dp, Hairline),
             elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
         ) {
-            Box(modifier = Modifier.background(TranslucentGlass)) {
+            Box(modifier = Modifier.background(CreamRaised)) {
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -207,13 +195,14 @@ fun AppConfirmDialog(
                 ) {
                     Text(
                         text = title,
-                        color = GhostWhite,
+                        color = Ink,
                         style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold
+                        fontFamily = SerifFamily,
+                        fontWeight = FontWeight.Medium
                     )
                     Text(
                         text = message,
-                        color = GhostWhite.copy(alpha = 0.8f),
+                        color = InkMuted,
                         style = MaterialTheme.typography.bodyMedium,
                         lineHeight = 20.sp
                     )
@@ -222,20 +211,20 @@ fun AppConfirmDialog(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        PremiumButton(
+                        EditorialButton(
                             text = dismissText,
                             onClick = onDismiss,
-                            isActive = false,
                             modifier = Modifier.weight(1f),
+                            style = EditorialButtonStyle.Ghost,
+                            trailingArrow = false,
                             testTag = dismissTestTag
                         )
-                        PremiumButton(
+                        EditorialButton(
                             text = confirmText,
                             onClick = onConfirm,
-                            isActive = true,
-                            // Warna merah ditentukan PremiumButton lewat
-                            // isDestructive, bukan dikirim manual dari sini.
-                            isDestructive = isDestructive,
+                            // Aksen jingga untuk aksi merusak, tinta untuk yang aman.
+                            accent = if (isDestructive) BurntOrange else Ink,
+                            trailingArrow = false,
                             modifier = Modifier.weight(1.2f),
                             testTag = confirmTestTag
                         )
