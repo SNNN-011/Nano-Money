@@ -37,23 +37,18 @@ fun UnifiedExportCard(
     onIsMonthsExpandedChanged: (Boolean) -> Unit,
     onExportPdfFile: (List<YearMonth>) -> Unit,
     onExportCsvFile: (List<YearMonth>) -> Unit,
-    onImportCsvFile: () -> Unit,
-    // Kalau true, isi card ini ditampilkan di dalam card milik pemanggil tanpa
-    // bungkus Card-nya sendiri, supaya bisa digabung dengan section lain.
-    insideCard: Boolean = false
+    onImportCsvFile: () -> Unit
 ) {
     var showPdfHelpInfo by remember { mutableStateOf(false) }
 
     val content: @Composable () -> Unit = {
         Column(
-            modifier = Modifier.padding(if (insideCard) 0.dp else 24.dp),
+            modifier = Modifier.padding(Spacing.card),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             // Header inside card
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 4.dp),
+                modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
@@ -75,11 +70,7 @@ fun UnifiedExportCard(
                     Spacer(modifier = Modifier.width(10.dp))
                     Text(
                         text = "Pilih Periode Laporan Keuangan",
-                        style = MaterialTheme.typography.titleMedium.copy(
-                            fontSize = 17.sp,
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = 0.2.sp
-                        ),
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
                         color = GhostWhite
                     )
                 }
@@ -263,7 +254,6 @@ fun UnifiedExportCard(
                 }
             }
 
-            Spacer(modifier = Modifier.height(4.dp))
             HorizontalDivider(color = GhostWhite.copy(alpha = 0.08f))
 
             // Buttons Layout (PDF Wide, CSV side-by-side)
@@ -310,22 +300,20 @@ fun UnifiedExportCard(
         }
     }
 
-    if (insideCard) {
-        content()
-    } else {
-        Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(CornerRadius.xl),
-            colors = CardDefaults.cardColors(containerColor = TranslucentForm.copy(alpha = 0.65f)),
-            border = BorderStroke(
-                width = 1.dp,
-                brush = Brush.verticalGradient(
-                    colors = listOf(GhostWhite.copy(alpha = 0.15f), GhostWhite.copy(alpha = 0.02f))
-                )
+    // Kartu ini memakai bentuk, warna, dan padding yang sama dengan kartu lain di
+    // tab Simpan (Sinkronisasi, Cadangan Drive, Keamanan, Sampah).
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(CornerRadius.card),
+        colors = CardDefaults.cardColors(containerColor = TranslucentForm.copy(alpha = 0.65f)),
+        border = BorderStroke(
+            width = 1.dp,
+            brush = Brush.verticalGradient(
+                colors = listOf(GhostWhite.copy(alpha = 0.15f), GhostWhite.copy(alpha = 0.02f))
             )
-        ) {
-            content()
-        }
+        )
+    ) {
+        content()
     }
 }
 
