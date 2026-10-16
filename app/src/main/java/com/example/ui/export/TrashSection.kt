@@ -18,7 +18,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -76,8 +75,8 @@ fun DeleteAllRecordsDialog(
                     width = 1.dp,
                     brush = Brush.verticalGradient(
                         colors = listOf(
-                            Color.Red.copy(alpha = 0.35f),
-                            Color.Red.copy(alpha = 0.05f)
+                            NeonRed.copy(alpha = 0.35f),
+                            NeonRed.copy(alpha = 0.05f)
                         )
                     )
                 ),
@@ -108,7 +107,11 @@ fun DeleteAllRecordsDialog(
                             onValueChange = { if (it.length <= 5) confirmText = it.uppercase() },
                             singleLine = true,
                             placeholder = {
-                                Text("HAPUS", color = GhostWhite.copy(alpha = 0.3f), fontSize = 13.sp)
+                                Text(
+                                    "HAPUS",
+                                    color = GhostWhite.copy(alpha = 0.55f),
+                                    style = MaterialTheme.typography.bodyMedium
+                                )
                             },
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -119,9 +122,9 @@ fun DeleteAllRecordsDialog(
                             ),
                             shape = RoundedCornerShape(12.dp),
                             colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = Color.Red.copy(alpha = 0.7f),
+                                focusedBorderColor = NeonRed.copy(alpha = 0.7f),
                                 unfocusedBorderColor = GhostWhite.copy(alpha = 0.15f),
-                                cursorColor = Color.Red
+                                cursorColor = NeonRed
                             )
                         )
 
@@ -144,11 +147,9 @@ fun DeleteAllRecordsDialog(
                                 },
                                 // Nonaktif sampai kata kuncinya diketik benar.
                                 enabled = confirmText == "HAPUS",
-                                isActive = false,
-                                gradientColors = listOf(
-                                    Color.Red.copy(alpha = 0.85f),
-                                    Color.Red.copy(alpha = 0.5f)
-                                ),
+                                // isDestructive membuat tombol langsung tampil
+                                // merah, tidak lagi perlu gradien manual.
+                                isDestructive = true,
                                 modifier = Modifier.weight(1.2f),
                                 testTag = "delete_all_step2_confirm"
                             )
@@ -189,7 +190,7 @@ fun AppConfirmDialog(
                 width = 1.dp,
                 brush = Brush.verticalGradient(
                     colors = if (isDestructive) {
-                        listOf(Color.Red.copy(alpha = 0.3f), Color.Red.copy(alpha = 0.05f))
+                        listOf(NeonRed.copy(alpha = 0.3f), NeonRed.copy(alpha = 0.05f))
                     } else {
                         listOf(GhostWhite.copy(alpha = 0.2f), GhostWhite.copy(alpha = 0.02f))
                     }
@@ -231,12 +232,10 @@ fun AppConfirmDialog(
                         PremiumButton(
                             text = confirmText,
                             onClick = onConfirm,
-                            isActive = !isDestructive,
-                            gradientColors = if (isDestructive) {
-                                listOf(Color.Red.copy(alpha = 0.85f), Color.Red.copy(alpha = 0.5f))
-                            } else {
-                                listOf(SteelBlue, SteelBlue.copy(alpha = 0.7f))
-                            },
+                            isActive = true,
+                            // Warna merah ditentukan PremiumButton lewat
+                            // isDestructive, bukan dikirim manual dari sini.
+                            isDestructive = isDestructive,
                             modifier = Modifier.weight(1.2f),
                             testTag = confirmTestTag
                         )
@@ -264,7 +263,7 @@ fun TrashSection(
         modifier = modifier
             .fillMaxWidth()
             .testTag("trash_card"),
-        shape = RoundedCornerShape(20.dp),
+        shape = RoundedCornerShape(CornerRadius.card),
         colors = CardDefaults.cardColors(containerColor = TranslucentForm.copy(alpha = 0.65f)),
         border = BorderStroke(
             width = 1.dp,
@@ -274,8 +273,8 @@ fun TrashSection(
         )
     ) {
         Column(
-            modifier = Modifier.padding(20.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            modifier = Modifier.padding(Spacing.card),
+            verticalArrangement = Arrangement.spacedBy(Spacing.md)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -287,7 +286,7 @@ fun TrashSection(
                         .height(20.dp)
                         .background(
                             brush = Brush.verticalGradient(
-                                colors = listOf(Color.Red.copy(alpha = 0.8f), Color.Red.copy(alpha = 0.3f))
+                                colors = listOf(NeonRed.copy(alpha = 0.8f), NeonRed.copy(alpha = 0.3f))
                             ),
                             shape = RoundedCornerShape(2.dp)
                         )
@@ -296,7 +295,6 @@ fun TrashSection(
                 Text(
                     text = "Sampah",
                     style = MaterialTheme.typography.titleMedium.copy(
-                        fontSize = 16.sp,
                         fontWeight = FontWeight.Bold,
                         letterSpacing = 0.2.sp
                     ),
@@ -307,7 +305,7 @@ fun TrashSection(
                     Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(8.dp))
-                            .background(Color.Red.copy(alpha = 0.2f))
+                            .background(NeonRed.copy(alpha = 0.2f))
                             .padding(horizontal = 8.dp, vertical = 2.dp)
                     ) {
                         Text(
@@ -316,7 +314,7 @@ fun TrashSection(
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 10.sp
                             ),
-                            color = Color.Red.copy(alpha = 0.9f)
+                            color = NeonRed.copy(alpha = 0.9f)
                         )
                     }
                 }
@@ -328,8 +326,8 @@ fun TrashSection(
                 } else {
                     "Transaksi yang sudah dihapus belum hilang permanen. Pilih untuk mengembalikannya."
                 },
-                style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp, lineHeight = 16.sp),
-                color = GhostWhite.copy(alpha = 0.55f)
+                style = MaterialTheme.typography.bodySmall,
+                color = GhostWhite.copy(alpha = 0.7f)
             )
 
             if (deletedRecords.isEmpty()) {
@@ -394,8 +392,8 @@ fun TrashSection(
                             .weight(1f)
                             .heightIn(min = 44.dp),
                         shape = RoundedCornerShape(12.dp),
-                        border = BorderStroke(1.dp, Color.Red.copy(alpha = 0.5f)),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Red.copy(alpha = 0.85f)),
+                        border = BorderStroke(1.dp, NeonRed.copy(alpha = 0.5f)),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = NeonRed.copy(alpha = 0.85f)),
                         contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
                     ) {
                         Icon(
@@ -487,12 +485,12 @@ private fun TrashItem(
                 Text(
                     text = if (isIncome) "+" else "-",
                     style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold, fontSize = 12.sp),
-                    color = if (isIncome) Color.Green.copy(alpha = 0.7f) else Color.Red.copy(alpha = 0.7f)
+                    color = if (isIncome) NeonGreen.copy(alpha = 0.7f) else NeonRed.copy(alpha = 0.7f)
                 )
                 Text(
                     text = FormatUtils.formatRupiah(record.amount),
                     style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold, fontSize = 12.sp),
-                    color = if (isIncome) Color.Green.copy(alpha = 0.7f) else Color.Red.copy(alpha = 0.7f)
+                    color = if (isIncome) NeonGreen.copy(alpha = 0.7f) else NeonRed.copy(alpha = 0.7f)
                 )
             }
         }

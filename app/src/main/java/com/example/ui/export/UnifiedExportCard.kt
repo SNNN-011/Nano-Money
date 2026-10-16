@@ -17,14 +17,12 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.ui.theme.*
-import com.example.ui.components.GlassCard
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -408,8 +406,9 @@ fun ImportCsvConfirmDialog(
                     PremiumButton(
                         text = "Ganti Semua",
                         onClick = onReplace,
-                        isActive = true,
-                        gradientColors = listOf(Color.Red.copy(alpha = 0.85f), Color.Red.copy(alpha = 0.55f)),
+                        // Aksi paling berisiko di dialog ini: ditandai merah
+                        // lewat isDestructive, bukan gradien manual lagi.
+                        isDestructive = true,
                         modifier = Modifier.fillMaxWidth(),
                         testTag = "import_confirm_replace"
                     )
