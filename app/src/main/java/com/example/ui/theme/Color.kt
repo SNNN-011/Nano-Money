@@ -36,4 +36,12 @@ val NeonRed = Color(0xFFFF0D5C)
 val SteelBlue = Color(0xFF8DA9C4)
 val SteelBlueGlow = Color(0x668DA9C4)
 
+// Permukaan (surface) yang sebelumnya ditulis sebagai warna literal di layar
+// chat dan tab penyimpanan. Dipakai supaya warna kartu/gelenbung hanya punya
+// satu sumber, bukan angka hex yang tersebar.
+val SurfaceElevated = Color(0xFF1E1E1E) // kartu & gelenbung AI/typing
+val SurfaceDeep = Color(0xFF13111C) // kartu indikator pemindaian struk
+val SurfaceViolet = Color(0xFF221A3B) // kotak ikon di kartu pemindaian
+val SurfaceDisabled = Color(0xFF0F0F14) // kolom input saat nonaktif
+
 
