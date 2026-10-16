@@ -253,7 +253,18 @@ export default {
         if (response.ok) return response;
 
         const status = response.status;
-        attempts.push(`${modelName}: HTTP ${status}`);
+
+        // Bawa pesan asli dari Gemini ke log. Tanpa ini kegagalan hanya terlihat
+        // sebagai "HTTP 400" tanpa penyebab (kunci tidak valid, payload ditolak,
+        // skema tidak didukung model, dsb.) sehingga diagnosa jadi menebak.
+        let reason = '';
+        try {
+          reason = (await response.text()).replace(/\s+/g, ' ').slice(0, 200);
+        } catch {
+          // Body tidak terbaca; status saja sudah cukup.
+        }
+
+        attempts.push(`${modelName}: HTTP ${status}${reason ? ` (${reason})` : ''}`);
         lastResponse = response;
 
         if (!RETRYABLE_STATUS.has(status)) break;
