@@ -12,6 +12,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DeleteOutline
@@ -776,10 +777,13 @@ fun MonthlyBudgetDialog(
                         unfocusedTextColor = Ink,
                         focusedLabelColor = Ink,
                         unfocusedLabelColor = InkMuted,
+                        focusedPlaceholderColor = InkMuted,
+                        unfocusedPlaceholderColor = InkMuted,
                         focusedBorderColor = Ink,
                         unfocusedBorderColor = HairlineStrong,
                         focusedContainerColor = Hairline,
                         unfocusedContainerColor = Cream,
+                        cursorColor = Ink,
                         errorBorderColor = BurntOrange,
                         errorTextColor = Ink
                     )
@@ -1108,7 +1112,8 @@ fun MonthlyBudgetDialog(
                                             focusedBorderColor = Ink,
                                             unfocusedBorderColor = Hairline,
                                             focusedContainerColor = Cream,
-                                            unfocusedContainerColor = Cream
+                                            unfocusedContainerColor = Cream,
+                                            cursorColor = Ink
                                         )
                                     )
 
@@ -1382,10 +1387,15 @@ fun RecurringTransactionManagementDialog(
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedTextColor = Ink,
                             unfocusedTextColor = Ink,
+                            focusedLabelColor = Ink,
+                            unfocusedLabelColor = InkMuted,
+                            focusedPlaceholderColor = InkMuted,
+                            unfocusedPlaceholderColor = InkMuted,
                             focusedBorderColor = BurntOrange,
                             unfocusedBorderColor = HairlineStrong,
                             focusedContainerColor = Cream,
-                            unfocusedContainerColor = Cream
+                            unfocusedContainerColor = Cream,
+                            cursorColor = BurntOrange
                         )
                     )
 
@@ -1411,10 +1421,15 @@ fun RecurringTransactionManagementDialog(
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedTextColor = Ink,
                             unfocusedTextColor = Ink,
+                            focusedLabelColor = Ink,
+                            unfocusedLabelColor = InkMuted,
+                            focusedPlaceholderColor = InkMuted,
+                            unfocusedPlaceholderColor = InkMuted,
                             focusedBorderColor = BurntOrange,
                             unfocusedBorderColor = HairlineStrong,
                             focusedContainerColor = Cream,
-                            unfocusedContainerColor = Cream
+                            unfocusedContainerColor = Cream,
+                            cursorColor = BurntOrange
                         )
                     )
 
@@ -1429,16 +1444,27 @@ fun RecurringTransactionManagementDialog(
                             onValueChange = {},
                             readOnly = true,
                             label = { Text("Kategori") },
-                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expandedCat) },
+                            trailingIcon = {
+                                Icon(
+                                    imageVector = Icons.Default.ArrowDropDown,
+                                    contentDescription = null,
+                                    tint = InkMuted
+                                )
+                            },
                             modifier = Modifier.menuAnchor().fillMaxWidth(),
                             shape = RoundedCornerShape(12.dp),
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedTextColor = Ink,
                                 unfocusedTextColor = Ink,
+                                focusedLabelColor = Ink,
+                                unfocusedLabelColor = InkMuted,
+                                focusedPlaceholderColor = InkMuted,
+                                unfocusedPlaceholderColor = InkMuted,
                                 focusedBorderColor = BurntOrange,
                                 unfocusedBorderColor = HairlineStrong,
                                 focusedContainerColor = Cream,
-                                unfocusedContainerColor = Cream
+                                unfocusedContainerColor = Cream,
+                                cursorColor = BurntOrange
                             )
                         )
                         ExposedDropdownMenu(
@@ -1479,10 +1505,15 @@ fun RecurringTransactionManagementDialog(
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedTextColor = Ink,
                             unfocusedTextColor = Ink,
+                            focusedLabelColor = Ink,
+                            unfocusedLabelColor = InkMuted,
+                            focusedPlaceholderColor = InkMuted,
+                            unfocusedPlaceholderColor = InkMuted,
                             focusedBorderColor = BurntOrange,
                             unfocusedBorderColor = HairlineStrong,
                             focusedContainerColor = Cream,
-                            unfocusedContainerColor = Cream
+                            unfocusedContainerColor = Cream,
+                            cursorColor = BurntOrange
                         )
                     )
 
@@ -1496,10 +1527,15 @@ fun RecurringTransactionManagementDialog(
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedTextColor = Ink,
                             unfocusedTextColor = Ink,
+                            focusedLabelColor = Ink,
+                            unfocusedLabelColor = InkMuted,
+                            focusedPlaceholderColor = InkMuted,
+                            unfocusedPlaceholderColor = InkMuted,
                             focusedBorderColor = BurntOrange,
                             unfocusedBorderColor = HairlineStrong,
                             focusedContainerColor = Cream,
-                            unfocusedContainerColor = Cream
+                            unfocusedContainerColor = Cream,
+                            cursorColor = BurntOrange
                         )
                     )
                 }
@@ -1617,7 +1653,10 @@ fun RecurringTransactionManagementDialog(
                     EditorialButton(
                         text = "Tambah Rutinitas Baru",
                         onClick = { isAddingNew = true },
-                        modifier = Modifier.fillMaxWidth().testTag("add_recurring_trigger_button")
+                        // Tanpa panah dan tanpa lebar penuh supaya label tetap
+                        // satu baris; rata kanan seperti tombol penutup lain.
+                        trailingArrow = false,
+                        modifier = Modifier.align(Alignment.End).testTag("add_recurring_trigger_button")
                     )
                 }
             }
@@ -1681,7 +1720,7 @@ fun RecurringTransactionManagementDialog(
                 EditorialButton(
                     text = "Tutup",
                     onClick = onDismissRequest,
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.align(Alignment.End),
                     style = EditorialButtonStyle.Ghost,
                     trailingArrow = false
                 )

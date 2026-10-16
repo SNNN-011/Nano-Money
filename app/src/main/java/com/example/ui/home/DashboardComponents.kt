@@ -672,7 +672,9 @@ private fun RutinInfoDialog(onDismiss: () -> Unit) {
                 EditorialButton(
                     text = "Mengerti",
                     onClick = onDismiss,
-                    modifier = Modifier.fillMaxWidth(),
+                    // Tombol penutup: cukup selebar labelnya dan rata kanan,
+                    // tidak melebar sampai tepi kiri dialog.
+                    modifier = Modifier.align(Alignment.End),
                     testTag = "rutin_info_understand_button"
                 )
             }

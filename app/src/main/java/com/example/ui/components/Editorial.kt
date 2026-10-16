@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -127,6 +128,10 @@ fun EditorialButton(
     Row(
         modifier = modifier
             .alpha(if (enabled) 1f else 0.5f)
+            // Tinggi minimum 48 dp: kalau chip panah dimatikan (tombol di dalam
+            // dialog), tombol jadi terlalu pendek karena chip 30 dp itulah yang
+            // biasanya menahan tingginya.
+            .heightIn(min = 48.dp)
             .clip(RoundedCornerShape(CornerRadius.pill))
             .background(container)
             .then(
