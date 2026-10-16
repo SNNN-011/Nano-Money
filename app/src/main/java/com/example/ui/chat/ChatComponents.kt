@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.ReceiptLong
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
@@ -79,6 +80,22 @@ fun UserMessageBubble(text: String) {
 @Composable
 fun UserImageMessageBubble(bitmap: Bitmap) {
     val bubbleShape = RoundedCornerShape(topStart = CornerRadius.lg, topEnd = CornerRadius.lg, bottomStart = CornerRadius.lg)
+
+    // Ukuran gambar ditetapkan eksplisit, dibatasi 250dp x 330dp dengan rasio
+    // aslinya tetap. Sebelumnya lebar penuh gelembung (85% layar) sehingga foto
+    // hampir menutupi seluruh layar.
+    //
+    // Image di Compose itu Spacer + drawBehind, dan Spacer hanya mengambil
+    // maxWidth/maxHeight kalau sisi itu berukuran fixed. Jadi tidak bisa
+    // mengandalkan fillMaxWidth (tingginya 0) atau aspectRatio + heightIn
+    // (heightIn menurunkan plafon, bukan menaikkan tinggi). `size` dengan dua
+    // nilai pasti adalah satu-satunya cara yang aman.
+    val maxWidth = 250.dp
+    val maxHeight = 330.dp
+    val ratio = if (bitmap.height > 0) bitmap.width.toFloat() / bitmap.height.toFloat() else 1f
+    val imageWidth = minOf(maxWidth, maxHeight * ratio)
+    val imageHeight = imageWidth / ratio
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -108,17 +125,13 @@ fun UserImageMessageBubble(bitmap: Bitmap) {
                 Image(
                     bitmap = bitmap.asImageBitmap(),
                     contentDescription = "Struk Belanjaan",
-                    // Ukuran harus ditentukan aspectRatio, bukan fillMaxWidth saja:
-                    // Image di Compose itu Spacer + drawBehind, dan Spacer hanya
-                    // mengambil maxWidth kalau lebarnya fixed. Dengan fillMaxWidth
-                    // saja tingginya tetap 0, jadi struk tampil gepeng memanjang.
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .aspectRatio(
-                            if (bitmap.height > 0) bitmap.width.toFloat() / bitmap.height.toFloat() else 1f
-                        )
+                        .size(width = imageWidth, height = imageHeight)
                         .clip(RoundedCornerShape(CornerRadius.md)),
-                    contentScale = ContentScale.Fit
+                    contentScale = ContentScale.Fit,
+                    // Medium memakai mipmap, jadi gambar yang diperkecil tetap
+                    // tajam (bawaan Low = bilinear biasa, terlihat kabur).
+                    filterQuality = FilterQuality.Medium
                 )
             }
         }

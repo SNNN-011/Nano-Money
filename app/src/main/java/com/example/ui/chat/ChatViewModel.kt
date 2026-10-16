@@ -159,9 +159,18 @@ class ChatViewModel(
         addAiMessage("Permintaan AI dibatalkan.")
     }
 
-    /** Thumbnail kecil untuk bubble chat; bitmap asli tidak boleh ikut tersimpan. */
+    /**
+     * Thumbnail untuk bubble chat; bitmap asli (sampai 2048 px) tidak boleh ikut
+     * tersimpan.
+     *
+     * 768 px, bukan 160 px seperti sebelumnya: gelembung menampilkan gambar
+     * sampai 250 dp, dan di layar berkerapatan 3x itu butuh sekitar 750 px.
+     * Dengan 160 px gambar di-zoom lebih dari 4x sehingga terlihat pecah.
+     * 768 px ARGB_8888 kira-kira 1,8 MB per foto -- jauh di bawah 12-16 MB
+     * bitmap asli yang dulu membuat aplikasi kehabisan memori.
+     */
     private fun createThumbnail(source: Bitmap): Bitmap {
-        val maxDimension = 160
+        val maxDimension = 768
         val scale = minOf(
             maxDimension / source.width.toFloat(),
             maxDimension / source.height.toFloat(),
