@@ -108,8 +108,11 @@ fun UserImageMessageBubble(bitmap: Bitmap) {
                 Image(
                     bitmap = bitmap.asImageBitmap(),
                     contentDescription = "Struk Belanjaan",
+                    // Gambar struk memakai lebar penuh gelenbung (85% lebar layar).
+                    // Sebelumnya dibatasi 160dp sehingga struk tidak terbaca.
                     modifier = Modifier
-                        .sizeIn(maxWidth = 160.dp, maxHeight = 160.dp)
+                        .fillMaxWidth()
+                        .heightIn(max = 480.dp)
                         .clip(RoundedCornerShape(CornerRadius.md)),
                     contentScale = ContentScale.Fit
                 )
