@@ -17,6 +17,13 @@ const MAX_ATTEMPTS_PER_MODEL = 2;
 // 40 detik (terukur), dan seluruh rantai ikut tertahan.
 const ATTEMPT_TIMEOUT_MS = 8000;
 
+// Jatah waktu yang disisakan untuk model TERAKHIR di rantai. Tanpa ini, dua
+// model yang menggantung (masing-masing sampai ATTEMPT_TIMEOUT_MS) menghabiskan
+// seluruh anggaran, dan model terakhir tidak pernah dicoba sama sekali —
+// padahal model itulah yang tersisa sebagai harapan terakhir. 5 detik dipilih
+// dari pengukuran: model paling andal membalas sekitar 3 detik.
+const RESERVE_FOR_LAST_MODEL_MS = 5000;
+
 // Batas total waktu seluruh rantai fallback. App Android memutus request di
 // ~20 detik, jadi seluruh percobaan + jeda retry harus selesai sebelum itu.
 const TOTAL_BUDGET_MS = 16_000;
@@ -105,6 +112,22 @@ export function parseRetryAfterMs(value) {
   const dateMs = Date.parse(value);
   if (Number.isNaN(dateMs)) return null;
   return Math.max(0, dateMs - Date.now());
+}
+
+/**
+ * Jatah waktu untuk satu percobaan model.
+ *
+ * Model yang bukan terakhir tidak boleh memakai seluruh sisa anggaran: sisakan
+ * RESERVE_FOR_LAST_MODEL_MS supaya model terakhir di rantai tetap kebagian
+ * percobaan sebelum anggaran habis.
+ *
+ * @param {number} remainingMs Sisa anggaran total saat ini
+ * @param {boolean} isLastModel Apakah ini model terakhir di rantai
+ * @returns {number} Milidetik untuk percobaan ini (minimal 1 detik)
+ */
+export function attemptBudgetMs(remainingMs, isLastModel) {
+  const reserve = isLastModel ? 0 : RESERVE_FOR_LAST_MODEL_MS;
+  return Math.max(1000, Math.min(ATTEMPT_TIMEOUT_MS, remainingMs - reserve));
 }
 
 export default {
@@ -201,6 +224,8 @@ export default {
     // Rantai dicoba berurutan; satu model boleh dicoba ulang kalau statusnya
     // sementara. Kalau sebuah model gagal dan berikutnya juga gagal, status yang
     // dikembalikan adalah yang paling informatif, bukan sekadar respons terakhir.
+    // Setiap percobaan memakai jatah waktu dari attemptBudgetMs() supaya model
+    // yang menggantung tidak menelan seluruh anggaran milik rantai.
     const attempts = [];
     let lastResponse = null;
     const startMs = Date.now();
@@ -213,9 +238,11 @@ export default {
         const remaining = TOTAL_BUDGET_MS - (Date.now() - startMs);
         if (remaining <= 0) break modelLoop;
 
+        const isLastModel = modelName === chain[chain.length - 1];
+
         let response;
         try {
-          response = await callGemini(modelName, Math.max(1, Math.min(ATTEMPT_TIMEOUT_MS, remaining)));
+          response = await callGemini(modelName, attemptBudgetMs(remaining, isLastModel));
         } catch (err) {
           console.error(`[uid:${uid}] ${modelName} gagal terhubung: ${err.message}`);
           attempts.push(`${modelName}: network error`);
