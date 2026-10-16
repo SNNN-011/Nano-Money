@@ -315,21 +315,16 @@ fun DatabaseBackupSection(
                                     Toast.makeText(context, "Sinkronisasi dimatikan. Data di HP tidak dihapus.", Toast.LENGTH_SHORT).show()
                                 }
                             },
+                            // Samakan dengan switch PIN di tab Simpan (pin_switch).
                             colors = SwitchDefaults.colors(
-                                checkedThumbColor = NeonViolet,
-                                checkedTrackColor = NeonViolet.copy(alpha = 0.4f)
+                                checkedThumbColor = GhostWhite,
+                                checkedTrackColor = SteelBlue,
+                                uncheckedThumbColor = GhostWhite.copy(alpha = 0.4f),
+                                uncheckedTrackColor = GhostWhite.copy(alpha = 0.1f)
                             ),
                             modifier = Modifier.testTag("firestore_sync_toggle")
                         )
                     }
-
-                    PremiumButton(
-                        text = if (isDeletingCloud) "MENGHAPUS DATA CLOUD..." else "HAPUS DATA CLOUD",
-                        onClick = { showDeleteCloudConfirm = true },
-                        isActive = !isDeletingCloud,
-                        isDestructive = true,
-                        modifier = Modifier.fillMaxWidth().testTag("delete_cloud_data_button")
-                    )
 
                     val workManager = remember { WorkManager.getInstance(context) }
                     val liveData = remember { workManager.getWorkInfosForUniqueWorkLiveData("SyncUniqueWork") }
@@ -385,6 +380,15 @@ fun DatabaseBackupSection(
                         isActive = !isSyncingByFirebase && firestoreSyncEnabled,
                         icon = Icons.Default.Sync,
                         modifier = Modifier.fillMaxWidth().testTag("sync_firestore_button")
+                    )
+
+                    // Sinkron dulu, aksi hapus data cloud di bawahnya.
+                    PremiumButton(
+                        text = if (isDeletingCloud) "MENGHAPUS DATA CLOUD..." else "HAPUS DATA CLOUD",
+                        onClick = { showDeleteCloudConfirm = true },
+                        isActive = !isDeletingCloud,
+                        isDestructive = true,
+                        modifier = Modifier.fillMaxWidth().testTag("delete_cloud_data_button")
                     )
                 }
             }
