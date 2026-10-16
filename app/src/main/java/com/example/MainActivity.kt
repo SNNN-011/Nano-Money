@@ -151,7 +151,11 @@ class MainActivity : FragmentActivity() {
             // Hasil restore backup harus menang atas versi cloud: tandai PENDING dulu.
             com.example.util.RestoreSyncMarker.consumeIfPresent(context)
 
-            if (com.example.util.FirebaseSyncHelper.isUserSignedIn()) {
+            // Sinkronisasi hanya berjalan kalau pengguna menyalakan toggle-nya
+            // (default MATI): tanpa ini tidak ada data yang menyentuh cloud.
+            if (com.example.util.FirebaseSyncHelper.isUserSignedIn() &&
+                com.example.data.sync.SyncCursors.isSyncEnabled(context)
+            ) {
                 // Realtime: perubahan dari perangkat lain langsung masuk.
                 com.example.data.sync.SyncManager.startRealtime(context)
                 launch {

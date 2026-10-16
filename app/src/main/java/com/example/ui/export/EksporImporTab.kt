@@ -161,7 +161,9 @@ fun EksporImporTabContent(
             coroutineScope.launch {
                 val firebaseResult = com.example.util.FirebaseSyncHelper.signInWithGoogleInFirebase(context, account)
                 if (firebaseResult.isSuccess) {
-                    Toast.makeText(context, "Berhasil menghubungkan Google Drive & sinkronisasi cloud!", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, "Berhasil menghubungkan akun Google.", Toast.LENGTH_SHORT).show()
+                    // Gerbang toggle ada di SyncManager.syncAll; panggilan ini tidak
+                    // mengunggah apa pun selama toggle belum dinyalakan pengguna.
                     com.example.util.FirebaseSyncHelper.syncFinancialRecordsWithFirestore(context)
                 } else {
                     Toast.makeText(context, "Google Drive terhubung, tetapi server sinkronisasi gagal: ${firebaseResult.exceptionOrNull()?.localizedMessage}", Toast.LENGTH_LONG).show()

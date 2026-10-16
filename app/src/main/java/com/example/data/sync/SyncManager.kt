@@ -105,6 +105,8 @@ object SyncManager {
      * tidak boleh terkirim ke uid baru.
      */
     suspend fun pushPending(context: Context) = withContext(Dispatchers.IO) {
+        // Toggle default MATI: tanpa izin eksplisit, tidak ada data ke cloud.
+        if (!SyncCursors.isSyncEnabled(context)) return@withContext
         if (handleAccountChangeIfNeeded(context)) {
             Log.i(TAG, "Ganti akun terdeteksi: data lokal lama dibersihkan sebelum push.")
         }
@@ -182,8 +184,101 @@ object SyncManager {
         editor.commit()
     }
 
+    /**
+     * Menandai SEMUA baris lokal PENDING + updatedAt=sekarang, supaya ikut
+     * diunggah penuh. Dipakai saat menyalakan toggle dan setelah hapus data cloud.
+     */
+    suspend fun markAllLocalPending(context: Context) = withContext(Dispatchers.IO) {
+        val db = AppDatabase.getDatabase(context)
+        val now = System.currentTimeMillis()
+        db.withTransaction {
+            db.financialRecordDao().markAllPendingForRestore(now)
+            db.recurringTransactionDao().markAllPendingForRestore(now)
+            db.categoryDao().markAllPendingForRestore(now)
+            db.categoryBudgetDao().markAllPendingForRestore(now)
+            db.appSettingDao().markAllPendingForRestore(now)
+        }
+        Log.i(TAG, "Semua baris lokal ditandai PENDING (updatedAt=$now).")
+    }
+
+    /**
+     * Menyalakan sinkronisasi atas persetujuan pengguna: tandai semua data lokal
+     * untuk diunggah penuh, lalu nyalakan realtime + pekerjaan periodik.
+     * Unggahan sebenarnya dijalankan lewat syncAll oleh pemanggil.
+     */
+    suspend fun enableSync(context: Context) {
+        SyncCursors.setSyncEnabled(context, true)
+        markAllLocalPending(context)
+        startRealtime(context)
+    }
+
+    /**
+     * Mematikan sinkronisasi: listener realtime dilepas dan pekerjaan periodik
+     * dibatalkan. Data di perangkat TIDAK disentuh sama sekali.
+     */
+    fun disableSync(context: Context) {
+        SyncCursors.setSyncEnabled(context, false)
+        stopRealtime()
+        runCatching {
+            WorkManager.getInstance(context.applicationContext).cancelUniqueWork(PERIODIC_SYNC_WORK)
+        }.onFailure { Log.w(TAG, "Gagal membatalkan sync periodik: ${it.message}") }
+    }
+
+    /**
+     * Menghapus SELURUH dokumen cloud milik akun yang sedang login (5 koleksi).
+     *
+     * Data di perangkat tidak disentuh: semua baris lokal ditandai PENDING dan
+     * kursor/tombstone direset, jadi kalau pengguna menyalakan sinkronisasi lagi,
+     * isi perangkat diunggah ulang penuh — bukan menarik sisa data cloud.
+     * Sinkronisasi dimatikan lebih dulu supaya listener tidak ikut mencatat
+     * tombstone saat dokumen dihapus massal, dan agar dokumen tidak langsung
+     * terunggah ulang oleh pekerja periodik berikutnya.
+     */
+    suspend fun deleteAllCloudData(context: Context): Report = withContext(Dispatchers.IO) {
+        val uid = FirebaseAuth.getInstance().currentUser?.uid
+            ?: return@withContext Report(errors = listOf("Belum terhubung akun Google."))
+
+        disableSync(context)
+
+        val errors = mutableListOf<String>()
+        val collections = listOf(
+            COLLECTION_RECORDS,
+            COLLECTION_RECURRING,
+            COLLECTION_CATEGORIES,
+            COLLECTION_CATEGORY_BUDGETS,
+            COLLECTION_SETTINGS
+        )
+        val db = FirebaseFirestore.getInstance()
+        var deleted = 0
+        for (name in collections) {
+            runCatching {
+                val documents = userCollection(name).get().await().documents
+                documents.chunked(CollectionSync.BATCH_LIMIT).forEach { chunk ->
+                    val batch = db.batch()
+                    chunk.forEach { batch.delete(it.reference) }
+                    withTimeout(CollectionSync.OP_TIMEOUT_MS) { batch.commit().await() }
+                }
+                deleted += documents.size
+                Log.i(TAG, "Hapus cloud koleksi $name: ${documents.size} dokumen.")
+            }.onFailure {
+                Log.w(TAG, "Gagal menghapus koleksi $name: ${it.message}")
+                errors += "$name: ${it.localizedMessage ?: it.message}"
+            }
+        }
+
+        // Data perangkat tetap ada; siapkan unggah ulang penuh bila dinyalakan lagi.
+        markAllLocalPending(context)
+        SyncCursors.resetCursorsAndTombstones(context)
+
+        Log.i(TAG, "Hapus data cloud selesai: $deleted dokumen terhapus (uid=$uid).")
+        Report(errors = errors)
+    }
+
     /** Sinkron penuh: push + pull tiap koleksi, plus sekali saja adopsi dokumen lama. */
     suspend fun syncAll(context: Context): Report = withContext(Dispatchers.IO) {
+        if (!SyncCursors.isSyncEnabled(context)) {
+            return@withContext Report(errors = listOf("Sinkronisasi cloud sedang dinonaktifkan."))
+        }
         if (FirebaseAuth.getInstance().currentUser == null) {
             return@withContext Report(errors = listOf("Belum terhubung akun Google."))
         }
@@ -766,6 +861,7 @@ object SyncManager {
      * L6: pekerjaan sinkronisasi periodik juga dinyalakan dari sini, bukan dari Activity.
      */
     fun startRealtime(context: Context) {
+        if (!SyncCursors.isSyncEnabled(context)) return
         if (FirebaseAuth.getInstance().currentUser == null) return
         if (!realtimeOn.compareAndSet(false, true)) return
 

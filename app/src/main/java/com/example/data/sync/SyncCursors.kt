@@ -14,6 +14,7 @@ object SyncCursors {
     private const val PREFS_NAME = "sync_meta"
     private const val KEY_PREFIX = "last_sync_"
     private const val KEY_LAST_UID = "last_synced_uid"
+    private const val KEY_SYNC_ENABLED = "firestore_sync_enabled"
 
     /** Tombstone (id dokumen yang terhapus di cloud) hidup 30 hari saja. */
     const val TOMBSTONE_TTL_MS = 30L * 24 * 60 * 60 * 1000
@@ -57,6 +58,33 @@ object SyncCursors {
      */
     fun resetForAccountChange(context: Context) {
         prefs(context).edit().clear().commit()
+    }
+
+    // ---- Toggle sinkronisasi Firestore (default MATI) ----
+
+    /**
+     * Status sinkronisasi Firestore milik pengguna. Default MATI: aplikasi tidak
+     * boleh mengirim data apa pun ke cloud tanpa persetujuan eksplisit.
+     * Disimpan dengan commit() supaya perubahan toggle langsung tahan mati proses.
+     */
+    fun isSyncEnabled(context: Context): Boolean =
+        prefs(context).getBoolean(KEY_SYNC_ENABLED, false)
+
+    fun setSyncEnabled(context: Context, enabled: Boolean) {
+        prefs(context).edit().putBoolean(KEY_SYNC_ENABLED, enabled).commit()
+    }
+
+    /**
+     * Menghapus kursor, flag adopsi, dan tombstone — TANPA menyentuh uid akun
+     * maupun status toggle. Dipakai setelah "Hapus Data Cloud": kursor lama
+     * akan menyembunyikan dokumen baru, dan tombstone lama mencegah data
+     * dikirim ulang.
+     */
+    fun resetCursorsAndTombstones(context: Context) {
+        val p = prefs(context)
+        val editor = p.edit()
+        p.all.keys.filter { it.startsWith(KEY_PREFIX) }.forEach { editor.remove(it) }
+        editor.commit()
     }
 
     // ---- Tombstone penghapusan cloud (M4) ----
