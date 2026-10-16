@@ -20,3 +20,15 @@ FIREBASE_PROJECT_ID = "nano-money-a44b0"
 [[kv_namespaces]]
 binding = "RATE_LIMIT"
 id = "e6ccf967168b4aabbcc0beef28b8bfb5"
+
+# --- Penempatan Worker (WAJIB agar Gemini tidak menolak) ---
+# Google menilai lokasi dari IP KELUAR Worker, bukan lokasi HP user. Tanpa blok
+# ini Cloudflare menjalankan Worker di colo terdekat pengunjung -- untuk
+# pengunjung Indonesia sering Hong Kong (HKG) -- dan Gemini membalas:
+#   HTTP 400 FAILED_PRECONDITION
+#   "User location is not supported for the API use."
+# Placement Hints memaksa Worker berjalan di colo terdekat GCP us-central1
+# (Amerika Serikat) yang diizinkan Gemini. Format nilainya {provider}:{region}.
+# Kalau perlu diganti, pakai region lain yang didukung Gemini, mis. gcp:us-east4.
+[placement]
+region = "gcp:us-central1"
