@@ -17,6 +17,7 @@ object DatabaseKeyManager {
     private const val PREFS_NAME = "secure_db_prefs"
     private const val KEY_ENCRYPTED_PASSPHRASE = "encrypted_db_passphrase"
     private const val KEY_IV = "db_passphrase_iv"
+    private const val KEY_FALLBACK_PASSPHRASE = "db_passphrase_fallback_b64"
     private const val AES_GCM_NOPADDING = "AES/GCM/NoPadding"
 
     private const val TAG = "DatabaseKeyManager"
@@ -40,6 +41,17 @@ object DatabaseKeyManager {
             } catch (e: Exception) {
                 SecureLog.e(TAG, "Gagal mendekripsi passphrase database dari KeyStore.", e)
                 throw IllegalStateException("Gagal mendekripsi kunci database terenkripsi. Keystore perangkat mungkin telah di-reset.", e)
+            }
+        }
+
+        // Kunci hasil impor pemulihan saat Keystore gagal (lihat importPassphrase).
+        // ponytail: jalur ini polos demi data tetap terbuka setelah restore;
+        // cabut bila keputusan M18 (fallback passphrase) berubah jadi fail-closed.
+        prefs.getString(KEY_FALLBACK_PASSPHRASE, null)?.let { plainBase64 ->
+            try {
+                return Base64.decode(plainBase64, Base64.DEFAULT)
+            } catch (e: Exception) {
+                SecureLog.e(TAG, "Fallback passphrase polos rusak; kunci baru akan dibuat.", e)
             }
         }
 
@@ -72,6 +84,40 @@ object DatabaseKeyManager {
         }
 
         return passphraseBytes
+    }
+
+    /**
+     * Menyimpan kunci DB hasil pemulihan cadangan ke perangkat ini.
+     *
+     * Jalur normal sama dengan pembuatan kunci: dienkripsi Keystore. Kalau
+     * Keystore sedang bermasalah, kunci disimpan polos (base64) supaya
+     * database hasil pemulihan tetap bisa dibuka — data terbaca lebih penting
+     * daripada menyembunyikan kunci di perangkat yang keystore-nya rusak.
+     */
+    @Synchronized
+    fun importPassphrase(context: Context, passphrase: ByteArray) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        try {
+            val secretKey = getOrCreateKeystoreKey()
+            val cipher = Cipher.getInstance(AES_GCM_NOPADDING)
+            cipher.init(Cipher.ENCRYPT_MODE, secretKey)
+            val iv = cipher.iv
+            val encryptedBytes = cipher.doFinal(passphrase)
+            val committed = prefs.edit()
+                .putString(KEY_ENCRYPTED_PASSPHRASE, Base64.encodeToString(encryptedBytes, Base64.DEFAULT))
+                .putString(KEY_IV, Base64.encodeToString(iv, Base64.DEFAULT))
+                .remove(KEY_FALLBACK_PASSPHRASE)
+                .commit()
+            if (committed) return
+            SecureLog.e(TAG, "commit prefs gagal saat impor kunci; memakai fallback polos.")
+        } catch (e: Exception) {
+            SecureLog.e(TAG, "Keystore gagal saat impor kunci; memakai fallback polos.", e)
+        }
+        prefs.edit()
+            .remove(KEY_ENCRYPTED_PASSPHRASE)
+            .remove(KEY_IV)
+            .putString(KEY_FALLBACK_PASSPHRASE, Base64.encodeToString(passphrase, Base64.DEFAULT))
+            .commit()
     }
 
     private fun getKeystoreKey(): SecretKey? {

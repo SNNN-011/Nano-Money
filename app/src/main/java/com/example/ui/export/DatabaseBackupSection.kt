@@ -100,6 +100,7 @@ fun DatabaseBackupSection(
     var isDriveBackupEnabled by remember { mutableStateOf(securityPrefs.getBoolean("drive_backup_enabled", true)) }
     var showDisconnectConfirmation by remember { mutableStateOf(false) }
     var driveBackupFileToDelete by remember { mutableStateOf<GoogleDriveHelper.DriveBackupFile?>(null) }
+    var isRestoring by remember { mutableStateOf(false) }
     var tempBackupHour by remember(autoBackupHour) { mutableStateOf(autoBackupHour) }
     var tempBackupMinute by remember(autoBackupMinute) { mutableStateOf(autoBackupMinute) }
     var tempBackupDayOfWeek by remember(autoBackupDayOfWeek) { mutableStateOf(autoBackupDayOfWeek) }
@@ -740,6 +741,142 @@ fun DatabaseBackupSection(
                                 isActive = true,
                                 modifier = Modifier.weight(1.3f),
                                 testTag = "confirm_delete_drive_backup"
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // --- Dialog konfirmasi pemulihan dari Drive ---
+    // Alur: unduh ZIP -> (best effort) cadangkan pengaman ke Drive -> validasi
+    // & tukar database + kunci + pengaturan -> aplikasi mulai ulang sendiri.
+    val restoreCandidate = selectedDriveBackupToRestore
+    if (restoreCandidate != null) {
+        Dialog(onDismissRequest = { if (!isRestoring) onSelectedDriveBackupToRestoreChange(null) }) {
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(containerColor = MidnightAbyss),
+                border = BorderStroke(
+                    width = 1.dp,
+                    brush = Brush.verticalGradient(
+                        colors = listOf(
+                            GhostWhite.copy(alpha = 0.2f),
+                            GhostWhite.copy(alpha = 0.02f)
+                        )
+                    )
+                ),
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+            ) {
+                Box(modifier = Modifier.background(TranslucentGlass)) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(24.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Text(
+                            text = "Pulihkan Cadangan Ini?",
+                            color = GhostWhite,
+                            style = MaterialTheme.typography.titleLarge,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = restoreCandidate.name,
+                            color = SteelBlue,
+                            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold)
+                        )
+                        Text(
+                            text = FormatUtils.formatDriveTimestamp(restoreCandidate.createdTime) +
+                                " · " + FormatUtils.formatFileSize(restoreCandidate.sizeBytes),
+                            color = GhostWhite.copy(alpha = 0.5f),
+                            style = MaterialTheme.typography.labelSmall
+                        )
+                        Text(
+                            text = "Seluruh data dan pengaturan di HP ini akan DIGANTIKAN isi cadangan. " +
+                                "Sebelum menimpa, aplikasi otomatis membuat cadangan pengaman ke Google Drive " +
+                                "(bila akun terhubung). Kunci database ikut dipulihkan sehingga cadangan dari " +
+                                "perangkat lain tetap bisa dibuka. PIN perangkat tidak ikut dipulihkan. " +
+                                "Aplikasi akan dimulai ulang setelah selesai.",
+                            color = GhostWhite.copy(alpha = 0.8f),
+                            style = MaterialTheme.typography.bodyMedium,
+                            lineHeight = 20.sp
+                        )
+                        if (isRestoring) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(18.dp),
+                                    strokeWidth = 2.dp,
+                                    color = SteelBlue
+                                )
+                                Text(
+                                    text = "Memulihkan... jangan tutup aplikasi.",
+                                    color = GhostWhite.copy(alpha = 0.7f),
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            PremiumButton(
+                                text = "Batal",
+                                onClick = { onSelectedDriveBackupToRestoreChange(null) },
+                                isActive = !isRestoring,
+                                modifier = Modifier.weight(1f),
+                                testTag = "cancel_restore_drive_backup"
+                            )
+                            PremiumButton(
+                                text = "PULIHKAN SEKARANG",
+                                onClick = {
+                                    coroutineScope.launch {
+                                        isRestoring = true
+                                        val downloadTarget = File(context.cacheDir, "restore_download.zip")
+                                        when (val download = GoogleDriveHelper.downloadBackupFromDrive(context, restoreCandidate.id, downloadTarget)) {
+                                            is GoogleDriveHelper.DriveResult.Error -> {
+                                                isRestoring = false
+                                                Toast.makeText(context, download.message, Toast.LENGTH_LONG).show()
+                                                onDriveErrorDetailMessageChange(download.message)
+                                            }
+                                            is GoogleDriveHelper.DriveResult.Success -> {
+                                                // Cadangan pengaman sebelum menimpa data saat ini.
+                                                if (connectedGoogleAccount != null) {
+                                                    try {
+                                                        when (val safety = BackupHelper.performBackup(context)) {
+                                                            is BackupHelper.BackupResult.Success -> {
+                                                                try {
+                                                                    GoogleDriveHelper.uploadBackupToDrive(context, safety.file)
+                                                                } finally {
+                                                                    if (safety.file.exists()) safety.file.delete()
+                                                                }
+                                                            }
+                                                            is BackupHelper.BackupResult.Error -> Unit
+                                                        }
+                                                    } catch (e: Exception) {
+                                                        com.example.util.SecureLog.e("DatabaseBackupSection", "Cadangan pengaman gagal dibuat", e)
+                                                    }
+                                                }
+                                                val outcome = BackupHelper.restoreBackup(context, downloadTarget)
+                                                if (!outcome.success) {
+                                                    isRestoring = false
+                                                    Toast.makeText(context, outcome.message, Toast.LENGTH_LONG).show()
+                                                    onDriveErrorDetailMessageChange(outcome.message)
+                                                }
+                                                // Sukses: aplikasi dimulai ulang oleh restoreBackup.
+                                            }
+                                        }
+                                    }
+                                },
+                                isActive = !isRestoring,
+                                modifier = Modifier.weight(1.3f),
+                                testTag = "confirm_restore_drive_backup"
                             )
                         }
                     }
