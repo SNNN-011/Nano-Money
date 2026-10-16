@@ -132,6 +132,13 @@ export function attemptBudgetMs(remainingMs, isLastModel) {
 
 export default {
   async fetch(request, env) {
+    // Colo Cloudflare tempat Worker ini benar-benar berjalan. Ini yang menentukan
+    // lokasi bagi Google: Gemini menilai IP keluar Worker, BUKAN lokasi HP user,
+    // sehingga colo yang diblokir (mis. HKG) membuat semua model gagal dengan
+    // HTTP 400 "User location is not supported for the API use". Selalu dibawa
+    // di log supaya diagnosa tidak perlu menebak.
+    const colo = request.cf?.colo ?? 'unknown';
+
     const projectId = env.FIREBASE_PROJECT_ID;
     if (!projectId) {
       return jsonResponse({ error: 'Server error: FIREBASE_PROJECT_ID belum diset di Worker' }, 500);
@@ -283,7 +290,18 @@ export default {
       }
     }
 
-    console.warn(`[uid:${uid}] Semua model gagal untuk "${requestedModel}" -> ${attempts.join(' | ')}`);
+    const failureText = attempts.join(' | ');
+    console.warn(`[uid:${uid}][colo:${colo}] Semua model gagal untuk "${requestedModel}" -> ${failureText}`);
+
+    // Khusus blokir lokasi: kolom "reason" di atas sudah memuat pesan asli
+    // Gemini, jadi cukup dicocokkan di sini. Ini kasus yang paling sering
+    // tertukar dengan "kunci API mati", padahal kuncinya sehat.
+    if (failureText.includes('User location is not supported')) {
+      console.warn(
+        `[colo:${colo}] Gemini menolak karena lokasi IP keluar Worker. ` +
+          `Set [placement] region di wrangler.toml (mis. gcp:us-central1) lalu deploy ulang.`
+      );
+    }
 
     const status = lastResponse?.status && !RETRYABLE_STATUS.has(lastResponse.status)
       ? lastResponse.status
