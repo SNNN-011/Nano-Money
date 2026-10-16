@@ -428,9 +428,9 @@ fun FinancialTrackerScreen(
         ) { route ->
             when (route) {
                 TrackerTab.BERANDA.name -> {
-                    Box(modifier = Modifier.fillMaxSize().background(Brush.radialGradient(colors = listOf(SteelBlueGlow.copy(alpha = 0.08f), Color.Transparent), center = Offset(500f, 300f), radius = 1000f)))
-                    Box(modifier = Modifier.fillMaxSize().background(Brush.radialGradient(colors = listOf(SteelBlueGlow.copy(alpha = 0.06f), Color.Transparent), center = Offset(100f, 1600f), radius = 1200f)))
-                    Box(modifier = Modifier.fillMaxSize().background(Brush.radialGradient(colors = listOf(SteelBlueGlow.copy(alpha = 0.04f), Color.Transparent), center = Offset(1500f, 1000f), radius = 900f)))
+                    // Tab Dashboard memakai palet editorial: latarnya krem polos,
+                    // bukan gradien neon seperti tab lain yang belum di-redesign.
+                    Box(modifier = Modifier.fillMaxSize().background(Cream))
                 }
                 TrackerTab.TRANSAKSI_BARU.name -> {
                     Box(modifier = Modifier.fillMaxSize().background(Brush.radialGradient(colors = listOf(SteelBlueGlow.copy(alpha = 0.12f), Color.Transparent), center = Offset(800f, 0f), radius = 900f)))

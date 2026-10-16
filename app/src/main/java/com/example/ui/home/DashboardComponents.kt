@@ -1,38 +1,72 @@
 package com.example.ui.home
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
-import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ArrowUpward
-import androidx.compose.material.icons.filled.Autorenew
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.KeyboardArrowLeft
-import androidx.compose.material.icons.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material.icons.outlined.AddCircleOutline
+import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
-import com.example.ui.theme.*
-import com.example.ui.components.GlassCard
+import com.example.data.FinancialRecord
+import com.example.ui.components.BezelCard
+import com.example.ui.components.DashedDivider
+import com.example.ui.components.EditorialButton
+import com.example.ui.components.EditorialButtonStyle
+import com.example.ui.components.EditorialPill
+import com.example.ui.components.EditorialProgress
+import com.example.ui.components.Eyebrow
+import com.example.ui.components.HairlineDivider
+import com.example.ui.components.Stamp
+import com.example.ui.components.Tag
 import com.example.ui.config.FormatUtils
+import com.example.ui.theme.*
+import com.example.ui.util.CategoryIconMapper
+import com.example.ui.util.displayCategoryName
+import java.util.Locale
 
+/**
+ * Pemasukan memakai hijau hutan, pengeluaran memakai terakota: dua aksen yang
+ * sama dengan referensi (--accent-2 dan --accent).
+ */
+val AmountIncomeColor = ForestGreen
+val AmountExpenseColor = BurntOrange
+
+/**
+ * Ringkasan dashboard: saldo sebagai hero, lalu kartu anggaran bulan berjalan
+ * plus anggaran per kategori.
+ *
+ * Susunannya mengikuti hero dan kartu "build slip" di referensi: label mono
+ * kecil di atas angka serif besar, daftar fakta bergaris rambut, dan isi kartu
+ * yang dipisah garis titik-titik.
+ */
 @Composable
 fun DashboardStatsSection(
     totalIncome: Long,
@@ -78,618 +112,477 @@ fun DashboardStatsSection(
         "-Rp ••••••"
     }
 
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(28.dp),
-        colors = CardDefaults.cardColors(containerColor = TranslucentGlass),
-        border = BorderStroke(
-            width = 1.dp,
-            brush = Brush.verticalGradient(
-                colors = listOf(
-                    GhostWhite.copy(alpha = 0.2f),
-                    GhostWhite.copy(alpha = 0.02f)
-                )
+    Column(modifier = modifier.fillMaxWidth()) {
+        if (welcomeMessage.isNotEmpty()) {
+            val parsedColor = remember(welcomeMessageColor) {
+                try {
+                    Color(android.graphics.Color.parseColor(welcomeMessageColor))
+                } catch (e: Exception) {
+                    BurntOrange
+                }
+            }
+            Text(
+                text = welcomeMessage,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = parsedColor,
+                modifier = Modifier.padding(bottom = Spacing.sm)
             )
-        ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
-    ) {
-        Column(
+        }
+        if (showNewFeature) {
+            Tag(
+                text = "Fitur baru tersedia",
+                color = Amber,
+                borderColor = Amber.copy(alpha = 0.45f),
+                modifier = Modifier.padding(bottom = Spacing.sm)
+            )
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Eyebrow(
+                    text = "Saldo total",
+                    modifier = Modifier.testTag("total_balance_label")
+                )
+                IconButton(
+                    onClick = onToggleBalanceVisible,
+                    modifier = Modifier
+                        .size(28.dp)
+                        .testTag("toggle_balance_visibility")
+                ) {
+                    Icon(
+                        imageVector = if (balanceVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                        contentDescription = if (balanceVisible) "Sembunyikan Saldo" else "Tampilkan Saldo",
+                        tint = InkMuted,
+                        modifier = Modifier.size(17.dp)
+                    )
+                }
+            }
+
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(
+                    onClick = { showRutinInfo = true },
+                    modifier = Modifier.size(28.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Info,
+                        contentDescription = "Info Transaksi Rutin",
+                        tint = InkMuted,
+                        modifier = Modifier.size(17.dp)
+                    )
+                }
+                EditorialPill(
+                    text = "Rutin",
+                    selected = false,
+                    onClick = onRecurringClick,
+                    testTag = "recurring_transactions_inline_button"
+                )
+            }
+        }
+
+        // Angka saldo: serif tipis ala h1 hero di referensi. Ukurannya dipilih
+        // menurut panjang nominal supaya nominal miliaran tidak terpotong --
+        // Compose tidak mengecilkan font otomatis untuk satu baris.
+        Text(
+            text = displayBalance,
+            style = when {
+                displayBalance.length > 16 -> MaterialTheme.typography.headlineLarge
+                displayBalance.length > 13 -> MaterialTheme.typography.displaySmall
+                else -> MaterialTheme.typography.displayLarge
+            },
+            color = Ink,
+            maxLines = 1
+        )
+
+        Spacer(modifier = Modifier.height(Spacing.lg))
+        HairlineDivider()
+
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+                .padding(vertical = Spacing.lg),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.lg)
         ) {
-            if (welcomeMessage.isNotEmpty()) {
-                val parsedColor = remember(welcomeMessageColor) {
-                    try {
-                        androidx.compose.ui.graphics.Color(android.graphics.Color.parseColor(welcomeMessageColor))
-                    } catch (e: Exception) {
-                        SteelBlue // Fallback color
-                    }
-                }
-                
-                Text(
-                    text = welcomeMessage,
-                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
-                    color = parsedColor,
-                    modifier = Modifier.padding(bottom = 8.dp)
-                )
-            }
-            if (showNewFeature) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 12.dp)
-                        .background(NeonGreen.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
-                        .border(1.dp, NeonGreen.copy(alpha = 0.5f), RoundedCornerShape(8.dp))
-                        .padding(8.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "✨ Fitur Baru Tersedia! ✨",
-                        color = NeonGreen,
-                        style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold)
-                    )
-                }
-            }
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Text(
-                        text = "SALDO TOTAL",
-                        style = MaterialTheme.typography.labelMedium.copy(
-                            letterSpacing = 1.5.sp,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 11.sp
-                        ),
-                        color = GhostWhite.copy(alpha = 0.6f),
-                        modifier = Modifier.testTag("total_balance_label")
-                    )
-                    IconButton(
-                        onClick = onToggleBalanceVisible,
-                        modifier = Modifier
-                            .size(20.dp)
-                            .testTag("toggle_balance_visibility")
-                    ) {
-                        Icon(
-                            imageVector = if (balanceVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
-                            contentDescription = if (balanceVisible) "Sembunyikan Saldo" else "Tampilkan Saldo",
-                            tint = GhostWhite.copy(alpha = 0.5f),
-                            modifier = Modifier.size(16.dp)
-                        )
-                    }
-                }
-
-                Row(
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    IconButton(
-                        onClick = { showRutinInfo = true },
-                        modifier = Modifier.size(24.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Info,
-                            contentDescription = "Info Transaksi Rutin",
-                            tint = GhostWhite.copy(alpha = 0.5f),
-                            modifier = Modifier.size(16.dp)
-                        )
-                    }
-                    Spacer(modifier = Modifier.width(4.dp))
-                    // Minimalist premium-styled Rutin button next to SALDO TOTAL
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(CornerRadius.xl))
-                            .background(SteelBlue.copy(alpha = 0.12f))
-                            .border(1.dp, SteelBlue.copy(alpha = 0.3f), RoundedCornerShape(CornerRadius.xl))
-                            .clickable { onRecurringClick() }
-                            .padding(horizontal = 10.dp, vertical = 6.dp)
-                            .testTag("recurring_transactions_inline_button"),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(Spacing.xs)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Autorenew,
-                                contentDescription = null,
-                                tint = SteelBlue,
-                                modifier = Modifier.size(13.dp)
-                            )
-                            Text(
-                                text = "Rutin",
-                                style = MaterialTheme.typography.labelMedium.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 11.sp
-                                ),
-                                color = SteelBlue
-                            )
-                        }
-                    }
-                }
-            }
-            Spacer(modifier = Modifier.height(Spacing.xs))
-            Text(
-                text = displayBalance,
-                style = MaterialTheme.typography.displayMedium.copy(
-                    fontWeight = FontWeight.W600,
-                    letterSpacing = (-1).sp,
-                ),
-                color = GhostWhite,
+            FactCell(
+                label = "Pendapatan",
+                value = displayIncome,
+                valueColor = AmountIncomeColor,
+                icon = Icons.Default.ArrowUpward,
+                testTag = "total_income_card",
+                modifier = Modifier.weight(1f)
             )
+            FactCell(
+                label = "Pengeluaran",
+                value = displayExpense,
+                valueColor = AmountExpenseColor,
+                icon = Icons.Default.ArrowDownward,
+                testTag = "total_expense_card",
+                modifier = Modifier.weight(1f)
+            )
+        }
 
-            Spacer(modifier = Modifier.height(Spacing.md))
+        BudgetSlip(
+            monthlySpendingTotal = monthlySpendingTotal,
+            monthlyBudgetLimit = monthlyBudgetLimit,
+            balanceVisible = balanceVisible,
+            selectedBudgetOffset = selectedBudgetOffset,
+            onBudgetOffsetChange = onBudgetOffsetChange,
+            categoryBudgets = categoryBudgets,
+            categoryNameById = categoryNameById,
+            categorySpending = categorySpending,
+            onSetBudgetClick = onSetBudgetClick
+        )
+    }
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Income
-                Column(
-                    horizontalAlignment = Alignment.Start,
-                    modifier = Modifier
-                        .weight(1f)
-                        .testTag("total_income_card")
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.ArrowUpward,
-                            contentDescription = null,
-                            tint = NeonGreen,
-                            modifier = Modifier.size(12.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = "PENDAPATAN",
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                letterSpacing = 1.sp,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 9.sp
-                            ),
-                            color = GhostWhite.copy(alpha = 0.5f)
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = displayIncome,
-                        style = MaterialTheme.typography.titleMedium.copy(
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 15.sp,
-                            letterSpacing = (-0.5).sp
-                        ),
-                        color = NeonGreen
-                    )
-                }
+    if (showRutinInfo) {
+        RutinInfoDialog(onDismiss = { showRutinInfo = false })
+    }
+}
 
-                // Decorative Center Divider
-                Box(
-                    modifier = Modifier
-                        .width(1.dp)
-                        .height(24.dp)
-                        .background(
-                            brush = Brush.verticalGradient(
-                                colors = listOf(Color.Transparent, GhostWhite.copy(alpha = 0.2f), Color.Transparent)
-                            )
-                        )
-                )
+/** Satu kolom fakta: label mono kecil di atas nilainya (.hero-facts). */
+@Composable
+private fun FactCell(
+    label: String,
+    value: String,
+    valueColor: Color,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    testTag: String,
+    modifier: Modifier = Modifier
+) {
+    Column(modifier = modifier.testTag(testTag)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = valueColor,
+                modifier = Modifier.size(13.dp)
+            )
+            Spacer(modifier = Modifier.width(Spacing.xs))
+            Eyebrow(text = label)
+        }
+        Spacer(modifier = Modifier.height(Spacing.xs))
+        Text(
+            text = value,
+            style = MaterialTheme.typography.titleMedium,
+            color = valueColor,
+            maxLines = 1
+        )
+    }
+}
 
-                // Expense
-                Column(
-                    horizontalAlignment = Alignment.End,
-                    modifier = Modifier
-                        .weight(1f)
-                        .testTag("total_expense_card")
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = "PENGELUARAN",
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                letterSpacing = 1.sp,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 9.sp
-                            ),
-                            color = GhostWhite.copy(alpha = 0.5f)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Icon(
-                            imageVector = Icons.Default.ArrowDownward,
-                            contentDescription = null,
-                            tint = NeonRed,
-                            modifier = Modifier.size(12.dp)
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = displayExpense,
-                        style = MaterialTheme.typography.titleMedium.copy(
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 15.sp,
-                            letterSpacing = (-0.5).sp
-                        ),
-                        color = NeonRed
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(Spacing.md))
-            Box(
+/**
+ * Kartu anggaran bulan berjalan. Bentuknya mengikuti "build slip" di
+ * referensi: kepala berisi label mono dan bulan, isi yang dipisah garis
+ * titik-titik, lalu kaki berisi sisa dan stempel persentase.
+ */
+@Composable
+private fun BudgetSlip(
+    monthlySpendingTotal: Long,
+    monthlyBudgetLimit: Long,
+    balanceVisible: Boolean,
+    selectedBudgetOffset: Int,
+    onBudgetOffsetChange: (Int) -> Unit,
+    categoryBudgets: Map<String, Long>,
+    categoryNameById: Map<String, String>,
+    categorySpending: Map<String, Long>,
+    onSetBudgetClick: () -> Unit
+) {
+    BezelCard {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            IconButton(
+                onClick = { onBudgetOffsetChange(selectedBudgetOffset - 1) },
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .height(1.dp)
-                    .background(GhostWhite.copy(alpha = 0.1f))
-            )
-            Spacer(modifier = Modifier.height(12.dp))
+                    .size(28.dp)
+                    .testTag("prev_budget_month_button")
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
+                    contentDescription = "Bulan Sebelumnya",
+                    tint = InkMuted,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
 
-            // Unified Month Switcher Header
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Eyebrow(text = "Anggaran bulan")
+                Spacer(modifier = Modifier.height(2.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = monthLabel(selectedBudgetOffset),
+                        style = MaterialTheme.typography.labelMedium,
+                        fontFamily = MonoFamily,
+                        fontWeight = FontWeight.Medium,
+                        color = BurntOrange,
+                        modifier = Modifier.testTag("budget_current_month_label")
+                    )
+                    if (selectedBudgetOffset == 0) {
+                        Spacer(modifier = Modifier.width(Spacing.sm))
+                        Tag(text = "bulan ini")
+                    }
+                }
+            }
+
+            IconButton(
+                onClick = { onBudgetOffsetChange(selectedBudgetOffset + 1) },
+                modifier = Modifier
+                    .size(28.dp)
+                    .testTag("next_budget_month_button")
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    contentDescription = "Bulan Selanjutnya",
+                    tint = InkMuted,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(Spacing.md))
+        HairlineDivider()
+        Spacer(modifier = Modifier.height(Spacing.md))
+
+        if (monthlyBudgetLimit <= 0L) {
             Row(
-                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                IconButton(
-                    onClick = { onBudgetOffsetChange(selectedBudgetOffset - 1) },
-                    modifier = Modifier.size(24.dp).testTag("prev_budget_month_button")
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.KeyboardArrowLeft,
-                        contentDescription = "Bulan Sebelumnya",
-                        tint = GhostWhite.copy(alpha = 0.5f),
-                        modifier = Modifier.size(16.dp)
+                Text(
+                    text = "Atur batas belanja bulanan Anda.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = InkMuted,
+                    modifier = Modifier.weight(1f)
+                )
+                Spacer(modifier = Modifier.width(Spacing.md))
+                EditorialButton(
+                    text = "Atur",
+                    onClick = onSetBudgetClick,
+                    testTag = "set_budget_cta_button"
+                )
+            }
+        } else {
+            val progress = if (balanceVisible) {
+                (monthlySpendingTotal.toDouble() / monthlyBudgetLimit).coerceIn(0.0, 1.0).toFloat()
+            } else {
+                0f
+            }
+            val isOverBudget = monthlySpendingTotal > monthlyBudgetLimit
+            val isWarningPercent = (monthlySpendingTotal.toDouble() / monthlyBudgetLimit) >= 0.8
+            val progressColor = when {
+                !balanceVisible -> HairlineStrong
+                isOverBudget -> AmountExpenseColor
+                isWarningPercent -> Amber
+                else -> ForestGreen
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(7.dp)
+                            .background(progressColor, CircleShape)
+                    )
+                    Spacer(modifier = Modifier.width(Spacing.sm))
+                    Eyebrow(
+                        text = if (isOverBudget) "Over budget" else "Belanja aman",
+                        color = progressColor
                     )
                 }
-
-                val labelText = {
-                    val cal = java.util.Calendar.getInstance()
-                    cal.add(java.util.Calendar.MONTH, selectedBudgetOffset)
-                    val monthNames = arrayOf(
-                        "Januari", "Februari", "Maret", "April", "Mei", "Juni",
-                        "Juli", "Agustus", "September", "Oktober", "November", "Desember"
-                    )
-                    val monthStr = monthNames[cal.get(java.util.Calendar.MONTH)]
-                    val year = cal.get(java.util.Calendar.YEAR)
-                    val prefix = "ANGGARAN"
-                    if (selectedBudgetOffset == 0) {
-                        "$prefix: $monthStr $year (BULAN INI)"
-                    } else {
-                        "$prefix: $monthStr $year"
-                    }
-                }()
-
-                Text(
-                    text = labelText.uppercase(),
-                    style = MaterialTheme.typography.labelMedium.copy(
-                        letterSpacing = 1.2.sp,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 10.sp
-                    ),
-                    color = SteelBlue,
-                    modifier = Modifier.testTag("budget_current_month_label")
-                )
-
                 IconButton(
-                    onClick = { onBudgetOffsetChange(selectedBudgetOffset + 1) },
-                    modifier = Modifier.size(24.dp).testTag("next_budget_month_button")
+                    onClick = onSetBudgetClick,
+                    modifier = Modifier
+                        .size(28.dp)
+                        .testTag("edit_budget_button")
                 ) {
                     Icon(
-                        imageVector = Icons.Default.KeyboardArrowRight,
-                        contentDescription = "Bulan Selanjutnya",
-                        tint = GhostWhite.copy(alpha = 0.5f),
-                        modifier = Modifier.size(16.dp)
+                        imageVector = Icons.Default.Edit,
+                        contentDescription = "Edit Anggaran",
+                        tint = InkMuted,
+                        modifier = Modifier.size(15.dp)
                     )
                 }
             }
 
-            if (monthlyBudgetLimit <= 0L) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Column(
-                        modifier = Modifier.weight(1f),
-                        horizontalAlignment = Alignment.Start
-                    ) {
-                        Text(
-                            text = "Atur batas belanja bulanan Anda.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = GhostWhite.copy(alpha = 0.6f),
-                            lineHeight = 14.sp
-                        )
-                    }
-                    PremiumButton(
-                        text = "Atur",
-                        onClick = onSetBudgetClick,
-                        isActive = true,
-                        testTag = "set_budget_cta_button",
-                        fillMaxWidth = false,
-                        horizontalPadding = 14.dp,
-                        verticalPadding = 6.dp
+            Spacer(modifier = Modifier.height(Spacing.md))
+            EditorialProgress(
+                progress = progress,
+                color = progressColor,
+                testTag = "budget_progress_bar_fill"
+            )
+            Spacer(modifier = Modifier.height(Spacing.md))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = if (!balanceVisible) {
+                            "Sisa: Rp ••••••"
+                        } else if (isOverBudget) {
+                            "Sisa: " + FormatUtils.formatRupiah(0L) + " (Over " + FormatUtils.formatRupiah(monthlySpendingTotal - monthlyBudgetLimit) + ")"
+                        } else {
+                            "Sisa: " + FormatUtils.formatRupiah(monthlyBudgetLimit - monthlySpendingTotal)
+                        },
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = progressColor
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = if (balanceVisible) {
+                            "${FormatUtils.formatRupiahCompact(monthlySpendingTotal)} terpakai dari ${FormatUtils.formatRupiahCompact(monthlyBudgetLimit)}"
+                        } else {
+                            "Rp •••••• terpakai dari Rp ••••••"
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = InkMuted
                     )
                 }
-            } else {
-                val progress = if (balanceVisible) (monthlySpendingTotal.toDouble() / monthlyBudgetLimit).coerceIn(0.0, 1.0).toFloat() else 0f
-                val isOverBudget = monthlySpendingTotal > monthlyBudgetLimit
-                val isWarningPercent = (monthlySpendingTotal.toDouble() / monthlyBudgetLimit) >= 0.8
-                
-                val progressColor = when {
-                    !balanceVisible -> GhostWhite.copy(alpha = 0.2f)
-                    isOverBudget -> NeonRed
-                    isWarningPercent -> Color(0xFFFFA000)
-                    else -> SteelBlue
-                }
+                val percentInt = ((monthlySpendingTotal.toDouble() / monthlyBudgetLimit) * 100).toInt()
+                Stamp(
+                    text = if (balanceVisible) "$percentInt%" else "••%",
+                    color = progressColor
+                )
+            }
+
+            val activeCategoryBudgets = categoryBudgets.filter { it.value > 0L }
+            if (activeCategoryBudgets.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(Spacing.lg))
+                DashedDivider()
+                Spacer(modifier = Modifier.height(Spacing.md))
+
+                var isExpanded by remember { mutableStateOf(false) }
 
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(6.dp)
-                                .background(progressColor, shape = CircleShape)
-                        )
-                        Text(
-                            text = if (isOverBudget) "OVER BUDGET" else "BELANJA AMAN",
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                letterSpacing = 1.sp,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 9.sp
-                            ),
-                            color = progressColor
-                        )
-                    }
-                    IconButton(
-                        onClick = onSetBudgetClick,
-                        modifier = Modifier
-                            .size(24.dp)
-                            .testTag("edit_budget_button")
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Edit,
-                            contentDescription = "Edit Anggaran",
-                            tint = GhostWhite.copy(alpha = 0.6f),
-                            modifier = Modifier.size(14.dp)
-                        )
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(8.dp)
-                        .clip(RoundedCornerShape(4.dp))
-                        .background(GhostWhite.copy(alpha = 0.08f))
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth(progress)
-                            .fillMaxHeight()
-                            .clip(RoundedCornerShape(4.dp))
-                            .background(progressColor)
-                            .testTag("budget_progress_bar_fill")
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(10.dp))
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
+                        .clickable { isExpanded = !isExpanded }
+                        .padding(vertical = Spacing.xs),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column(horizontalAlignment = Alignment.Start) {
-                        Text(
-                            text = if (!balanceVisible) {
-                                "Sisa: Rp ••••••"
-                            } else if (isOverBudget) {
-                                "Sisa: " + FormatUtils.formatRupiah(0L) + " (Over " + FormatUtils.formatRupiah(monthlySpendingTotal - monthlyBudgetLimit) + ")"
-                            } else {
-                                "Sisa: " + FormatUtils.formatRupiah(monthlyBudgetLimit - monthlySpendingTotal)
-                            },
-                            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
-                            color = if (!balanceVisible) SteelBlue else if (isOverBudget) NeonRed else SteelBlue
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(7.dp)
+                                .background(ForestGreen, CircleShape)
                         )
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = if (balanceVisible) {
-                                "${FormatUtils.formatRupiahCompact(monthlySpendingTotal)} terpakai dari ${FormatUtils.formatRupiahCompact(monthlyBudgetLimit)}"
-                            } else {
-                                "Rp •••••• terpakai dari Rp ••••••"
-                            },
-                            style = MaterialTheme.typography.bodySmall,
-                            color = GhostWhite.copy(alpha = 0.5f),
-                            fontSize = 11.sp
-                        )
+                        Spacer(modifier = Modifier.width(Spacing.sm))
+                        Eyebrow(text = "Anggaran per kategori")
                     }
-
-                    val percentInt = ((monthlySpendingTotal.toDouble() / monthlyBudgetLimit) * 100).toInt()
-                    Box(
-                        modifier = Modifier
-                            .background(
-                                color = progressColor.copy(alpha = 0.12f),
-                                shape = RoundedCornerShape(6.dp)
-                            )
-                            .border(1.dp, progressColor.copy(alpha = 0.3f), RoundedCornerShape(6.dp))
-                            .padding(horizontal = 6.dp, vertical = 2.dp)
-                    ) {
-                        Text(
-                            text = if (balanceVisible) "$percentInt%" else "••%",
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = progressColor
-                        )
-                    }
+                    Icon(
+                        imageVector = if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                        contentDescription = if (isExpanded) "Sembunyikan" else "Tampilkan",
+                        tint = InkMuted,
+                        modifier = Modifier.size(18.dp)
+                    )
                 }
 
-                val activeCategoryBudgets = categoryBudgets.filter { it.value > 0L }
-                if (activeCategoryBudgets.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(Spacing.md))
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(1.dp)
-                            .background(GhostWhite.copy(alpha = 0.05f))
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    var isExpanded by remember { mutableStateOf(false) }
-
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { isExpanded = !isExpanded }
-                            .padding(vertical = 4.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(6.dp)
-                                    .background(SteelBlue, shape = CircleShape)
-                            )
-                            Text(
-                                text = "ANGGARAN PER KATEGORI",
-                                style = MaterialTheme.typography.labelSmall.copy(
-                                    letterSpacing = 1.2.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 10.sp
-                                ),
-                                color = SteelBlue
-                            )
+                if (isExpanded) {
+                    Spacer(modifier = Modifier.height(Spacing.xs))
+                    activeCategoryBudgets.entries.forEachIndexed { index, (catId, limit) ->
+                        // Budget dikunci categoryId; label & spending pakai nama terbaru.
+                        val cat = categoryNameById[catId] ?: catId
+                        val spent = if (balanceVisible) (categorySpending[cat] ?: 0L) else 0L
+                        val catProgress = if (limit > 0L) (spent.toDouble() / limit).coerceIn(0.0, 1.0).toFloat() else 0f
+                        val isCatOver = spent > limit
+                        val isCatWarning = (spent.toDouble() / limit) >= 0.8
+                        val catPercent = ((spent.toDouble() / limit) * 100).toInt()
+                        val catColor = when {
+                            !balanceVisible -> HairlineStrong
+                            isCatOver -> AmountExpenseColor
+                            isCatWarning -> Amber
+                            else -> ForestGreen
                         }
 
-                        Icon(
-                            imageVector = if (isExpanded) Icons.Default.ArrowUpward else Icons.Default.ArrowDownward,
-                            contentDescription = if (isExpanded) "Sembunyikan" else "Tampilkan",
-                            tint = GhostWhite.copy(alpha = 0.5f),
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
+                        if (index > 0) {
+                            DashedDivider()
+                        }
 
-                    if (isExpanded) {
-                        Spacer(modifier = Modifier.height(8.dp))
                         Column(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalArrangement = Arrangement.spacedBy(Spacing.md)
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = Spacing.md)
                         ) {
-                            activeCategoryBudgets.forEach { (catId, limit) ->
-                                // Budget dikunci categoryId; label & spending pakai nama terbaru.
-                                val cat = categoryNameById[catId] ?: catId
-                                val spent = if (balanceVisible) (categorySpending[cat] ?: 0L) else 0L
-                                val catProgress = if (limit > 0L) (spent.toDouble() / limit).coerceIn(0.0, 1.0).toFloat() else 0f
-                                val isCatOver = spent > limit
-                                val isCatWarning = (spent.toDouble() / limit) >= 0.8
-
-                                val catPercent = ((spent.toDouble() / limit) * 100).toInt()
-
-                                val catColor = when {
-                                    !balanceVisible -> GhostWhite.copy(alpha = 0.2f)
-                                    isCatOver -> NeonRed
-                                    isCatWarning -> Color(0xFFFFA000)
-                                    else -> SteelBlue
-                                }
-
-                                Column(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .background(TranslucentInput, RoundedCornerShape(12.dp))
-                                        .border(1.dp, GhostWhite.copy(alpha = 0.02f), RoundedCornerShape(12.dp))
-                                        .padding(horizontal = 12.dp, vertical = 8.dp)
-                                ) {
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                                        ) {
-                                            Box(
-                                                modifier = Modifier
-                                                    .size(6.dp)
-                                                    .background(catColor, CircleShape)
-                                            )
-                                            Text(
-                                                text = cat,
-                                                style = MaterialTheme.typography.bodyMedium,
-                                                fontWeight = FontWeight.Bold,
-                                                color = GhostWhite
-                                            )
-                                        }
-                                        Text(
-                                            text = if (balanceVisible) {
-                                                // formatRupiahCompact sudah mem-prefix "Rp",
-                                                // jadi di sini jangan ditambah lagi.
-                                                if (isCatOver) "Over ${FormatUtils.formatRupiahCompact(spent - limit)}" else "Sisa ${FormatUtils.formatRupiahCompact(limit - spent)}"
-                                            } else "Rp ••••••",
-                                            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold),
-                                            color = if (isCatOver && balanceVisible) NeonRed else GhostWhite.copy(alpha = 0.5f),
-                                            fontSize = 11.sp
-                                        )
-                                    }
-
-                                    Spacer(modifier = Modifier.height(6.dp))
-
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
                                     Box(
                                         modifier = Modifier
-                                            .fillMaxWidth()
-                                            .height(6.dp)
-                                            .clip(RoundedCornerShape(3.dp))
-                                            .background(GhostWhite.copy(alpha = 0.05f))
-                                    ) {
-                                        Box(
-                                            modifier = Modifier
-                                                .fillMaxWidth(catProgress)
-                                                .fillMaxHeight()
-                                                .clip(RoundedCornerShape(3.dp))
-                                                .background(catColor)
-                                                .testTag("category_budget_progress_fill_${cat.lowercase()}")
-                                        )
-                                    }
-
-                                    Spacer(modifier = Modifier.height(4.dp))
-
-                                    Row(
-                                        modifier = Modifier.fillMaxWidth(),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Text(
-                                            text = if (balanceVisible) {
-                                                "${FormatUtils.formatRupiahCompact(spent)} terpakai dari ${FormatUtils.formatRupiahCompact(limit)}"
-                                            } else "Rp •••••• terpakai",
-                                            style = MaterialTheme.typography.labelSmall,
-                                            color = GhostWhite.copy(alpha = 0.4f),
-                                            fontSize = 10.sp
-                                        )
-
-                                        Text(
-                                            text = if (balanceVisible) "$catPercent%" else "••%",
-                                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                                            color = catColor,
-                                            fontSize = 10.sp
-                                        )
-                                    }
+                                            .size(7.dp)
+                                            .background(catColor, CircleShape)
+                                    )
+                                    Spacer(modifier = Modifier.width(Spacing.sm))
+                                    Text(
+                                        text = cat,
+                                        style = MaterialTheme.typography.titleSmall,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = Ink
+                                    )
                                 }
+                                Text(
+                                    text = if (balanceVisible) {
+                                        // formatRupiahCompact sudah mem-prefix "Rp",
+                                        // jadi di sini jangan ditambah lagi.
+                                        if (isCatOver) {
+                                            "Over ${FormatUtils.formatRupiahCompact(spent - limit)}"
+                                        } else {
+                                            "Sisa ${FormatUtils.formatRupiahCompact(limit - spent)}"
+                                        }
+                                    } else {
+                                        "Rp ••••••"
+                                    },
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = if (isCatOver && balanceVisible) AmountExpenseColor else InkMuted
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.height(Spacing.sm))
+                            EditorialProgress(
+                                progress = catProgress,
+                                color = catColor,
+                                height = 6.dp,
+                                testTag = "category_budget_progress_fill_${cat.lowercase(Locale.getDefault())}"
+                            )
+                            Spacer(modifier = Modifier.height(Spacing.xs))
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = if (balanceVisible) {
+                                        "${FormatUtils.formatRupiahCompact(spent)} terpakai dari ${FormatUtils.formatRupiahCompact(limit)}"
+                                    } else {
+                                        "Rp •••••• terpakai"
+                                    },
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = InkMuted
+                                )
+                                Text(
+                                    text = if (balanceVisible) "$catPercent%" else "••%",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Medium,
+                                    color = catColor
+                                )
                             }
                         }
                     }
@@ -697,57 +590,359 @@ fun DashboardStatsSection(
             }
         }
     }
+}
 
-    if (showRutinInfo) {
-        Dialog(onDismissRequest = { showRutinInfo = false }) {
-            Card(
-                modifier = Modifier.fillMaxWidth().padding(16.dp),
-                shape = RoundedCornerShape(24.dp),
-                colors = CardDefaults.cardColors(containerColor = MidnightAbyss),
-                border = BorderStroke(
-                    width = 1.dp,
-                    brush = Brush.verticalGradient(
-                        colors = listOf(
-                            GhostWhite.copy(alpha = 0.2f),
-                            GhostWhite.copy(alpha = 0.02f)
-                        )
-                    )
-                ),
-                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+/** "AGUSTUS 2026" untuk selisih bulan [offset] dari bulan berjalan. */
+private fun monthLabel(offset: Int): String {
+    val cal = java.util.Calendar.getInstance()
+    cal.add(java.util.Calendar.MONTH, offset)
+    val monthNames = arrayOf(
+        "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+        "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+    )
+    return "${monthNames[cal.get(java.util.Calendar.MONTH)]} ${cal.get(java.util.Calendar.YEAR)}".uppercase()
+}
+
+/** Dialog penjelasan transaksi rutin. */
+@Composable
+private fun RutinInfoDialog(onDismiss: () -> Unit) {
+    Dialog(onDismissRequest = onDismiss) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(CornerRadius.bezel))
+                .background(CreamRaised)
+                .border(1.dp, Hairline, RoundedCornerShape(CornerRadius.bezel))
+                .padding(Spacing.xl)
+        ) {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(Spacing.md)
             ) {
-                Box(modifier = Modifier.background(TranslucentGlass)) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(24.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        Text(
-                            text = "Transaksi Rutin",
-                            color = GhostWhite,
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold
-                        )
+                Eyebrow(text = "Transaksi rutin")
+                Text(
+                    text = "Catat otomatis tiap bulan",
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = Ink
+                )
+                Text(
+                    text = "Transaksi Rutin memungkinkan Anda membuat transaksi yang otomatis tercatat setiap bulan tanpa perlu input manual.\n\nContoh penggunaan:\n• Gaji masuk setiap tanggal 1\n• Cicilan atau tagihan rutin setiap bulan\n• Uang jajan mingguan\n\nTransaksi akan otomatis ditambahkan ke catatan sesuai tanggal dan frekuensi yang Anda tentukan.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = InkMuted
+                )
+                EditorialButton(
+                    text = "Mengerti",
+                    onClick = onDismiss,
+                    modifier = Modifier.fillMaxWidth(),
+                    testTag = "rutin_info_understand_button"
+                )
+            }
+        }
+    }
+}
 
-                        Text(
-                            text = "Transaksi Rutin memungkinkan Anda membuat transaksi yang otomatis tercatat setiap bulan tanpa perlu input manual.\n\nContoh penggunaan:\n• Gaji masuk setiap tanggal 1\n• Cicilan atau tagihan rutin setiap bulan\n• Uang jajan mingguan\n\nTransaksi akan otomatis ditambahkan ke catatan sesuai tanggal dan frekuensi yang Anda tentukan.",
-                            color = GhostWhite.copy(alpha = 0.8f),
-                            style = MaterialTheme.typography.bodyMedium
-                        )
+/** Judul bagian riwayat plus pilihan filter. */
+@Composable
+fun DashboardHistoryFilter(
+    currentFilter: String,
+    onFilterSelected: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(modifier = modifier.fillMaxWidth()) {
+        Eyebrow(text = "Riwayat transaksi", color = Ink)
+        Spacer(modifier = Modifier.height(Spacing.md))
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("history_filter_dropdown"),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
+        ) {
+            listOf("Semua", "Pendapatan", "Pengeluaran").forEach { opt ->
+                EditorialPill(
+                    text = opt,
+                    selected = currentFilter == opt,
+                    onClick = { onFilterSelected(opt) }
+                )
+            }
+        }
+    }
+}
 
-                        Spacer(modifier = Modifier.height(8.dp))
+/** Kolom cari, tombol urut, dan tombol hapus semua. */
+@Composable
+fun DashboardSearchActions(
+    searchQuery: String,
+    onSearchQueryChange: (String) -> Unit,
+    sortByNewest: Boolean,
+    onSortToggled: () -> Unit,
+    onDeleteAllClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(48.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
+    ) {
+        Row(
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxHeight()
+                .clip(RoundedCornerShape(CornerRadius.pill))
+                .background(CreamRaised)
+                .border(1.dp, Hairline, RoundedCornerShape(CornerRadius.pill))
+                .padding(horizontal = Spacing.lg),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = Icons.Default.Search,
+                contentDescription = "Cari",
+                tint = InkMuted,
+                modifier = Modifier.size(18.dp)
+            )
+            Spacer(modifier = Modifier.width(Spacing.sm))
+            Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+                if (searchQuery.isEmpty()) {
+                    Text(
+                        text = "Cari...",
+                        color = InkMuted.copy(alpha = 0.7f),
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+                BasicTextField(
+                    value = searchQuery,
+                    onValueChange = onSearchQueryChange,
+                    textStyle = MaterialTheme.typography.bodyMedium.copy(color = Ink),
+                    singleLine = true,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("search_input"),
+                    cursorBrush = SolidColor(BurntOrange)
+                )
+            }
+            if (searchQuery.isNotEmpty()) {
+                IconButton(onClick = { onSearchQueryChange("") }, modifier = Modifier.size(24.dp)) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "Hapus",
+                        tint = InkMuted,
+                        modifier = Modifier.size(15.dp)
+                    )
+                }
+            }
+        }
 
-                        PremiumButton(
-                            text = "Mengerti",
-                            onClick = { showRutinInfo = false },
-                            isActive = true,
-                            modifier = Modifier.fillMaxWidth(),
-                            testTag = "rutin_info_understand_button"
-                        )
-                    }
+        Row(
+            modifier = Modifier
+                .fillMaxHeight()
+                .clip(RoundedCornerShape(CornerRadius.pill))
+                .border(1.dp, HairlineStrong, RoundedCornerShape(CornerRadius.pill))
+                .clickable { onSortToggled() }
+                .padding(horizontal = Spacing.lg)
+                .testTag("history_sort_button"),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.xs)
+        ) {
+            Text(
+                text = if (sortByNewest) "Terbaru" else "Terlama",
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = Ink
+            )
+            Icon(
+                imageVector = if (sortByNewest) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowUp,
+                contentDescription = "Urutkan",
+                tint = Ink,
+                modifier = Modifier.size(16.dp)
+            )
+        }
+
+        // Tombol hapus semua transaksi. Ikon saja supaya tidak memakan lebar
+        // baris cari; areanya tetap 48.dp agar mudah ditekan. Memakai aksen
+        // terakota karena aksinya berbahaya; detail konfirmasinya ada di
+        // DeleteAllRecordsDialog.
+        Box(
+            modifier = Modifier
+                .fillMaxHeight()
+                .aspectRatio(1f)
+                .clip(RoundedCornerShape(CornerRadius.pill))
+                .background(BurntOrange.copy(alpha = 0.08f))
+                .border(1.dp, BurntOrange.copy(alpha = 0.45f), RoundedCornerShape(CornerRadius.pill))
+                .clickable { onDeleteAllClick() }
+                .testTag("delete_all_button"),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.DeleteOutline,
+                contentDescription = "Hapus Semua Transaksi",
+                tint = BurntOrange,
+                modifier = Modifier.size(19.dp)
+            )
+        }
+    }
+}
+
+/** Satu baris transaksi: deskripsi di kiri, jumlah dan aksi di kanan. */
+@Composable
+fun DashboardTransactionRow(
+    record: FinancialRecord,
+    categoryNameById: Map<String, String>,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val isIncome = record.type == "income"
+    // Nama kategori me-resolve dari categoryId supaya rename ikut tercermin.
+    val resolvedCategory = record.displayCategoryName(categoryNameById)
+    val (parsedEmoji, cleanCategory) = CategoryIconMapper.extractEmojiAndLabel(resolvedCategory)
+    val amountColor = if (isIncome) AmountIncomeColor else AmountExpenseColor
+
+    // Huruf besar di awal tiap kata, sama seperti daftar transaksi di tab lain.
+    val capitalizedDescription = record.description.trim().split(WHITESPACE_REGEX)
+        .filter { it.isNotEmpty() }
+        .joinToString(" ") { word ->
+            word.lowercase(Locale.getDefault())
+                .replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() }
+        }
+
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(vertical = Spacing.md)
+            .testTag("record_item_card_${record.id}"),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = if (parsedEmoji != null) "$parsedEmoji $capitalizedDescription" else capitalizedDescription,
+                style = MaterialTheme.typography.titleMedium,
+                color = Ink,
+                maxLines = 2
+            )
+            Spacer(modifier = Modifier.height(3.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = cleanCategory,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = InkMuted
+                )
+                Box(
+                    modifier = Modifier
+                        .padding(horizontal = Spacing.sm)
+                        .size(3.dp)
+                        .background(InkMuted.copy(alpha = 0.4f), CircleShape)
+                )
+                Text(
+                    text = FormatUtils.formatDate(record.date),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = InkMuted
+                )
+            }
+            if (record.notes.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(3.dp))
+                Text(
+                    text = "Catatan: ${record.notes}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = InkMuted
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.width(Spacing.md))
+
+        Column(horizontalAlignment = Alignment.End) {
+            Text(
+                text = if (isIncome) "+" + FormatUtils.formatRupiah(record.amount) else "-" + FormatUtils.formatRupiah(record.amount),
+                style = MaterialTheme.typography.titleMedium,
+                color = amountColor,
+                maxLines = 1
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                IconButton(
+                    onClick = onEdit,
+                    modifier = Modifier
+                        .size(28.dp)
+                        .testTag("edit_record_button"),
+                    colors = IconButtonDefaults.iconButtonColors(contentColor = InkMuted)
+                ) {
+                    Icon(Icons.Default.Edit, contentDescription = "Edit Transaksi", modifier = Modifier.size(15.dp))
+                }
+                IconButton(
+                    onClick = onDelete,
+                    modifier = Modifier
+                        .size(28.dp)
+                        .testTag("delete_record_button"),
+                    colors = IconButtonDefaults.iconButtonColors(contentColor = InkMuted)
+                ) {
+                    Icon(Icons.Default.Delete, contentDescription = "Hapus Transaksi", modifier = Modifier.size(15.dp))
                 }
             }
         }
     }
 }
 
+/**
+ * Dipakai untuk memecah kata pada judul transaksi.
+ *
+ * Sengaja dibuat sekali di level file: `String.toRegex()` menyusun ulang objek Pattern
+ * setiap kali dipanggil, dan pemanggilnya ada di dalam item daftar yang terus
+ * recomposition saat scroll. Menyusunnya per item terasa sebagai freeze saat digulir.
+ */
+private val WHITESPACE_REGEX = "\\s+".toRegex()
+
+/** Keadaan kosong: belum ada transaksi, atau filter tidak menemukan apa pun. */
+@Composable
+fun DashboardEmptyState(
+    isFiltered: Boolean,
+    onSeedData: () -> Unit,
+    onClearFilters: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(vertical = Spacing.xxxl),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Icon(
+            imageVector = if (isFiltered) Icons.Default.Search else Icons.Outlined.AddCircleOutline,
+            contentDescription = null,
+            tint = InkMuted.copy(alpha = 0.45f),
+            modifier = Modifier.size(36.dp)
+        )
+        Spacer(modifier = Modifier.height(Spacing.md))
+        Text(
+            text = if (isFiltered) "Tidak ada yang cocok" else "Belum ada transaksi",
+            style = MaterialTheme.typography.headlineSmall,
+            color = Ink
+        )
+        Spacer(modifier = Modifier.height(Spacing.xs))
+        Text(
+            text = if (isFiltered) {
+                "Coba ganti atau kosongkan filter di atas."
+            } else {
+                "Mulai catat pengeluaran pertamamu, atau isi dengan data contoh."
+            },
+            style = MaterialTheme.typography.bodyMedium,
+            color = InkMuted,
+            textAlign = TextAlign.Center
+        )
+        Spacer(modifier = Modifier.height(Spacing.lg))
+        if (isFiltered) {
+            EditorialButton(
+                text = "Hapus Filter",
+                onClick = onClearFilters,
+                style = EditorialButtonStyle.Ghost,
+                testTag = "clear_filters_button"
+            )
+        } else {
+            EditorialButton(
+                text = "Isi Data Contoh",
+                onClick = onSeedData,
+                testTag = "seed_data_button"
+            )
+        }
+    }
+}

@@ -44,4 +44,21 @@ val SurfaceDeep = Color(0xFF13111C) // kartu indikator pemindaian struk
 val SurfaceViolet = Color(0xFF221A3B) // kotak ikon di kartu pemindaian
 val SurfaceDisabled = Color(0xFF0F0F14) // kolom input saat nonaktif
 
+// ── Palet editorial ──────────────────────────────────────────────────────────
+// Diambil langsung dari referensi portfolio
+// (C:\Users\yasin\portfolio\css\styles.css, blok :root). Tab Dashboard memakai
+// palet ini lebih dulu; tab lain menyusul, jadi nilai gelap di atas sengaja
+// tidak dihapus supaya layar yang belum di-redesign tidak ikut berubah.
+val Cream = Color(0xFFF3EEE4) // --bg: latar halaman
+val CreamRaised = Color(0xFFFBF7EF) // --bg-2: latar kolom isian
+val Ink = Color(0xFF18130E) // --fg: teks utama
+val InkMuted = Color(0xFF6B6357) // --muted: teks sekunder
+val Hairline = Color(0xFF18130E).copy(alpha = 0.12f) // --line
+val HairlineStrong = Color(0xFF18130E).copy(alpha = 0.22f) // --line-strong
+val BurntOrange = Color(0xFFD63F1A) // --accent
+val ForestGreen = Color(0xFF264136) // --accent-2
+val Amber = Color(0xFFB8922E) // --accent-3
+val CardVeil = Color(0xFFFFFFFF).copy(alpha = 0.55f) // --card: bingkai bezel
+val CardCore = Color(0xFFFFFDF8) // --card-core: inti bezel
+
 
