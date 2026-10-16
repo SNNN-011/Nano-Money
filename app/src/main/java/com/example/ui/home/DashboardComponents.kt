@@ -60,12 +60,12 @@ val AmountIncomeColor = ForestGreen
 val AmountExpenseColor = BurntOrange
 
 /**
- * Ringkasan dashboard: saldo sebagai hero, lalu kartu anggaran bulan berjalan
- * plus anggaran per kategori.
+ * Ringkasan dashboard: satu kartu anggaran bulan berjalan yang sekaligus memuat
+ * saldo total, pendapatan, dan pengeluaran bulan berjalan.
  *
- * Susunannya mengikuti hero dan kartu "build slip" di referensi: label mono
- * kecil di atas angka serif besar, daftar fakta bergaris rambut, dan isi kartu
- * yang dipisah garis titik-titik.
+ * Susunannya mengikuti "build slip" di referensi: label mono kecil di atas
+ * angka serif besar, daftar fakta bergaris rambut, dan isi kartu yang dipisah
+ * garis titik-titik.
  */
 @Composable
 fun DashboardStatsSection(
@@ -138,97 +138,20 @@ fun DashboardStatsSection(
             )
         }
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Eyebrow(
-                    text = "Saldo total",
-                    modifier = Modifier.testTag("total_balance_label")
-                )
-                IconButton(
-                    onClick = onToggleBalanceVisible,
-                    modifier = Modifier
-                        .size(28.dp)
-                        .testTag("toggle_balance_visibility")
-                ) {
-                    Icon(
-                        imageVector = if (balanceVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
-                        contentDescription = if (balanceVisible) "Sembunyikan Saldo" else "Tampilkan Saldo",
-                        tint = InkMuted,
-                        modifier = Modifier.size(17.dp)
-                    )
-                }
-            }
-
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(
-                    onClick = { showRutinInfo = true },
-                    modifier = Modifier.size(28.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Info,
-                        contentDescription = "Info Transaksi Rutin",
-                        tint = InkMuted,
-                        modifier = Modifier.size(17.dp)
-                    )
-                }
-                EditorialPill(
-                    text = "Rutin",
-                    selected = false,
-                    onClick = onRecurringClick,
-                    testTag = "recurring_transactions_inline_button"
-                )
-            }
-        }
-
-        // Angka saldo: serif tipis ala h1 hero di referensi. Ukurannya dipilih
-        // menurut panjang nominal supaya nominal miliaran tidak terpotong --
-        // Compose tidak mengecilkan font otomatis untuk satu baris.
-        Text(
-            text = displayBalance,
-            style = when {
-                displayBalance.length > 16 -> MaterialTheme.typography.headlineLarge
-                displayBalance.length > 13 -> MaterialTheme.typography.displaySmall
-                else -> MaterialTheme.typography.displayLarge
-            },
-            color = Ink,
-            maxLines = 1
-        )
-
-        Spacer(modifier = Modifier.height(Spacing.lg))
-        HairlineDivider()
-
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = Spacing.lg),
-            horizontalArrangement = Arrangement.spacedBy(Spacing.lg)
-        ) {
-            FactCell(
-                label = "Pendapatan",
-                value = displayIncome,
-                valueColor = AmountIncomeColor,
-                icon = Icons.Default.ArrowUpward,
-                testTag = "total_income_card",
-                modifier = Modifier.weight(1f)
-            )
-            FactCell(
-                label = "Pengeluaran",
-                value = displayExpense,
-                valueColor = AmountExpenseColor,
-                icon = Icons.Default.ArrowDownward,
-                testTag = "total_expense_card",
-                modifier = Modifier.weight(1f)
-            )
-        }
-
+        // Saldo, pendapatan, dan pengeluaran tidak lagi berdiri sendiri di atas
+        // kartu: ketiganya masuk ke dalam kartu anggaran bulanan sebagai kepala
+        // "slip". Di luar kartu hanya tinggal pesan sambutan dan penanda fitur
+        // baru, yang memang bukan bagian dari ringkasan bulan.
         BudgetSlip(
             monthlySpendingTotal = monthlySpendingTotal,
             monthlyBudgetLimit = monthlyBudgetLimit,
             balanceVisible = balanceVisible,
+            balanceText = displayBalance,
+            incomeText = displayIncome,
+            expenseText = displayExpense,
+            onToggleBalanceVisible = onToggleBalanceVisible,
+            onRecurringClick = onRecurringClick,
+            onRecurringInfoClick = { showRutinInfo = true },
             selectedBudgetOffset = selectedBudgetOffset,
             onBudgetOffsetChange = onBudgetOffsetChange,
             categoryBudgets = categoryBudgets,
@@ -275,15 +198,28 @@ private fun FactCell(
 }
 
 /**
- * Kartu anggaran bulan berjalan. Bentuknya mengikuti "build slip" di
- * referensi: kepala berisi label mono dan bulan, isi yang dipisah garis
- * titik-titik, lalu kaki berisi sisa dan stempel persentase.
+ * Kartu anggaran bulan berjalan, sekaligus ringkasan halaman ini.
+ *
+ * Bentuknya mengikuti "build slip" di referensi: bagian saldo (saldo total,
+ * pendapatan, pengeluaran) di atas, lalu bagian anggaran bulan yang dikendalikan
+ * panah bulan, isi yang dipisah garis titik-titik, dan kaki berisi sisa dan
+ * stempel persentase.
+ *
+ * Bagian saldo sengaja tidak ikut berubah saat bulan anggaran diganti: panah
+ * bulan hanya menggeser batas belanja bulanan, sedangkan saldo total tetap
+ * saldo berjalan sampai hari ini.
  */
 @Composable
 private fun BudgetSlip(
     monthlySpendingTotal: Long,
     monthlyBudgetLimit: Long,
     balanceVisible: Boolean,
+    balanceText: String,
+    incomeText: String,
+    expenseText: String,
+    onToggleBalanceVisible: () -> Unit,
+    onRecurringClick: () -> Unit,
+    onRecurringInfoClick: () -> Unit,
     selectedBudgetOffset: Int,
     onBudgetOffsetChange: (Int) -> Unit,
     categoryBudgets: Map<String, Long>,
@@ -292,8 +228,101 @@ private fun BudgetSlip(
     onSetBudgetClick: () -> Unit
 ) {
     BezelCard {
+        // ── Bagian saldo ────────────────────────────────────────────────────
         Row(
             modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Eyebrow(
+                    text = "Saldo total",
+                    modifier = Modifier.testTag("total_balance_label")
+                )
+                IconButton(
+                    onClick = onToggleBalanceVisible,
+                    modifier = Modifier
+                        .size(28.dp)
+                        .testTag("toggle_balance_visibility")
+                ) {
+                    Icon(
+                        imageVector = if (balanceVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                        contentDescription = if (balanceVisible) "Sembunyikan Saldo" else "Tampilkan Saldo",
+                        tint = InkMuted,
+                        modifier = Modifier.size(17.dp)
+                    )
+                }
+            }
+
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(
+                    onClick = onRecurringInfoClick,
+                    modifier = Modifier.size(28.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Info,
+                        contentDescription = "Info Transaksi Rutin",
+                        tint = InkMuted,
+                        modifier = Modifier.size(17.dp)
+                    )
+                }
+                EditorialPill(
+                    text = "Rutin",
+                    selected = false,
+                    onClick = onRecurringClick,
+                    testTag = "recurring_transactions_inline_button"
+                )
+            }
+        }
+
+        // Angka saldo: serif tipis ala h1 hero di referensi. Ukurannya dipilih
+        // menurut panjang nominal supaya nominal miliaran tidak terpotong --
+        // Compose tidak mengecilkan font otomatis untuk satu baris.
+        Text(
+            text = balanceText,
+            style = when {
+                balanceText.length > 16 -> MaterialTheme.typography.headlineLarge
+                balanceText.length > 13 -> MaterialTheme.typography.displaySmall
+                else -> MaterialTheme.typography.displayLarge
+            },
+            color = Ink,
+            maxLines = 1
+        )
+
+        Spacer(modifier = Modifier.height(Spacing.lg))
+        HairlineDivider()
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = Spacing.lg),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.lg)
+        ) {
+            FactCell(
+                label = "Pendapatan",
+                value = incomeText,
+                valueColor = AmountIncomeColor,
+                icon = Icons.Default.ArrowUpward,
+                testTag = "total_income_card",
+                modifier = Modifier.weight(1f)
+            )
+            FactCell(
+                label = "Pengeluaran",
+                value = expenseText,
+                valueColor = AmountExpenseColor,
+                icon = Icons.Default.ArrowDownward,
+                testTag = "total_expense_card",
+                modifier = Modifier.weight(1f)
+            )
+        }
+
+        // ── Bagian anggaran bulan berjalan ──────────────────────────────────
+        HairlineDivider()
+
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = Spacing.md),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
