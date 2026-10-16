@@ -257,67 +257,118 @@ object BackupHelper {
     }
 
     /**
-     * Memulihkan cadangan ZIP. Alur lama (impor kunci & prefs lintas perangkat)
-     * menyusul di perubahan terpisah; di sini tetap jalur perangkat yang sama.
+     * Memulihkan cadangan ZIP (format 2, atau format 1 lama).
+     *
+     * Urutan aman:
+     *  1. ekstrak database + kunci + prefs ke cache, validasi database
+     *     (kunci perangkat saat ini -> kunci dari ZIP -> mode polos);
+     *  2. kalau perlu, impor kunci dari ZIP lalu BUKTIKAN kunci tersimpan;
+     *  3. salin pengaman DB lama, tukar berkas, verifikasi ulang;
+     *  4. tulis balik prefs (XML polos + prefs terenkripsi lewat API);
+     *  5. tandai hasil restore untuk sinkronisasi, lalu mulai ulang aplikasi.
      */
-    fun restoreBackup(context: Context, backupFile: File): Boolean {
-        return try {
-            val tempDbFile = File(context.cacheDir, "temp_restore.db")
-            if (tempDbFile.exists()) {
-                tempDbFile.delete()
-            }
+    suspend fun restoreBackup(context: Context, backupFile: File): RestoreResult = withContext(Dispatchers.IO) {
+        val tempDir = File(context.cacheDir, "restore_unpack")
+        try {
+            tempDir.deleteRecursively()
+            tempDir.mkdirs()
+            val tempDbFile = File(tempDir, "financial_tracker_database")
+            var keyBase64: String? = null
+            val rawPrefs = LinkedHashMap<String, ByteArray>()
+            val jsonPrefs = LinkedHashMap<String, ByteArray>()
 
             ZipInputStream(backupFile.inputStream()).use { zis ->
-                extractEntryToFile(zis, tempDbFile, ENTRY_DB, MAX_DB_BYTES)
+                var entry = zis.nextEntry
+                while (entry != null) {
+                    if (!entry.isDirectory) {
+                        val entryName = entry.name
+                        when {
+                            entryName == ENTRY_DB ->
+                                writeEntryToFile(zis, tempDbFile, MAX_DB_BYTES)
+
+                            entryName == ENTRY_KEY ->
+                                keyBase64 = String(readEntryBytes(zis, 8 * 1024), Charsets.UTF_8).trim()
+
+                            entryName == ENTRY_MANIFEST -> try {
+                                readEntryBytes(zis, 64 * 1024) // metadata; tidak dipakai saat pulih
+                            } catch (e: Exception) {
+                                // Manifest hanya diagnostik; entri terlalu besar tidak fatal.
+                            }
+
+                            entryName.startsWith(PREFIX_RAW_PREFS) -> {
+                                val fileName = entryName.substringAfter(PREFIX_RAW_PREFS)
+                                val baseName = fileName.removeSuffix(".xml")
+                                if (fileName.endsWith(".xml") && isSafeFileName(fileName) &&
+                                    baseName !in EXCLUDED_PREFS && baseName !in ENCRYPTED_PREFS
+                                ) {
+                                    rawPrefs[fileName] = readEntryBytes(zis, MAX_PREFS_BYTES)
+                                }
+                            }
+
+                            entryName.startsWith(PREFIX_JSON_PREFS) -> {
+                                val baseName = entryName.substringAfter(PREFIX_JSON_PREFS)
+                                if (baseName in ENCRYPTED_PREFS && isSafeFileName(baseName)) {
+                                    jsonPrefs[baseName] = readEntryBytes(zis, MAX_PREFS_BYTES)
+                                }
+                            }
+                        }
+                    }
+                    zis.closeEntry()
+                    entry = zis.nextEntry
+                }
             }
 
             if (!tempDbFile.exists() || tempDbFile.length() == 0L) {
-                throw IllegalStateException("File database cadangan tidak ditemukan atau kosong")
+                throw IllegalStateException("File database di dalam cadangan tidak ditemukan atau kosong.")
             }
 
             net.sqlcipher.database.SQLiteDatabase.loadLibs(context)
-            val passphraseBytes = DatabaseKeyManager.getOrCreatePassphrase(context)
-            var restoredVersion = 0
-            var isValid = false
 
-            // Buka langsung lewat SQLCipher, bukan lewat SupportSQLiteOpenHelper.
-            // Helper memaksa cocokkan user_version dengan versi Callback, sehingga
-            // backup versi lama selalu ditolak oleh Callback(8) padahal file-nya sehat.
-            try {
-                val probe = net.sqlcipher.database.SQLiteDatabase.openDatabase(
-                    tempDbFile.absolutePath,
-                    passphraseBytes,
-                    null,
-                    net.sqlcipher.database.SQLiteDatabase.OPEN_READWRITE,
-                    null,
-                    null
-                )
+            // Database polos (dari versi lama) dikenali dari header SQLite;
+            // database SQLCipher tidak punya header itu.
+            val header = ByteArray(16)
+            tempDbFile.inputStream().use { it.read(header) }
+            val isPlaintextDb = String(header, Charsets.US_ASCII).startsWith("SQLite format 3")
+
+            val zipKeyBytes: ByteArray? = keyBase64?.let {
                 try {
-                    restoredVersion = probe.version
-                    var total = -1
-                    var visible = -1
-                    probe.rawQuery("SELECT COUNT(*) FROM financial_records", null).use { c ->
-                        if (c.moveToFirst()) total = c.getInt(0)
-                    }
-                    probe.rawQuery("SELECT COUNT(*) FROM financial_records WHERE isDeleted = 0", null).use { c ->
-                        if (c.moveToFirst()) visible = c.getInt(0)
-                    }
-                    SecureLog.d(TAG, "VALIDASI: total=$total terlihat=$visible")
-                    isValid = true
-                } finally {
-                    probe.close()
+                    android.util.Base64.decode(it, android.util.Base64.DEFAULT)
+                } catch (e: Exception) {
+                    null
                 }
-            } catch (e: Exception) {
-                SecureLog.e(TAG, "Database validasi gagal: ${e.message}", e)
-            } finally {
-                java.util.Arrays.fill(passphraseBytes, 0.toByte())
             }
 
-            if (!isValid) {
-                if (tempDbFile.exists()) {
-                    tempDbFile.delete()
+            var probe: DbProbe? = null
+            var keyToImport: ByteArray? = null
+            var plaintextRestore = false
+
+            if (isPlaintextDb) {
+                probe = probeDatabase(tempDbFile, ByteArray(0))
+                plaintextRestore = true
+            } else {
+                val currentPassphrase = DatabaseKeyManager.getOrCreatePassphrase(context)
+                probe = probeDatabase(tempDbFile, currentPassphrase)
+                if (probe == null && zipKeyBytes != null) {
+                    // Kunci berbeda: cadangan berasal dari perangkat lain.
+                    probe = probeDatabase(tempDbFile, zipKeyBytes)
+                    if (probe != null) keyToImport = zipKeyBytes
                 }
-                throw IllegalStateException("Format database rusak atau kata sandi enkripsi salah (v$restoredVersion)")
+            }
+
+            if (probe == null) {
+                throw IllegalStateException("Database di dalam cadangan tidak bisa dibuka: berkas rusak atau kunci tidak cocok.")
+            }
+            SecureLog.d(TAG, "CADANGAN: versi=${probe.version} total=${probe.total} terlihat=${probe.visible} polos=$plaintextRestore")
+
+            // Impor kunci SEBELUM menimpa apa pun, dan buktikan tersimpan —
+            // kalau gagal, database lama masih utuh dan pemulihan dibatalkan.
+            if (keyToImport != null) {
+                DatabaseKeyManager.importPassphrase(context, keyToImport)
+                val reprobed = DatabaseKeyManager.getOrCreatePassphrase(context)
+                if (!reprobed.contentEquals(keyToImport)) {
+                    throw IllegalStateException("Kunci cadangan gagal disimpan di perangkat ini; pemulihan dibatalkan.")
+                }
+                SecureLog.d(TAG, "Kunci database cadangan berhasil diimpor.")
             }
 
             AppDatabase.resetDatabaseInstance()
@@ -326,10 +377,8 @@ object BackupHelper {
             val walFile = File(dbFile.path + "-wal")
             val shmFile = File(dbFile.path + "-shm")
 
-            // -wal/-shm milik database LAMA. Hapus setelah file utama diganti,
-            // kalau tidak SQLite akan memutar ulang log transaksi lama.
             if (dbFile.exists()) {
-                // Jaring pengaman: simpan DB lama sebelum ditimpa.
+                // Jaring pengaman terakhir: simpan DB lama sebelum ditimpa.
                 try {
                     val safety = File(context.filesDir, "prerestore_safety.db")
                     if (safety.exists()) safety.delete()
@@ -341,80 +390,108 @@ object BackupHelper {
                 dbFile.delete()
             }
             dbFile.parentFile?.mkdirs()
-            val moved = tempDbFile.renameTo(dbFile)
-            if (!moved) {
+            if (!tempDbFile.renameTo(dbFile)) {
                 tempDbFile.inputStream().use { input ->
                     dbFile.outputStream().use { output -> input.copyTo(output) }
                 }
-                tempDbFile.delete()
             }
+            // -wal/-shm milik database LAMA: kalau tidak dihapus, SQLite memutar
+            // ulang log transaksi lama di atas database hasil pemulihan.
             if (walFile.exists()) walFile.delete()
             if (shmFile.exists()) shmFile.delete()
 
-            // Whitelist: hanya prefs yang dikenal & aman yang ditulis balik.
-            val allowedPrefsFiles = setOf(
-                "financial_tracker_prefs.xml",
-                "app_security_prefs.xml",
-                "security_prefs.xml"
-            )
+            // Verifikasi berkas di tempat tujuan, dengan kunci yang kini berlaku.
+            val verifyKey = if (plaintextRestore) ByteArray(0) else DatabaseKeyManager.getOrCreatePassphrase(context)
+            val verify = probeDatabase(dbFile, verifyKey)
+                ?: throw IllegalStateException("Database hasil pemulihan tidak dapat dibuka kembali.")
 
-            ZipInputStream(backupFile.inputStream()).use { zis ->
-                var entry = zis.nextEntry
-                while (entry != null) {
-                    if (!entry.isDirectory && entry.name.startsWith(PREFIX_RAW_PREFS)) {
-                        val fileName = entry.name.substringAfter(PREFIX_RAW_PREFS)
-                        if (fileName !in allowedPrefsFiles) {
-                            SecureLog.w(TAG, "Skipping non-whitelisted prefs file: $fileName")
-                            zis.closeEntry()
-                            entry = zis.nextEntry
-                            continue
-                        }
-                        val dataDir = context.applicationContext.dataDir ?: context.filesDir.parentFile ?: context.dataDir
-                        val sharedPrefsDir = File(dataDir, "shared_prefs")
-                        if (!sharedPrefsDir.exists()) {
-                            sharedPrefsDir.mkdirs()
-                        }
-                        val targetPrefFile = File(sharedPrefsDir, fileName)
-                        if (!targetPrefFile.canonicalPath.startsWith(sharedPrefsDir.canonicalPath + File.separator)) {
-                            SecureLog.w(TAG, "Zip Slip attack detected in entry: ${entry.name}")
-                            zis.closeEntry()
-                            entry = zis.nextEntry
-                            continue
-                        }
-                        writeEntryToFile(zis, targetPrefFile, MAX_PREFS_BYTES)
-                    }
-                    zis.closeEntry()
-                    entry = zis.nextEntry
+            // Prefs polos: salinan XML apa adanya.
+            val dataDir = context.applicationContext.dataDir ?: context.filesDir.parentFile ?: context.dataDir
+            val sharedPrefsDir = File(dataDir, "shared_prefs")
+            if (!sharedPrefsDir.exists()) sharedPrefsDir.mkdirs()
+            rawPrefs.forEach { (fileName, bytes) ->
+                try {
+                    File(sharedPrefsDir, fileName).writeBytes(bytes)
+                } catch (e: Exception) {
+                    SecureLog.e(TAG, "Gagal memulihkan prefs '$fileName'", e)
                 }
             }
 
-            // Data hasil restore harus menang atas versi yang ada di Firestore.
+            // Prefs terenkripsi: tulis lewat API supaya dienkripsi ulang dengan
+            // Keystore perangkat ini (XML mentahnya tidak portabel).
+            var prefsRestored = 0
+            jsonPrefs.forEach { (name, bytes) ->
+                try {
+                    val prefs = SecurePrefsHelper.getEncryptedPrefs(context, name)
+                    prefsRestored += PrefsBackupCodec.import(prefs, String(bytes, Charsets.UTF_8))
+                } catch (e: Exception) {
+                    SecureLog.e(TAG, "Gagal memulihkan prefs terenkripsi '$name'", e)
+                }
+            }
+
+            // Hasil restore tidak boleh kalah dari versi lama di Firestore.
             RestoreSyncMarker.markPending(context)
 
             TelemetryHelper.trackBackupAction("restore", true)
+            SecureLog.d(
+                TAG,
+                "Pemulihan selesai: versi=${verify.version} baris=${verify.total} prefs_terenkripsi=$prefsRestored"
+            )
+
             restartApplication(context)
-            true
+            RestoreResult(
+                success = true,
+                message = "Cadangan dipulihkan: ${verify.visible} transaksi aktif (versi skema ${verify.version})."
+            )
         } catch (e: Exception) {
-            SecureLog.e(TAG, "Gagal mengembalikan cadangan: ${e.message}", e)
+            SecureLog.e(TAG, "Gagal memulihkan cadangan: ${e.message}", e)
             TelemetryHelper.trackBackupAction("restore", false, e.message)
             TelemetryHelper.logNonFatal(e, "Restore failed")
-            false
+            RestoreResult(false, e.localizedMessage ?: "Pemulihan gagal.")
+        } finally {
+            try {
+                tempDir.deleteRecursively()
+            } catch (e: Exception) {
+                // abaikan: cache akan dibersihkan sistem nanti
+            }
         }
     }
 
     // ---- Utilitas entri ZIP (semua dengan batas ukuran anti decompression bomb) ----
 
-    private fun extractEntryToFile(zis: ZipInputStream, target: File, wantedName: String, maxBytes: Long) {
-        var entry = zis.nextEntry
-        while (entry != null) {
-            if (!entry.isDirectory && entry.name == wantedName) {
-                writeEntryToFile(zis, target, maxBytes)
-                return
+    private data class DbProbe(val version: Int, val total: Int, val visible: Int)
+
+    /** Coba buka database; null kalau kunci salah atau berkas rusak. */
+    private fun probeDatabase(dbFile: File, passphrase: ByteArray): DbProbe? {
+        return try {
+            val probe = net.sqlcipher.database.SQLiteDatabase.openDatabase(
+                dbFile.absolutePath,
+                passphrase,
+                null,
+                net.sqlcipher.database.SQLiteDatabase.OPEN_READONLY,
+                null,
+                null
+            )
+            try {
+                var total = -1
+                var visible = -1
+                probe.rawQuery("SELECT COUNT(*) FROM financial_records", null).use { c ->
+                    if (c.moveToFirst()) total = c.getInt(0)
+                }
+                probe.rawQuery("SELECT COUNT(*) FROM financial_records WHERE isDeleted = 0", null).use { c ->
+                    if (c.moveToFirst()) visible = c.getInt(0)
+                }
+                DbProbe(probe.version, total, visible)
+            } finally {
+                probe.close()
             }
-            zis.closeEntry()
-            entry = zis.nextEntry
+        } catch (e: Exception) {
+            null
         }
     }
+
+    private fun isSafeFileName(name: String): Boolean =
+        name.isNotEmpty() && name != "." && name != ".." && !name.contains('/') && !name.contains('\\')
 
     private fun writeEntryToFile(zis: ZipInputStream, target: File, maxBytes: Long) {
         target.parentFile?.mkdirs()
@@ -433,7 +510,6 @@ object BackupHelper {
         }
     }
 
-    @Suppress("unused")
     private fun readEntryBytes(zis: ZipInputStream, maxBytes: Long): ByteArray {
         val out = ByteArrayOutputStream()
         val buffer = ByteArray(8192)
