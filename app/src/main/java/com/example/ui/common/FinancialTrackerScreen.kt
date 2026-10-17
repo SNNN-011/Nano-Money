@@ -441,9 +441,9 @@ fun FinancialTrackerScreen(
                     Box(modifier = Modifier.fillMaxSize().background(Brush.radialGradient(colors = listOf(SteelBlueGlow.copy(alpha = 0.1f), Color.Transparent), center = Offset(800f, 1500f), radius = 1100f)))
                 }
                 TrackerTab.CHAT.name -> {
-                    Box(modifier = Modifier.fillMaxSize().background(Brush.radialGradient(colors = listOf(SteelBlueGlow.copy(alpha = 0.11f), Color.Transparent), center = Offset(800f, 1500f), radius = 800f)))
-                    Box(modifier = Modifier.fillMaxSize().background(Brush.radialGradient(colors = listOf(NeonViolet.copy(alpha = 0.1f), Color.Transparent), center = Offset(800f, 0f), radius = 900f)))
-                    Box(modifier = Modifier.fillMaxSize().background(Brush.radialGradient(colors = listOf(SteelBlueGlow.copy(alpha = 0.08f), Color.Transparent), center = Offset(0f, 1500f), radius = 600f)))
+                    // Tab Chat ikut palet editorial (pilihan pengguna): latar krem
+                    // polos, sama seperti tab Dashboard.
+                    Box(modifier = Modifier.fillMaxSize().background(Cream))
                 }
                 TrackerTab.EKSPOR_IMPOR.name -> {
                     Box(modifier = Modifier.fillMaxSize().background(Brush.radialGradient(colors = listOf(NeonViolet.copy(alpha = 0.09f), Color.Transparent), center = Offset(0f, 1500f), radius = 900f)))
@@ -456,10 +456,11 @@ fun FinancialTrackerScreen(
             }
         }
 
-        // Tab Dashboard memakai palet editorial, jadi bar atas dan bar bawah ikut
-        // krem-tinta supaya tidak beradu dengan latar krem halamannya. Tab lain
-        // yang belum di-redesign tetap memakai warna gelap yang lama.
-        val isEditorialTab = currentRoute == TrackerTab.BERANDA.name
+        // Tab Dashboard dan tab Chat memakai palet editorial, jadi bar atas dan
+        // bar bawah ikut krem-tinta supaya tidak beradu dengan latar krem
+        // halamannya. Tab lain yang belum di-redesign tetap memakai warna gelap
+        // yang lama.
+        val isEditorialTab = currentRoute == TrackerTab.BERANDA.name || currentRoute == TrackerTab.CHAT.name
         val barContainer = if (isEditorialTab) CreamRaised else MidnightAbyss.copy(alpha = 0.95f)
         val barDivider = if (isEditorialTab) Hairline else GhostWhite.copy(alpha = 0.05f)
         val barTitleColor = if (isEditorialTab) Ink else GhostWhite

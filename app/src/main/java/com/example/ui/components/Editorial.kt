@@ -122,13 +122,21 @@ fun EditorialButton(
     trailingArrow: Boolean = true,
     enabled: Boolean = true,
     accent: Color = Ink,
-    testTag: String = ""
+    testTag: String = "",
+    /**
+     * Lebar penuh dengan label di kiri dan chip panah di kanan, seperti
+     * `.hero-actions .btn { width: 100%; justify-content: space-between }`
+     * di referensi. Tanpa ini, tombol selebar layar menyisakan ruang kosong
+     * besar di kanan label.
+     */
+    expanded: Boolean = false
 ) {
     val container = if (style == EditorialButtonStyle.Filled) accent else Color.Transparent
     val contentColor = if (style == EditorialButtonStyle.Filled) Cream else accent
 
     Row(
         modifier = modifier
+            .then(if (expanded) Modifier.fillMaxWidth() else Modifier)
             .alpha(if (enabled) 1f else 0.5f)
             // Tinggi minimum 48 dp: kalau chip panah dimatikan (tombol di dalam
             // dialog), tombol jadi terlalu pendek karena chip 30 dp itulah yang
@@ -152,7 +160,7 @@ fun EditorialButton(
             )
             .then(if (testTag.isNotEmpty()) Modifier.testTag(testTag) else Modifier),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(11.dp)
+        horizontalArrangement = if (expanded) Arrangement.SpaceBetween else Arrangement.spacedBy(11.dp)
     ) {
         Text(
             text = text,

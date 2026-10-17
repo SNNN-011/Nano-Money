@@ -24,9 +24,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
@@ -51,7 +49,6 @@ import android.provider.MediaStore
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.window.Dialog
 import com.example.ui.util.CategoryIconMapper
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.common.api.ApiException
@@ -60,10 +57,32 @@ import kotlinx.coroutines.launch
 import com.example.util.FirebaseSyncHelper
 import com.example.data.remote.ExtractionResult
 import com.example.ui.common.CustomDatePickerDialog
+import com.example.ui.components.EditorialButton
+import com.example.ui.components.EditorialButtonStyle
+import com.example.ui.components.EditorialDialog
+import com.example.ui.components.Eyebrow
+import com.example.ui.components.HairlineDivider
+
+/**
+ * Tab Chat memakai palet editorial seperti tab Dashboard.
+ *
+ * Pembungkus `MaterialTheme` ada di sini (bukan menempel di setiap elemen)
+ * supaya seluruh isi tab, termasuk pop up yang dikomposisi di jendela
+ * terpisah, memakai skala tipe yang sama.
+ */
+@Composable
+fun ChatScreen(
+    viewModel: ChatViewModel,
+    modifier: Modifier = Modifier
+) {
+    MaterialTheme(typography = EditorialTypography) {
+        ChatScreenContent(viewModel = viewModel, modifier = modifier)
+    }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ChatScreen(
+private fun ChatScreenContent(
     viewModel: ChatViewModel,
     modifier: Modifier = Modifier
 ) {
@@ -120,33 +139,31 @@ fun ChatScreen(
             Icon(
                 imageVector = Icons.Default.AccountCircle,
                 contentDescription = "Login Required",
-                tint = BlueGradientStart,
+                tint = BurntOrange,
                 modifier = Modifier.size(80.dp)
             )
             Spacer(modifier = Modifier.height(24.dp))
             Text(
                 text = "Autentikasi Diperlukan",
-                style = MaterialTheme.typography.titleLarge,
-                color = GhostWhite,
-                fontWeight = FontWeight.Bold
+                style = MaterialTheme.typography.headlineMedium,
+                color = Ink
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
                 text = "Untuk menggunakan fitur Asisten AI Cerdas, Anda harus masuk dengan Akun Google terlebih dahulu. Hal ini untuk memastikan keamanan permintaan AI Anda.",
                 style = MaterialTheme.typography.bodyMedium,
-                color = GhostWhite.copy(alpha = 0.7f),
+                color = InkMuted,
                 textAlign = TextAlign.Center
             )
             Spacer(modifier = Modifier.height(32.dp))
-            PremiumButton(
+            EditorialButton(
                 text = "Masuk dengan Google",
                 onClick = {
                     val client = com.example.util.GoogleDriveHelper.getGoogleSignInClient(context)
                     googleSignInLauncher.launch(client.signInIntent)
                 },
-                isActive = true,
-                icon = Icons.Default.Login,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                expanded = true
             )
         }
         return
@@ -246,139 +263,105 @@ fun ChatScreen(
     }
 
     if (showModelInfo) {
-        Dialog(onDismissRequest = { showModelInfo = false }) {
-            Card(
-                modifier = Modifier.fillMaxWidth().padding(16.dp),
-                shape = RoundedCornerShape(24.dp),
-                colors = CardDefaults.cardColors(containerColor = MidnightAbyss),
-                border = BorderStroke(
-                    width = 1.dp,
-                    brush = Brush.verticalGradient(
-                        colors = listOf(
-                            GhostWhite.copy(alpha = 0.2f),
-                            GhostWhite.copy(alpha = 0.02f)
-                        )
-                    )
-                ),
-                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+        EditorialDialog(onDismissRequest = { showModelInfo = false }) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(CornerRadius.bezel))
+                    .background(CreamRaised)
+                    .border(1.dp, Hairline, RoundedCornerShape(CornerRadius.bezel))
+                    .padding(Spacing.xl)
             ) {
-                Box(modifier = Modifier.background(TranslucentGlass)) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(24.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        Text(
-                            text = "Informasi AI",
-                            color = GhostWhite,
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold
-                        )
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.md)
+                ) {
+                    Text(
+                        text = "Informasi AI",
+                        color = Ink,
+                        style = MaterialTheme.typography.headlineSmall
+                    )
 
-                        Text(
-                            text = "Nano AI memakai satu model utama. Kalau model itu sedang tidak tersedia, " +
-                                "aplikasi otomatis mencoba dua model cadangan secara berurutan, jadi tidak perlu " +
-                                "memilih model secara manual.",
-                            color = GhostWhite.copy(alpha = 0.8f),
-                            style = MaterialTheme.typography.bodyMedium
-                        )
+                    Text(
+                        text = "Nano AI memakai satu model utama. Kalau model itu sedang tidak tersedia, " +
+                            "aplikasi otomatis mencoba dua model cadangan secara berurutan, jadi tidak perlu " +
+                            "memilih model secara manual.",
+                        color = InkMuted,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
 
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        PremiumButton(
-                            text = "Mengerti",
-                            onClick = { showModelInfo = false },
-                            isActive = true,
-                            modifier = Modifier.fillMaxWidth(),
-                            testTag = "model_info_understand_button"
-                        )
-                    }
+                    EditorialButton(
+                        text = "Mengerti",
+                        onClick = { showModelInfo = false },
+                        // Tombol penutup: selebar labelnya dan rata kanan, sama
+                        // seperti dialog penjelasan lain di aplikasi.
+                        modifier = Modifier.align(Alignment.End),
+                        testTag = "model_info_understand_button"
+                    )
                 }
             }
         }
     }
 
     if (showSourceSelector) {
-        Dialog(onDismissRequest = { showSourceSelector = false }) {
-            Card(
-                modifier = Modifier.fillMaxWidth().padding(16.dp),
-                shape = RoundedCornerShape(24.dp),
-                colors = CardDefaults.cardColors(containerColor = MidnightAbyss),
-                border = BorderStroke(
-                    width = 1.dp,
-                    brush = Brush.verticalGradient(
-                        colors = listOf(
-                            GhostWhite.copy(alpha = 0.2f),
-                            GhostWhite.copy(alpha = 0.02f)
-                        )
-                    )
-                ),
-                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+        EditorialDialog(onDismissRequest = { showSourceSelector = false }) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(CornerRadius.bezel))
+                    .background(CreamRaised)
+                    .border(1.dp, Hairline, RoundedCornerShape(CornerRadius.bezel))
+                    .padding(Spacing.xl)
             ) {
-                Box(modifier = Modifier.background(TranslucentGlass)) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(24.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        Text(
-                            text = "Ambil Struk Belanja",
-                            style = MaterialTheme.typography.titleLarge,
-                            color = GhostWhite,
-                            fontWeight = FontWeight.Bold
-                        )
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.md)
+                ) {
+                    Text(
+                        text = "Ambil Struk Belanja",
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = Ink
+                    )
 
-                        Text(
-                            text = "Silakan pilih sumber foto struk belanja Anda untuk dipindai oleh AI.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = GhostWhite.copy(alpha = 0.7f)
-                        )
+                    Text(
+                        text = "Silakan pilih sumber foto struk belanja Anda untuk dipindai oleh AI.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = InkMuted
+                    )
 
-                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            PremiumButton(
-                                text = "Ambil Foto Langsung",
-                                onClick = {
-                                    showSourceSelector = false
-                                    cameraLauncher.launch(null)
-                                },
-                                modifier = Modifier.fillMaxWidth(),
-                                isActive = true,
-                                icon = Icons.Default.AddAPhoto,
-                                testTag = "camera_button"
-                            )
-
-                            PremiumButton(
-                                text = "Pilih dari Galeri",
-                                onClick = {
-                                    showSourceSelector = false
-                                    imagePickerLauncher.launch("image/*")
-                                },
-                                modifier = Modifier.fillMaxWidth(),
-                                isActive = false,
-                                icon = Icons.Default.Image,
-                                testTag = "gallery_button"
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.height(4.dp))
-
-                        Row(
+                    Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                        EditorialButton(
+                            text = "Ambil Foto Langsung",
+                            onClick = {
+                                showSourceSelector = false
+                                cameraLauncher.launch(null)
+                            },
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.End
-                        ) {
-                            PremiumButton(
-                                text = "Batal",
-                                onClick = { showSourceSelector = false },
-                                isActive = false,
-                                testTag = "cancel_source_selector_button",
-                                fillMaxWidth = false,
-                                horizontalPadding = 24.dp,
-                                verticalPadding = 8.dp
-                            )
-                        }
+                            expanded = true,
+                            testTag = "camera_button"
+                        )
+
+                        EditorialButton(
+                            text = "Pilih dari Galeri",
+                            onClick = {
+                                showSourceSelector = false
+                                imagePickerLauncher.launch("image/*")
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            style = EditorialButtonStyle.Ghost,
+                            trailingArrow = false,
+                            testTag = "gallery_button"
+                        )
                     }
+
+                    EditorialButton(
+                        text = "Batal",
+                        onClick = { showSourceSelector = false },
+                        style = EditorialButtonStyle.Ghost,
+                        trailingArrow = false,
+                        modifier = Modifier.align(Alignment.End),
+                        testTag = "cancel_source_selector_button"
+                    )
                 }
             }
         }
@@ -426,7 +409,7 @@ fun ChatScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(TranslucentForm)
+                    .background(CreamRaised)
                     .padding(horizontal = Spacing.lg, vertical = Spacing.md),
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -434,13 +417,13 @@ fun ChatScreen(
                     modifier = Modifier
                         .size(36.dp)
                         .clip(CircleShape)
-                        .background(SteelBlue),
+                        .background(Ink),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = Icons.Default.SmartToy,
                         contentDescription = "Bot AI",
-                        tint = MidnightAbyss,
+                        tint = Cream,
                         modifier = Modifier.size(20.dp)
                     )
                 }
@@ -448,8 +431,8 @@ fun ChatScreen(
                 Column {
                     Text(
                         text = "Nano AI",
-                        color = GhostWhite,
-                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
+                        color = Ink,
+                        style = MaterialTheme.typography.titleMedium
                     )
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -457,15 +440,10 @@ fun ChatScreen(
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(6.dp)
-                                .clip(CircleShape)
-                                .background(NeonGreen)
+                                .size(7.dp)
+                                .background(ForestGreen, CircleShape)
                         )
-                        Text(
-                            text = "Aktif & Siap Membantu",
-                            color = GhostWhite.copy(alpha = 0.7f),
-                            style = MaterialTheme.typography.labelMedium
-                        )
+                        Eyebrow(text = "Aktif & Siap Membantu", color = ForestGreen)
                     }
                 }
 
@@ -481,13 +459,13 @@ fun ChatScreen(
                     Icon(
                         imageVector = Icons.Default.Info,
                         contentDescription = "Info Model",
-                        tint = GhostWhite.copy(alpha = 0.7f),
+                        tint = InkMuted,
                         modifier = Modifier.size(20.dp)
                     )
                 }
             }
 
-            HorizontalDivider(color = GhostWhite.copy(alpha = 0.1f), thickness = 1.dp)
+            HairlineDivider()
 
             // Chat History Area
             LazyColumn(
@@ -515,7 +493,7 @@ fun ChatScreen(
                             ) {
                                 Text(
                                     "Batalkan permintaan AI",
-                                    color = GhostWhite.copy(alpha = 0.8f),
+                                    color = InkMuted,
                                     style = MaterialTheme.typography.labelMedium
                                 )
                             }
@@ -563,9 +541,9 @@ fun ChatScreen(
                         .fillMaxWidth()
                         .padding(horizontal = Spacing.lg, vertical = Spacing.xs)
                         .testTag("inline_edit_transaction_card"),
-                    shape = RoundedCornerShape(CornerRadius.lg),
-                    colors = CardDefaults.cardColors(containerColor = TranslucentGlass),
-                    border = BorderStroke(1.dp, GhostWhite.copy(alpha = 0.08f))
+                    shape = RoundedCornerShape(CornerRadius.bezelCore),
+                    colors = CardDefaults.cardColors(containerColor = CardCore),
+                    border = BorderStroke(1.dp, Hairline)
                 ) {
                     Column(
                         modifier = Modifier
@@ -587,22 +565,18 @@ fun ChatScreen(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(
-                                text = "SESUAIKAN TRANSAKSI AI",
-                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, letterSpacing = 1.sp),
-                                color = SteelBlue
-                            )
+                            Eyebrow(text = "Sesuaikan transaksi AI", color = Ink)
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(
                                     text = if (isPendingCardExpanded) "Tutup" else "Ubah",
-                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                                    color = SteelBlue,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = InkMuted,
                                     modifier = Modifier.padding(end = 4.dp)
                                 )
                                 Icon(
                                     imageVector = if (isPendingCardExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
                                     contentDescription = null,
-                                    tint = SteelBlue,
+                                    tint = InkMuted,
                                     modifier = Modifier.size(16.dp)
                                 )
                             }
@@ -613,7 +587,7 @@ fun ChatScreen(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clip(RoundedCornerShape(8.dp))
-                                    .background(GhostWhite.copy(alpha = 0.03f))
+                                    .background(CreamRaised)
                                     .padding(8.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
@@ -627,13 +601,13 @@ fun ChatScreen(
                                     Text(
                                         text = "$typeIcon  $amtStr",
                                         style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
-                                        color = GhostWhite
+                                        color = Ink
                                     )
                                     Spacer(modifier = Modifier.height(2.dp))
                                     Text(
                                         text = "$desc (${category})",
                                         style = MaterialTheme.typography.bodySmall,
-                                        color = GhostWhite.copy(alpha = 0.6f)
+                                        color = InkMuted
                                     )
                                 }
                             }
@@ -648,8 +622,8 @@ fun ChatScreen(
                                 Box(
                                     modifier = Modifier
                                         .clip(RoundedCornerShape(8.dp))
-                                        .background(GhostWhite.copy(alpha = 0.05f))
-                                        .border(1.dp, GhostWhite.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
+                                        .background(CreamRaised)
+                                        .border(1.dp, Hairline, RoundedCornerShape(8.dp))
                                         .clickable {
                                             val newType = if (isIncome) "expense" else "income"
                                             viewModel.updatePendingTransaction(pending.copy(type = newType))
@@ -660,7 +634,7 @@ fun ChatScreen(
                                     Text(
                                         text = if (isIncome) "🟢 Masuk" else "🔴 Keluar",
                                         style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
-                                        color = GhostWhite
+                                        color = Ink
                                     )
                                 }
 
@@ -674,8 +648,8 @@ fun ChatScreen(
                                     Row(
                                         modifier = Modifier
                                             .clip(RoundedCornerShape(8.dp))
-                                            .background(GhostWhite.copy(alpha = 0.05f))
-                                            .border(1.dp, GhostWhite.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
+                                            .background(CreamRaised)
+                                            .border(1.dp, Hairline, RoundedCornerShape(8.dp))
                                             .clickable { categoryDropdownExpanded = true }
                                             .padding(horizontal = 8.dp, vertical = 6.dp),
                                         verticalAlignment = Alignment.CenterVertically,
@@ -685,21 +659,21 @@ fun ChatScreen(
                                         Text(
                                             text = currentCat,
                                             style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
-                                            color = SteelBlue,
+                                            color = Ink,
                                             maxLines = 1
                                         )
-                                        Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = GhostWhite.copy(alpha = 0.5f), modifier = Modifier.size(14.dp))
+                                        Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = InkMuted, modifier = Modifier.size(14.dp))
                                     }
 
                                     DropdownMenu(
                                         expanded = categoryDropdownExpanded,
                                         onDismissRequest = { categoryDropdownExpanded = false },
-                                        modifier = Modifier.background(MidnightAbyss).border(1.dp, GhostWhite.copy(alpha = 0.1f))
+                                        modifier = Modifier.background(CreamRaised).border(1.dp, Hairline)
                                     ) {
                                         cats.forEach { categoryLabel ->
                                             val (_, label) = CategoryIconMapper.extractEmojiAndLabel(categoryLabel)
                                             DropdownMenuItem(
-                                                text = { Text(categoryLabel, color = GhostWhite) },
+                                                text = { Text(categoryLabel, color = Ink) },
                                                 onClick = {
                                                     viewModel.updatePendingTransaction(pending.copy(category = label))
                                                     categoryDropdownExpanded = false
@@ -716,12 +690,12 @@ fun ChatScreen(
                                     modifier = Modifier
                                         .weight(1f)
                                         .clip(RoundedCornerShape(8.dp))
-                                        .background(GhostWhite.copy(alpha = 0.05f))
-                                        .border(1.dp, GhostWhite.copy(alpha = 0.1f), RoundedCornerShape(8.dp))
+                                        .background(CreamRaised)
+                                        .border(1.dp, Hairline, RoundedCornerShape(8.dp))
                                         .padding(horizontal = 8.dp, vertical = 6.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Text("Rp", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold), color = GhostWhite.copy(alpha = 0.5f))
+                                    Text("Rp", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold), color = InkMuted)
                                     Spacer(modifier = Modifier.width(4.dp))
                                     androidx.compose.foundation.text.BasicTextField(
                                         value = amtFieldValue,
@@ -732,8 +706,8 @@ fun ChatScreen(
                                                 viewModel.updatePendingTransaction(pending.copy(amount = parsedAmt))
                                             }
                                         },
-                                        textStyle = MaterialTheme.typography.bodySmall.copy(color = GhostWhite, fontWeight = FontWeight.Bold),
-                                        cursorBrush = androidx.compose.ui.graphics.SolidColor(GhostWhite),
+                                        textStyle = MaterialTheme.typography.bodySmall.copy(color = Ink, fontWeight = FontWeight.Bold),
+                                        cursorBrush = androidx.compose.ui.graphics.SolidColor(Ink),
                                         singleLine = true,
                                         keyboardOptions = KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
                                         modifier = Modifier.fillMaxWidth()
@@ -746,20 +720,20 @@ fun ChatScreen(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clip(RoundedCornerShape(8.dp))
-                                    .background(GhostWhite.copy(alpha = 0.03f))
-                                    .border(1.dp, GhostWhite.copy(alpha = 0.08f), RoundedCornerShape(8.dp))
+                                    .background(CreamRaised)
+                                    .border(1.dp, Hairline, RoundedCornerShape(8.dp))
                                     .padding(horizontal = 8.dp, vertical = 6.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Icon(Icons.Default.Edit, contentDescription = null, tint = GhostWhite.copy(alpha = 0.4f), modifier = Modifier.size(14.dp))
+                                Icon(Icons.Default.Edit, contentDescription = null, tint = InkMuted, modifier = Modifier.size(14.dp))
                                 Spacer(modifier = Modifier.width(6.dp))
                                 androidx.compose.foundation.text.BasicTextField(
                                     value = pending.description ?: "",
                                     onValueChange = { newValue ->
                                         if (newValue.length <= 20) viewModel.updatePendingTransaction(pending.copy(description = newValue))
                                     },
-                                    textStyle = MaterialTheme.typography.bodySmall.copy(color = GhostWhite),
-                                    cursorBrush = androidx.compose.ui.graphics.SolidColor(GhostWhite),
+                                    textStyle = MaterialTheme.typography.bodySmall.copy(color = Ink),
+                                    cursorBrush = androidx.compose.ui.graphics.SolidColor(Ink),
                                     singleLine = true,
                                     modifier = Modifier.fillMaxWidth()
                                 )
@@ -770,20 +744,20 @@ fun ChatScreen(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clip(RoundedCornerShape(8.dp))
-                                    .background(GhostWhite.copy(alpha = 0.02f))
-                                    .border(1.dp, GhostWhite.copy(alpha = 0.05f), RoundedCornerShape(8.dp))
+                                    .background(CreamRaised)
+                                    .border(1.dp, Hairline, RoundedCornerShape(8.dp))
                                     .padding(horizontal = 8.dp, vertical = 6.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Icon(Icons.Default.Info, contentDescription = null, tint = GhostWhite.copy(alpha = 0.3f), modifier = Modifier.size(14.dp))
+                                Icon(Icons.Default.Info, contentDescription = null, tint = InkMuted, modifier = Modifier.size(14.dp))
                                 Spacer(modifier = Modifier.width(6.dp))
                                 androidx.compose.foundation.text.BasicTextField(
                                     value = pending.notes ?: "",
                                     onValueChange = { newValue ->
                                         if (newValue.length <= 100) viewModel.updatePendingTransaction(pending.copy(notes = newValue))
                                     },
-                                    textStyle = MaterialTheme.typography.bodySmall.copy(color = GhostWhite.copy(alpha = 0.6f)),
-                                    cursorBrush = androidx.compose.ui.graphics.SolidColor(GhostWhite),
+                                    textStyle = MaterialTheme.typography.bodySmall.copy(color = InkMuted),
+                                    cursorBrush = androidx.compose.ui.graphics.SolidColor(Ink),
                                     singleLine = true,
                                     modifier = Modifier.fillMaxWidth()
                                 )
@@ -800,21 +774,21 @@ fun ChatScreen(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clip(RoundedCornerShape(8.dp))
-                                    .background(GhostWhite.copy(alpha = 0.03f))
-                                    .border(1.dp, GhostWhite.copy(alpha = 0.08f), RoundedCornerShape(8.dp))
+                                    .background(CreamRaised)
+                                    .border(1.dp, Hairline, RoundedCornerShape(8.dp))
                                     .clickable { showPendingDatePicker = true }
                                     .padding(horizontal = 8.dp, vertical = 6.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Icon(Icons.Default.CalendarToday, contentDescription = null, tint = GhostWhite.copy(alpha = 0.4f), modifier = Modifier.size(14.dp))
+                                Icon(Icons.Default.CalendarToday, contentDescription = null, tint = InkMuted, modifier = Modifier.size(14.dp))
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text(
                                     text = "Tanggal: $formattedDate",
                                     style = MaterialTheme.typography.bodySmall,
-                                    color = GhostWhite,
+                                    color = Ink,
                                     modifier = Modifier.weight(1f)
                                 )
-                                Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = GhostWhite.copy(alpha = 0.5f), modifier = Modifier.size(14.dp))
+                                Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = InkMuted, modifier = Modifier.size(14.dp))
                             }
                         }
                     }
@@ -823,25 +797,25 @@ fun ChatScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(TranslucentForm)
+                        .background(CreamRaised)
                         .padding(horizontal = 16.dp, vertical = 12.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    PremiumButton(
+                    EditorialButton(
                         text = "Ya, Simpan",
                         onClick = { viewModel.confirmPendingTransaction() },
                         modifier = Modifier.weight(1f),
-                        isActive = true,
-                        icon = Icons.Default.Check,
+                        // Separuh lebar: panah dimatikan supaya label tetap satu baris.
+                        trailingArrow = false,
                         testTag = "confirm_yes_button"
                     )
 
-                    PremiumButton(
+                    EditorialButton(
                         text = "Batal",
                         onClick = { viewModel.cancelPendingTransaction() },
                         modifier = Modifier.weight(1f),
-                        isActive = false,
-                        icon = Icons.Default.Close,
+                        style = EditorialButtonStyle.Ghost,
+                        trailingArrow = false,
                         testTag = "confirm_no_button"
                     )
                 }
@@ -857,9 +831,9 @@ fun ChatScreen(
                         .fillMaxWidth()
                         .padding(horizontal = Spacing.lg, vertical = Spacing.xs)
                         .testTag("receipt_edit_card"),
-                    shape = RoundedCornerShape(CornerRadius.lg),
-                    colors = CardDefaults.cardColors(containerColor = TranslucentGlass),
-                    border = BorderStroke(1.dp, GhostWhite.copy(alpha = 0.08f))
+                    shape = RoundedCornerShape(CornerRadius.bezelCore),
+                    colors = CardDefaults.cardColors(containerColor = CardCore),
+                    border = BorderStroke(1.dp, Hairline)
                 ) {
                     Column(
                         modifier = Modifier
@@ -880,22 +854,18 @@ fun ChatScreen(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(
-                                text = "SESUAIKAN STRUK BELANJA AI",
-                                style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, letterSpacing = 1.sp),
-                                color = SteelBlue
-                            )
+                            Eyebrow(text = "Sesuaikan struk belanja AI", color = Ink)
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(
                                     text = if (isReceiptCardExpanded) "Tutup" else "Ubah",
-                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                                    color = SteelBlue,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = InkMuted,
                                     modifier = Modifier.padding(end = 4.dp)
                                 )
                                 Icon(
                                     imageVector = if (isReceiptCardExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
                                     contentDescription = null,
-                                    tint = SteelBlue,
+                                    tint = InkMuted,
                                     modifier = Modifier.size(16.dp)
                                 )
                             }
@@ -906,23 +876,23 @@ fun ChatScreen(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clip(RoundedCornerShape(8.dp))
-                                    .background(GhostWhite.copy(alpha = 0.03f))
+                                    .background(CreamRaised)
                                     .padding(8.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Icon(Icons.Default.Store, contentDescription = null, tint = GhostWhite.copy(alpha = 0.4f), modifier = Modifier.size(16.dp))
+                                Icon(Icons.Default.Store, contentDescription = null, tint = InkMuted, modifier = Modifier.size(16.dp))
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
                                         text = receipt.title.ifBlank { "Struk Belanja AI" },
                                         style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
-                                        color = GhostWhite
+                                        color = Ink
                                     )
                                     Spacer(modifier = Modifier.height(2.dp))
                                     Text(
                                         text = "${receipt.grouped.size} kategori transaksi  •  Total: ${FormatUtils.formatRupiah(receipt.total)}",
                                         style = MaterialTheme.typography.bodySmall,
-                                        color = GhostWhite.copy(alpha = 0.6f)
+                                        color = InkMuted
                                     )
                                 }
                             }
@@ -933,20 +903,20 @@ fun ChatScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(8.dp))
-                                .background(GhostWhite.copy(alpha = 0.04f))
-                                .border(1.dp, GhostWhite.copy(alpha = 0.08f), RoundedCornerShape(8.dp))
+                                .background(Ink.copy(alpha = 0.04f))
+                                .border(1.dp, Hairline, RoundedCornerShape(8.dp))
                                 .padding(horizontal = 8.dp, vertical = 6.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(Icons.Default.Store, contentDescription = null, tint = GhostWhite.copy(alpha = 0.4f), modifier = Modifier.size(14.dp))
+                            Icon(Icons.Default.Store, contentDescription = null, tint = InkMuted, modifier = Modifier.size(14.dp))
                             Spacer(modifier = Modifier.width(6.dp))
                             androidx.compose.foundation.text.BasicTextField(
                                 value = receipt.title,
                                 onValueChange = { newValue ->
                                     viewModel.updatePendingReceipt(receipt.copy(title = newValue))
                                 },
-                                textStyle = MaterialTheme.typography.bodySmall.copy(color = GhostWhite, fontWeight = FontWeight.Bold),
-                                cursorBrush = androidx.compose.ui.graphics.SolidColor(GhostWhite),
+                                textStyle = MaterialTheme.typography.bodySmall.copy(color = Ink, fontWeight = FontWeight.Bold),
+                                cursorBrush = androidx.compose.ui.graphics.SolidColor(Ink),
                                 singleLine = true,
                                 modifier = Modifier.fillMaxWidth()
                             )
@@ -962,27 +932,27 @@ fun ChatScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(8.dp))
-                                .background(GhostWhite.copy(alpha = 0.03f))
-                                .border(1.dp, GhostWhite.copy(alpha = 0.08f), RoundedCornerShape(8.dp))
+                                .background(CreamRaised)
+                                .border(1.dp, Hairline, RoundedCornerShape(8.dp))
                                 .clickable { showReceiptDatePicker = true }
                                 .padding(horizontal = 8.dp, vertical = 6.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(Icons.Default.CalendarToday, contentDescription = null, tint = GhostWhite.copy(alpha = 0.4f), modifier = Modifier.size(14.dp))
+                            Icon(Icons.Default.CalendarToday, contentDescription = null, tint = InkMuted, modifier = Modifier.size(14.dp))
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
                                 text = "Tanggal: $formattedReceiptDate",
                                 style = MaterialTheme.typography.bodySmall,
-                                color = GhostWhite,
+                                color = Ink,
                                 modifier = Modifier.weight(1f)
                             )
-                            Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = GhostWhite.copy(alpha = 0.5f), modifier = Modifier.size(14.dp))
+                            Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = InkMuted, modifier = Modifier.size(14.dp))
                         }
 
                         // 3. Collapsible Categories List
                         Text(
                             text = "Rencana Catatan Transaksi (Dapat Dibuka-Tutup):",
-                            style = MaterialTheme.typography.labelSmall.copy(color = GhostWhite.copy(alpha = 0.4f)),
+                            style = MaterialTheme.typography.labelSmall.copy(color = InkMuted),
                             modifier = Modifier.padding(top = 4.dp)
                         )
 
@@ -991,8 +961,8 @@ fun ChatScreen(
                             Card(
                                 modifier = Modifier.fillMaxWidth(),
                                 shape = RoundedCornerShape(10.dp),
-                                colors = CardDefaults.cardColors(containerColor = GhostWhite.copy(alpha = 0.02f)),
-                                border = BorderStroke(1.dp, GhostWhite.copy(alpha = 0.05f))
+                                colors = CardDefaults.cardColors(containerColor = CreamRaised),
+                                border = BorderStroke(1.dp, Hairline)
                             ) {
                                 Column(modifier = Modifier.padding(8.dp)) {
                                     // Header
@@ -1018,12 +988,12 @@ fun ChatScreen(
                                             Text(
                                                 text = grp.category,
                                                 style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
-                                                color = SteelBlue,
+                                                color = Ink,
                                                 maxLines = 1
                                             )
                                             Text(
                                                 text = grp.description.ifBlank { "" },
-                                                style = MaterialTheme.typography.bodySmall.copy(color = GhostWhite.copy(alpha = 0.5f)),
+                                                style = MaterialTheme.typography.bodySmall.copy(color = InkMuted),
                                                 maxLines = 1,
                                                 modifier = Modifier.padding(start = 4.dp)
                                             )
@@ -1036,12 +1006,12 @@ fun ChatScreen(
                                             Text(
                                                 text = FormatUtils.formatRupiah(grp.amount),
                                                 style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
-                                                color = GhostWhite
+                                                color = Ink
                                             )
                                             Icon(
                                                 imageVector = if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
                                                 contentDescription = if (isExpanded) "Sembunyikan" else "Tampilkan",
-                                                tint = GhostWhite.copy(alpha = 0.4f),
+                                                tint = InkMuted,
                                                 modifier = Modifier.size(16.dp)
                                             )
                                         }
@@ -1062,8 +1032,8 @@ fun ChatScreen(
                                             Box(
                                                 modifier = Modifier
                                                     .clip(RoundedCornerShape(6.dp))
-                                                    .background(GhostWhite.copy(alpha = 0.05f))
-                                                    .border(1.dp, GhostWhite.copy(alpha = 0.1f), RoundedCornerShape(6.dp))
+                                                    .background(CreamRaised)
+                                                    .border(1.dp, Hairline, RoundedCornerShape(6.dp))
                                                     .clickable {
                                                         val newType = if (isItemIncome) "expense" else "income"
                                                         val updatedGrouped = receipt.grouped.toMutableList()
@@ -1076,7 +1046,7 @@ fun ChatScreen(
                                                 Text(
                                                     text = if (isItemIncome) "🟢 Masuk" else "🔴 Keluar",
                                                     style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp, fontWeight = FontWeight.Bold),
-                                                    color = GhostWhite
+                                                    color = Ink
                                                 )
                                             }
 
@@ -1090,8 +1060,8 @@ fun ChatScreen(
                                                 Row(
                                                     modifier = Modifier
                                                         .clip(RoundedCornerShape(6.dp))
-                                                        .background(GhostWhite.copy(alpha = 0.05f))
-                                                        .border(1.dp, GhostWhite.copy(alpha = 0.1f), RoundedCornerShape(6.dp))
+                                                        .background(CreamRaised)
+                                                        .border(1.dp, Hairline, RoundedCornerShape(6.dp))
                                                         .clickable { itemDropdownExpanded = true }
                                                         .padding(horizontal = 6.dp, vertical = 4.dp),
                                                     verticalAlignment = Alignment.CenterVertically,
@@ -1100,21 +1070,21 @@ fun ChatScreen(
                                                     Text(
                                                         text = grp.category,
                                                         style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp, fontWeight = FontWeight.Bold),
-                                                        color = SteelBlue,
+                                                        color = Ink,
                                                         maxLines = 1
                                                     )
-                                                    Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = GhostWhite.copy(alpha = 0.5f), modifier = Modifier.size(12.dp))
+                                                    Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = InkMuted, modifier = Modifier.size(12.dp))
                                                 }
 
                                                 DropdownMenu(
                                                     expanded = itemDropdownExpanded,
                                                     onDismissRequest = { itemDropdownExpanded = false },
-                                                    modifier = Modifier.background(MidnightAbyss).border(1.dp, GhostWhite.copy(alpha = 0.1f))
+                                                    modifier = Modifier.background(CreamRaised).border(1.dp, Hairline)
                                                 ) {
                                                     cats.forEach { categoryLabel ->
                                                         val (_, label) = CategoryIconMapper.extractEmojiAndLabel(categoryLabel)
                                                         DropdownMenuItem(
-                                                            text = { Text(categoryLabel, color = GhostWhite, fontSize = 12.sp) },
+                                                            text = { Text(categoryLabel, color = Ink, fontSize = 12.sp) },
                                                             onClick = {
                                                                 val updatedGrouped = receipt.grouped.toMutableList()
                                                                 updatedGrouped[index] = grp.copy(category = label)
@@ -1133,12 +1103,12 @@ fun ChatScreen(
                                                 modifier = Modifier
                                                     .weight(1f)
                                                     .clip(RoundedCornerShape(6.dp))
-                                                    .background(GhostWhite.copy(alpha = 0.05f))
-                                                    .border(1.dp, GhostWhite.copy(alpha = 0.1f), RoundedCornerShape(6.dp))
+                                                    .background(CreamRaised)
+                                                    .border(1.dp, Hairline, RoundedCornerShape(6.dp))
                                                     .padding(horizontal = 6.dp, vertical = 4.dp),
                                                 verticalAlignment = Alignment.CenterVertically
                                             ) {
-                                                Text("Rp", style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp, fontWeight = FontWeight.Bold), color = GhostWhite.copy(alpha = 0.5f))
+                                                Text("Rp", style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp, fontWeight = FontWeight.Bold), color = InkMuted)
                                                 Spacer(modifier = Modifier.width(3.dp))
                                                 androidx.compose.foundation.text.BasicTextField(
                                                     value = grpAmtFieldValue,
@@ -1152,8 +1122,8 @@ fun ChatScreen(
                                                             viewModel.updatePendingReceipt(receipt.copy(grouped = updatedGrouped, total = newTotal))
                                                         }
                                                     },
-                                                    textStyle = MaterialTheme.typography.bodySmall.copy(color = GhostWhite, fontSize = 11.sp, fontWeight = FontWeight.Bold),
-                                                    cursorBrush = androidx.compose.ui.graphics.SolidColor(GhostWhite),
+                                                    textStyle = MaterialTheme.typography.bodySmall.copy(color = Ink, fontSize = 11.sp, fontWeight = FontWeight.Bold),
+                                                    cursorBrush = androidx.compose.ui.graphics.SolidColor(Ink),
                                                     singleLine = true,
                                                     keyboardOptions = KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
                                                     modifier = Modifier.fillMaxWidth()
@@ -1168,12 +1138,12 @@ fun ChatScreen(
                                             modifier = Modifier
                                                 .fillMaxWidth()
                                                 .clip(RoundedCornerShape(6.dp))
-                                                .background(GhostWhite.copy(alpha = 0.02f))
-                                                .border(1.dp, GhostWhite.copy(alpha = 0.05f), RoundedCornerShape(6.dp))
+                                                .background(CreamRaised)
+                                                .border(1.dp, Hairline, RoundedCornerShape(6.dp))
                                                 .padding(horizontal = 6.dp, vertical = 4.dp),
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
-                                            Icon(Icons.Default.Edit, contentDescription = null, tint = GhostWhite.copy(alpha = 0.3f), modifier = Modifier.size(12.dp))
+                                            Icon(Icons.Default.Edit, contentDescription = null, tint = InkMuted, modifier = Modifier.size(12.dp))
                                             Spacer(modifier = Modifier.width(4.dp))
                                             androidx.compose.foundation.text.BasicTextField(
                                                 value = grp.description,
@@ -1184,8 +1154,8 @@ fun ChatScreen(
                                                         viewModel.updatePendingReceipt(receipt.copy(grouped = updatedGrouped))
                                                     }
                                                 },
-                                                textStyle = MaterialTheme.typography.bodySmall.copy(color = GhostWhite, fontSize = 11.sp),
-                                                cursorBrush = androidx.compose.ui.graphics.SolidColor(GhostWhite),
+                                                textStyle = MaterialTheme.typography.bodySmall.copy(color = Ink, fontSize = 11.sp),
+                                                cursorBrush = androidx.compose.ui.graphics.SolidColor(Ink),
                                                 singleLine = true,
                                                 modifier = Modifier.fillMaxWidth()
                                             )
@@ -1201,37 +1171,37 @@ fun ChatScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(TranslucentForm)
+                        .background(CreamRaised)
                         .padding(horizontal = 16.dp, vertical = 12.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    PremiumButton(
+                    EditorialButton(
                         text = "Ya, Simpan",
                         onClick = { viewModel.confirmPendingReceipt() },
                         modifier = Modifier.weight(1f),
-                        isActive = true,
-                        icon = Icons.Default.Check,
+                        // Separuh lebar: panah dimatikan supaya label tetap satu baris.
+                        trailingArrow = false,
                         testTag = "confirm_receipt_yes_button"
                     )
 
-                    PremiumButton(
+                    EditorialButton(
                         text = "Batal",
                         onClick = { viewModel.cancelPendingReceipt() },
                         modifier = Modifier.weight(1f),
-                        isActive = false,
-                        icon = Icons.Default.Close,
+                        style = EditorialButtonStyle.Ghost,
+                        trailingArrow = false,
                         testTag = "confirm_receipt_no_button"
                     )
                 }
             }
 
-            HorizontalDivider(color = GhostWhite.copy(alpha = 0.1f), thickness = 1.dp)
+            HairlineDivider()
 
             // Input Bar
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(TranslucentForm)
+                    .background(CreamRaised)
                     .padding(horizontal = Spacing.md, vertical = Spacing.sm),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
@@ -1242,17 +1212,17 @@ fun ChatScreen(
                     modifier = Modifier
                         .size(48.dp)
                         .clip(CircleShape)
-                        .background(GhostWhite.copy(alpha = 0.08f))
+                        .background(Hairline)
                         .testTag("chat_receipt_button")
                 ) {
                     Icon(
                         imageVector = Icons.Default.AddAPhoto,
                         contentDescription = "Pindai Struk Belanja",
-                        tint = if (hasPending || isAiProcessing) GhostWhite.copy(alpha = 0.45f) else SteelBlue
+                        tint = if (hasPending || isAiProcessing) InkMuted else Ink
                     )
                 }
 
-                TextField(
+                OutlinedTextField(
                     value = inputText,
                     onValueChange = { inputText = it },
                     enabled = !hasPending && !isAiProcessing,
@@ -1266,24 +1236,29 @@ fun ChatScreen(
                         }
                         Text(
                             placeholderText,
-                            color = if (hasPending || isAiProcessing) GhostWhite.copy(alpha = 0.45f) else GhostWhite.copy(alpha = 0.6f),
+                            color = InkMuted,
                             style = MaterialTheme.typography.bodyMedium
                         )
                     },
                     modifier = Modifier
                         .weight(1f)
                         .testTag("chat_input_field"),
-                    colors = TextFieldDefaults.colors(
-                        focusedContainerColor = SurfaceElevated,
-                        unfocusedContainerColor = SurfaceElevated,
-                        disabledContainerColor = SurfaceDisabled,
-                        focusedIndicatorColor = Color.Transparent,
-                        unfocusedIndicatorColor = Color.Transparent,
-                        disabledIndicatorColor = Color.Transparent,
-                        focusedTextColor = GhostWhite,
-                        unfocusedTextColor = GhostWhite,
-                        disabledTextColor = GhostWhite.copy(alpha = 0.45f),
-                        cursorColor = SteelBlue
+                    // Gaya kolom isian editorial: latar krem, bingkai rambut yang
+                    // menyala jingga saat fokus — sama seperti kolom di dialog.
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = Ink,
+                        unfocusedTextColor = Ink,
+                        disabledTextColor = InkMuted,
+                        focusedPlaceholderColor = InkMuted,
+                        unfocusedPlaceholderColor = InkMuted,
+                        disabledPlaceholderColor = InkMuted,
+                        focusedBorderColor = BurntOrange,
+                        unfocusedBorderColor = HairlineStrong,
+                        disabledBorderColor = Hairline,
+                        focusedContainerColor = Cream,
+                        unfocusedContainerColor = Cream,
+                        disabledContainerColor = Cream,
+                        cursorColor = BurntOrange
                     ),
                     shape = RoundedCornerShape(CornerRadius.md),
                     maxLines = 3,
@@ -1314,9 +1289,9 @@ fun ChatScreen(
                         .clip(CircleShape)
                         .background(
                             if (inputText.trim().isEmpty() || hasPending || isAiProcessing) {
-                                GhostWhite.copy(alpha = 0.08f)
+                                Hairline
                             } else {
-                                SteelBlue
+                                Ink
                             }
                         )
                         .testTag("chat_send_button"),
@@ -1326,9 +1301,9 @@ fun ChatScreen(
                         imageVector = Icons.AutoMirrored.Filled.Send,
                         contentDescription = "Kirim",
                         tint = if (inputText.trim().isEmpty() || hasPending || isAiProcessing) {
-                            GhostWhite.copy(alpha = 0.45f)
+                            InkMuted
                         } else {
-                            MidnightAbyss
+                            Cream
                         }
                     )
                 }

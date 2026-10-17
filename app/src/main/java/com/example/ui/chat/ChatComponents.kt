@@ -40,7 +40,10 @@ import com.example.ui.util.CategoryIconMapper
 
 @Composable
 fun UserMessageBubble(text: String) {
-    val bubbleShape = RoundedCornerShape(topStart = CornerRadius.lg, topEnd = CornerRadius.lg, bottomStart = CornerRadius.lg)
+    // Palet editorial: pesan pengguna jadi bidang tinta penuh (teks krem),
+    // jawaban AI tetap kartu inti terang. Pembedanya jadi kontras warna isi,
+    // bukan lagi gelembung kaca bergradien.
+    val bubbleShape = RoundedCornerShape(CornerRadius.bezelCore)
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -54,22 +57,12 @@ fun UserMessageBubble(text: String) {
             Box(
                 modifier = Modifier
                     .clip(bubbleShape)
-                    .background(GhostWhite.copy(alpha = 0.12f))
-                    .border(
-                        width = 1.dp,
-                        brush = Brush.verticalGradient(
-                            colors = listOf(
-                                GhostWhite.copy(alpha = 0.25f),
-                                GhostWhite.copy(alpha = 0.03f)
-                            )
-                        ),
-                        shape = bubbleShape
-                    )
+                    .background(Ink)
                     .padding(horizontal = Spacing.md, vertical = Spacing.sm)
             ) {
                 Text(
                     text = text,
-                    color = GhostWhite,
+                    color = Cream,
                     style = MaterialTheme.typography.bodyMedium
                 )
             }
@@ -79,7 +72,7 @@ fun UserMessageBubble(text: String) {
 
 @Composable
 fun UserImageMessageBubble(bitmap: Bitmap) {
-    val bubbleShape = RoundedCornerShape(topStart = CornerRadius.lg, topEnd = CornerRadius.lg, bottomStart = CornerRadius.lg)
+    val bubbleShape = RoundedCornerShape(CornerRadius.bezelCore)
 
     // Ukuran gambar ditetapkan eksplisit, dibatasi 250dp x 330dp dengan rasio
     // aslinya tetap. Sebelumnya lebar penuh gelembung (85% layar) sehingga foto
@@ -109,17 +102,7 @@ fun UserImageMessageBubble(bitmap: Bitmap) {
             Box(
                 modifier = Modifier
                     .clip(bubbleShape)
-                    .background(GhostWhite.copy(alpha = 0.12f))
-                    .border(
-                        width = 1.dp,
-                        brush = Brush.verticalGradient(
-                            colors = listOf(
-                                GhostWhite.copy(alpha = 0.25f),
-                                GhostWhite.copy(alpha = 0.03f)
-                            )
-                        ),
-                        shape = bubbleShape
-                    )
+                    .background(Ink)
                     .padding(6.dp)
             ) {
                 Image(
@@ -145,22 +128,13 @@ fun AiMessageBubble(
     isError: Boolean = false,
     onRetry: (() -> Unit)? = null
 ) {
-    val bubbleShape = RoundedCornerShape(topStart = CornerRadius.lg, topEnd = CornerRadius.lg, bottomEnd = CornerRadius.lg)
+    val bubbleShape = RoundedCornerShape(CornerRadius.bezelCore)
 
-    // Kegagalan diberi batas merah supaya beda jelas dari jawaban AI biasa.
+    // Kegagalan diberi batas aksen supaya beda jelas dari jawaban AI biasa.
     val bubbleBorder = if (isError) {
-        Modifier.border(1.dp, NeonRed.copy(alpha = 0.45f), bubbleShape)
+        Modifier.border(1.dp, BurntOrange.copy(alpha = 0.45f), bubbleShape)
     } else {
-        Modifier.border(
-            width = 1.dp,
-            brush = Brush.verticalGradient(
-                colors = listOf(
-                    GhostWhite.copy(alpha = 0.2f),
-                    GhostWhite.copy(alpha = 0.02f)
-                )
-            ),
-            shape = bubbleShape
-        )
+        Modifier.border(1.dp, Hairline, bubbleShape)
     }
 
     Box(
@@ -176,7 +150,7 @@ fun AiMessageBubble(
             Box(
                 modifier = Modifier
                     .clip(bubbleShape)
-                    .background(if (isError) NeonRed.copy(alpha = 0.10f) else TranslucentGlass)
+                    .background(if (isError) BurntOrange.copy(alpha = 0.08f) else CardCore)
                     .then(bubbleBorder)
                     .padding(horizontal = Spacing.md, vertical = Spacing.sm)
             ) {
@@ -185,7 +159,7 @@ fun AiMessageBubble(
                         Icon(
                             imageVector = Icons.Default.ErrorOutline,
                             contentDescription = null,
-                            tint = NeonRed,
+                            tint = BurntOrange,
                             modifier = Modifier
                                 .padding(top = 2.dp)
                                 .size(16.dp)
@@ -194,7 +168,7 @@ fun AiMessageBubble(
                     }
                     Text(
                         text = text,
-                        color = GhostWhite,
+                        color = Ink,
                         style = MaterialTheme.typography.bodyMedium
                     )
                 }
@@ -206,7 +180,7 @@ fun AiMessageBubble(
                     onClick = onRetry,
                     modifier = Modifier.testTag("retry_ai_button"),
                     contentPadding = PaddingValues(horizontal = Spacing.sm, vertical = Spacing.xs),
-                    colors = ButtonDefaults.textButtonColors(contentColor = NeonRed)
+                    colors = ButtonDefaults.textButtonColors(contentColor = BurntOrange)
                 ) {
                     Icon(
                         imageVector = Icons.Default.Refresh,
@@ -237,8 +211,8 @@ fun ConfirmationTransactionCard(record: FinancialRecord) {
             .fillMaxWidth(0.95f)
             .testTag("confirmation_card"),
         shape = RoundedCornerShape(CornerRadius.md),
-        colors = CardDefaults.cardColors(containerColor = SurfaceElevated),
-        border = BorderStroke(1.dp, TranslucentBorder)
+        colors = CardDefaults.cardColors(containerColor = CardCore),
+        border = BorderStroke(1.dp, Hairline)
     ) {
         Column(
             modifier = Modifier.padding(Spacing.lg),
@@ -250,18 +224,18 @@ fun ConfirmationTransactionCard(record: FinancialRecord) {
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 modifier = Modifier
                     .clip(RoundedCornerShape(6.dp))
-                    .background(NeonGreen.copy(alpha = 0.15f))
+                    .background(ForestGreen.copy(alpha = 0.12f))
                     .padding(horizontal = Spacing.sm, vertical = Spacing.xs)
             ) {
                 Icon(
                     imageVector = Icons.Default.Check,
                     contentDescription = null,
-                    tint = NeonGreen,
+                    tint = ForestGreen,
                     modifier = Modifier.size(14.dp)
                 )
                 Text(
                     text = "Tersimpan",
-                    color = NeonGreen,
+                    color = ForestGreen,
                     style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold)
                 )
             }
@@ -270,19 +244,19 @@ fun ConfirmationTransactionCard(record: FinancialRecord) {
             Column {
                 Text(
                     text = record.description,
-                    color = GhostWhite,
+                    color = Ink,
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
                 )
                 Spacer(modifier = Modifier.height(2.dp))
                 val isIncome = record.type == "income"
                 Text(
                     text = "${if (isIncome) "+" else "-"} ${FormatUtils.formatRupiah(record.amount)}",
-                    color = if (isIncome) NeonGreen else NeonRed,
+                    color = if (isIncome) ForestGreen else BurntOrange,
                     style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.ExtraBold)
                 )
             }
 
-            HorizontalDivider(color = GhostWhite.copy(alpha = 0.1f))
+            HorizontalDivider(color = Hairline)
 
             // Metadata Detail Grid (Kategori, Tanggal, Notes)
             Row(
@@ -304,13 +278,13 @@ fun ConfirmationTransactionCard(record: FinancialRecord) {
                         Icon(
                             imageVector = CategoryIconMapper.getIcon(record.category),
                             contentDescription = "Kategori",
-                            tint = SteelBlue,
+                            tint = InkMuted,
                             modifier = Modifier.size(16.dp)
                         )
                     }
                     Text(
                         text = cleanCategory,
-                        color = GhostWhite.copy(alpha = 0.75f),
+                        color = InkMuted,
                         style = MaterialTheme.typography.labelMedium
                     )
                 }
@@ -323,12 +297,12 @@ fun ConfirmationTransactionCard(record: FinancialRecord) {
                     Icon(
                         imageVector = Icons.Default.DateRange,
                         contentDescription = "Tanggal",
-                        tint = SteelBlue,
+                        tint = InkMuted,
                         modifier = Modifier.size(16.dp)
                     )
                     Text(
                         text = FormatUtils.formatDate(record.date),
-                        color = GhostWhite.copy(alpha = 0.75f),
+                        color = InkMuted,
                         style = MaterialTheme.typography.labelMedium
                     )
                 }
@@ -352,14 +326,9 @@ fun TypingIndicatorRow() {
         ) {
             Box(
                 modifier = Modifier
-                    .clip(
-                        RoundedCornerShape(
-                            topStart = CornerRadius.lg,
-                            topEnd = CornerRadius.lg,
-                            bottomEnd = CornerRadius.lg
-                        )
-                    )
-                    .background(SurfaceElevated)
+                    .clip(RoundedCornerShape(CornerRadius.bezelCore))
+                    .background(CardCore)
+                    .border(1.dp, Hairline, RoundedCornerShape(CornerRadius.bezelCore))
             ) {
                 TypingIndicatorBubble()
             }
@@ -419,9 +388,9 @@ fun TypingIndicatorBubble() {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(Spacing.xs)
     ) {
-        Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(GhostWhite.copy(alpha = dot1Alpha)))
-        Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(GhostWhite.copy(alpha = dot2Alpha)))
-        Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(GhostWhite.copy(alpha = dot3Alpha)))
+        Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(Ink.copy(alpha = dot1Alpha)))
+        Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(Ink.copy(alpha = dot2Alpha)))
+        Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(Ink.copy(alpha = dot3Alpha)))
     }
 }
 
@@ -438,17 +407,9 @@ fun ScanningReceiptIndicatorRow() {
         Card(
             modifier = Modifier
                 .fillMaxWidth(0.95f)
-                .clip(RoundedCornerShape(topStart = 4.dp, topEnd = CornerRadius.xl, bottomStart = CornerRadius.xl, bottomEnd = CornerRadius.xl)),
-            colors = CardDefaults.cardColors(containerColor = SurfaceDeep),
-            border = BorderStroke(
-                width = 1.dp,
-                brush = Brush.verticalGradient(
-                    colors = listOf(
-                        SteelBlue.copy(alpha = 0.50f),
-                        SteelBlue.copy(alpha = 0.10f)
-                    )
-                )
-            )
+                .clip(RoundedCornerShape(CornerRadius.bezelCore)),
+            colors = CardDefaults.cardColors(containerColor = CardCore),
+            border = BorderStroke(1.dp, Hairline)
         ) {
             val transition = rememberInfiniteTransition(label = "scanning_receipt")
             
@@ -496,7 +457,8 @@ fun ScanningReceiptIndicatorRow() {
                     modifier = Modifier
                         .size(56.dp)
                         .clip(RoundedCornerShape(14.dp))
-                        .background(SurfaceViolet),
+                        .background(CreamRaised)
+                        .border(1.dp, Hairline, RoundedCornerShape(14.dp)),
                     contentAlignment = Alignment.Center
                 ) {
                     // Moving scan line (laser) drawn behind/above
@@ -509,7 +471,7 @@ fun ScanningReceiptIndicatorRow() {
                                 brush = Brush.horizontalGradient(
                                     colors = listOf(
                                         Color.Transparent,
-                                        SteelBlue,
+                                        BurntOrange,
                                         Color.Transparent
                                     )
                                 )
@@ -524,10 +486,10 @@ fun ScanningReceiptIndicatorRow() {
                                 drawArc(
                                     brush = Brush.sweepGradient(
                                         colors = listOf(
-                                            SteelBlue.copy(alpha = 0.1f),
-                                            SteelBlue,
-                                            SteelBlue.copy(alpha = 0.7f),
-                                            SteelBlue.copy(alpha = 0.1f)
+                                            BurntOrange.copy(alpha = 0.1f),
+                                            BurntOrange,
+                                            BurntOrange.copy(alpha = 0.7f),
+                                            BurntOrange.copy(alpha = 0.1f)
                                         )
                                     ),
                                     startAngle = ringRotation,
@@ -544,7 +506,7 @@ fun ScanningReceiptIndicatorRow() {
                     Icon(
                         imageVector = Icons.Default.ReceiptLong,
                         contentDescription = "Fitur OCR / Membaca Struk",
-                        tint = SteelBlue,
+                        tint = BurntOrange,
                         modifier = Modifier
                             .size(24.dp)
                             .scale(iconScale)
@@ -565,13 +527,13 @@ fun ScanningReceiptIndicatorRow() {
                             text = "Memproses struk belanja Anda...",
                             style = MaterialTheme.typography.titleMedium.copy(
                                 fontWeight = FontWeight.Bold,
-                                color = GhostWhite
+                                color = Ink
                             )
                         )
                         Icon(
                             imageVector = Icons.Default.AutoAwesome,
                             contentDescription = "Kecerdasan Buatan",
-                            tint = SteelBlue,
+                            tint = BurntOrange,
                             modifier = Modifier
                                 .size(14.dp)
                                 .scale(iconScale)
@@ -583,7 +545,7 @@ fun ScanningReceiptIndicatorRow() {
                     Text(
                         text = "Membaca nominal belanja, tanggal & rincian transaksi menggunakan AI. Mohon tidak menutup layar ini ya 😊",
                         style = MaterialTheme.typography.bodySmall.copy(
-                            color = GhostWhite.copy(alpha = 0.75f)
+                            color = InkMuted
                         )
                     )
                 }
