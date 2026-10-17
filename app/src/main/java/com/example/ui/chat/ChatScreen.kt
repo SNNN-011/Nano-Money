@@ -7,11 +7,13 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -25,15 +27,19 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.example.data.FinancialRecord
+import com.example.domain.ParsedReceipt
 import com.example.ui.theme.*
 import com.example.ui.config.AiModelConfig
 import com.example.ui.config.FormatUtils
@@ -57,9 +63,11 @@ import kotlinx.coroutines.launch
 import com.example.util.FirebaseSyncHelper
 import com.example.data.remote.ExtractionResult
 import com.example.ui.common.CustomDatePickerDialog
+import com.example.ui.components.DashedDivider
 import com.example.ui.components.EditorialButton
 import com.example.ui.components.EditorialButtonStyle
 import com.example.ui.components.EditorialDialog
+import com.example.ui.components.EditorialPill
 import com.example.ui.components.Eyebrow
 import com.example.ui.components.HairlineDivider
 
@@ -467,732 +475,70 @@ private fun ChatScreenContent(
 
             HairlineDivider()
 
-            // Chat History Area
-            LazyColumn(
-                state = listState,
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-                    .padding(horizontal = Spacing.md)
-                    .testTag("chat_messages_list"),
-                verticalArrangement = Arrangement.spacedBy(Spacing.md),
-                contentPadding = PaddingValues(top = Spacing.lg, bottom = Spacing.lg),
-                reverseLayout = true
-            ) {
-                // reverseLayout: item pertama tampil paling bawah. Tombol batal
-                // ditaruh paling bawah supaya selalu terlihat saat AI memproses.
-                if (isAiProcessing) {
-                    item(key = "cancel_ai_request") {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.Center
-                        ) {
-                            TextButton(
-                                onClick = { viewModel.cancelAiProcessing() },
-                                modifier = Modifier.testTag("cancel_ai_request_button")
-                            ) {
-                                Text(
-                                    "Batalkan permintaan AI",
-                                    color = InkMuted,
-                                    style = MaterialTheme.typography.labelMedium
-                                )
-                            }
-                        }
-                    }
-                }
-                items(messages.asReversed()) { message ->
-                    when (message) {
-                        is ChatMessage.UserMessage -> {
-                            UserMessageBubble(text = message.text)
-                        }
-                        is ChatMessage.UserImageMessage -> {
-                            UserImageMessageBubble(bitmap = message.bitmap)
-                        }
-                        is ChatMessage.AiMessage -> {
-                            AiMessageBubble(
-                                text = message.text,
-                                record = message.record,
-                                isError = message.isError,
-                                // Tombol "Coba Lagi" hanya untuk kegagalan yang
-                                // teks aslinya masih tersimpan.
-                                onRetry = message.retryText?.let { { viewModel.retryMessage(message) } }
-                            )
-                        }
-                        is ChatMessage.TypingIndicator -> {
-                            TypingIndicatorRow()
-                        }
-                        is ChatMessage.ScanningReceiptIndicator -> {
-                            ScanningReceiptIndicatorRow()
-                        }
-                    }
-                }
-            }
-
             val pendingConfirmation by viewModel.pendingConfirmation.collectAsState()
             val pendingReceiptConfirmation by viewModel.pendingReceiptConfirmation.collectAsState()
             val hasPending = pendingConfirmation != null || pendingReceiptConfirmation != null
 
-            if (pendingConfirmation != null) {
-                val pending = pendingConfirmation!!
-                var isPendingCardExpanded by rememberSaveable { mutableStateOf(false) }
-
-                Card(
+            // Saat ada transaksi yang menunggu diperiksa, daftar pesan diganti
+            // lembar konfirmasi. Cuma ada SATU area bergulir: dulu isi kartu
+            // digulir di dalam daftar pesan, jadi gulirnya bersarang dan sebagian
+            // isian tersembunyi.
+            if (hasPending) {
+                Column(
                     modifier = Modifier
+                        .weight(1f)
                         .fillMaxWidth()
-                        .padding(horizontal = Spacing.lg, vertical = Spacing.xs)
-                        .testTag("inline_edit_transaction_card"),
-                    shape = RoundedCornerShape(CornerRadius.bezelCore),
-                    colors = CardDefaults.cardColors(containerColor = CardCore),
-                    border = BorderStroke(1.dp, Hairline)
                 ) {
                     Column(
                         modifier = Modifier
-                            .padding(Spacing.md)
-                            // Isi kartu dibatasi dan digulir sendiri supaya di layar
-                            // kecil input bar tidak terdorong keluar layar. Tombol
-                            // Ya/Batal ada DI LUAR kartu, jadi tetap terlihat.
-                            .heightIn(max = 320.dp)
-                            .verticalScroll(rememberScrollState()),
-                        verticalArrangement = Arrangement.spacedBy(Spacing.sm)
+                            .weight(1f)
+                            .fillMaxWidth()
+                            .verticalScroll(rememberScrollState())
+                            .padding(horizontal = Spacing.lg, vertical = Spacing.md),
+                        verticalArrangement = Arrangement.spacedBy(Spacing.md)
                     ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable(
-                                    onClickLabel = if (isPendingCardExpanded) "Tutup penyesuaian" else "Ubah penyesuaian"
-                                ) { isPendingCardExpanded = !isPendingCardExpanded }
-                                .padding(vertical = Spacing.xs),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Eyebrow(text = "Sesuaikan transaksi AI", color = Ink)
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(
-                                    text = if (isPendingCardExpanded) "Tutup" else "Ubah",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = InkMuted,
-                                    modifier = Modifier.padding(end = 4.dp)
-                                )
-                                Icon(
-                                    imageVector = if (isPendingCardExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                                    contentDescription = null,
-                                    tint = InkMuted,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                            }
+                        pendingConfirmation?.let { pending ->
+                            PendingTransactionSheet(
+                                pending = pending,
+                                viewModel = viewModel,
+                                onPickDate = { showPendingDatePicker = true }
+                            )
                         }
-                        
-                        if (!isPendingCardExpanded) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(CreamRaised)
-                                    .padding(8.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                val isIncome = pending.type?.lowercase() == "income" || pending.type?.lowercase() == "pemasukan"
-                                val typeIcon = if (isIncome) "🟢 Masuk" else "🔴 Keluar"
-                                val amtStr = FormatUtils.formatRupiah(pending.amount ?: 0L)
-                                val desc = if (pending.description.isNullOrBlank()) "Tanpa deskripsi" else pending.description
-                                val category = pending.category ?: "Umum"
-
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = "$typeIcon  $amtStr",
-                                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
-                                        color = Ink
-                                    )
-                                    Spacer(modifier = Modifier.height(2.dp))
-                                    Text(
-                                        text = "$desc (${category})",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = InkMuted
-                                    )
-                                }
-                            }
-                        } else {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                // Type tag toggle
-                                val isIncome = pending.type?.lowercase() == "income" || pending.type?.lowercase() == "pemasukan"
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .background(CreamRaised)
-                                        .border(1.dp, Hairline, RoundedCornerShape(8.dp))
-                                        .clickable {
-                                            val newType = if (isIncome) "expense" else "income"
-                                            viewModel.updatePendingTransaction(pending.copy(type = newType))
-                                        }
-                                        .padding(horizontal = 8.dp, vertical = 6.dp),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text(
-                                        text = if (isIncome) "🟢 Masuk" else "🔴 Keluar",
-                                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
-                                        color = Ink
-                                    )
-                                }
-
-                                // Category selector tag
-                                val incomeCategories by viewModel.incomeCategories.collectAsState()
-                                val expenseCategories by viewModel.expenseCategories.collectAsState()
-                                val cats = if (isIncome) incomeCategories else expenseCategories
-                                var categoryDropdownExpanded by remember { mutableStateOf(false) }
-
-                                Box {
-                                    Row(
-                                        modifier = Modifier
-                                            .clip(RoundedCornerShape(8.dp))
-                                            .background(CreamRaised)
-                                            .border(1.dp, Hairline, RoundedCornerShape(8.dp))
-                                            .clickable { categoryDropdownExpanded = true }
-                                            .padding(horizontal = 8.dp, vertical = 6.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                    ) {
-                                        val currentCat = pending.category ?: "Kategori"
-                                        Text(
-                                            text = currentCat,
-                                            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
-                                            color = Ink,
-                                            maxLines = 1
-                                        )
-                                        Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = InkMuted, modifier = Modifier.size(14.dp))
-                                    }
-
-                                    DropdownMenu(
-                                        expanded = categoryDropdownExpanded,
-                                        onDismissRequest = { categoryDropdownExpanded = false },
-                                        modifier = Modifier.background(CreamRaised).border(1.dp, Hairline)
-                                    ) {
-                                        cats.forEach { categoryLabel ->
-                                            val (_, label) = CategoryIconMapper.extractEmojiAndLabel(categoryLabel)
-                                            DropdownMenuItem(
-                                                text = { Text(categoryLabel, color = Ink) },
-                                                onClick = {
-                                                    viewModel.updatePendingTransaction(pending.copy(category = label))
-                                                    categoryDropdownExpanded = false
-                                                }
-                                            )
-                                        }
-                                    }
-                                }
-
-                                // Amount block (compact basic input field)
-                                val amtStr = if (pending.amount == null || pending.amount == 0L) "" else FormatUtils.formatInputNumber(pending.amount.toString())
-                                val amtFieldValue = remember(amtStr) { androidx.compose.ui.text.input.TextFieldValue(amtStr, androidx.compose.ui.text.TextRange(amtStr.length)) }
-                                Row(
-                                    modifier = Modifier
-                                        .weight(1f)
-                                        .clip(RoundedCornerShape(8.dp))
-                                        .background(CreamRaised)
-                                        .border(1.dp, Hairline, RoundedCornerShape(8.dp))
-                                        .padding(horizontal = 8.dp, vertical = 6.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text("Rp", style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold), color = InkMuted)
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    androidx.compose.foundation.text.BasicTextField(
-                                        value = amtFieldValue,
-                                        onValueChange = { field ->
-                                            val clean = field.text.replace(".", "")
-                                            if (clean.length <= 11) {
-                                                val parsedAmt = clean.toLongOrNull() ?: 0L
-                                                viewModel.updatePendingTransaction(pending.copy(amount = parsedAmt))
-                                            }
-                                        },
-                                        textStyle = MaterialTheme.typography.bodySmall.copy(color = Ink, fontWeight = FontWeight.Bold),
-                                        cursorBrush = androidx.compose.ui.graphics.SolidColor(Ink),
-                                        singleLine = true,
-                                        keyboardOptions = KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
-                                        modifier = Modifier.fillMaxWidth()
-                                    )
-                                }
-                            }
-
-                            // Row 2: Description
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(CreamRaised)
-                                    .border(1.dp, Hairline, RoundedCornerShape(8.dp))
-                                    .padding(horizontal = 8.dp, vertical = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(Icons.Default.Edit, contentDescription = null, tint = InkMuted, modifier = Modifier.size(14.dp))
-                                Spacer(modifier = Modifier.width(6.dp))
-                                androidx.compose.foundation.text.BasicTextField(
-                                    value = pending.description ?: "",
-                                    onValueChange = { newValue ->
-                                        if (newValue.length <= 20) viewModel.updatePendingTransaction(pending.copy(description = newValue))
-                                    },
-                                    textStyle = MaterialTheme.typography.bodySmall.copy(color = Ink),
-                                    cursorBrush = androidx.compose.ui.graphics.SolidColor(Ink),
-                                    singleLine = true,
-                                    modifier = Modifier.fillMaxWidth()
-                                )
-                            }
-
-                            // Row 3: Notes
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(CreamRaised)
-                                    .border(1.dp, Hairline, RoundedCornerShape(8.dp))
-                                    .padding(horizontal = 8.dp, vertical = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(Icons.Default.Info, contentDescription = null, tint = InkMuted, modifier = Modifier.size(14.dp))
-                                Spacer(modifier = Modifier.width(6.dp))
-                                androidx.compose.foundation.text.BasicTextField(
-                                    value = pending.notes ?: "",
-                                    onValueChange = { newValue ->
-                                        if (newValue.length <= 100) viewModel.updatePendingTransaction(pending.copy(notes = newValue))
-                                    },
-                                    textStyle = MaterialTheme.typography.bodySmall.copy(color = InkMuted),
-                                    cursorBrush = androidx.compose.ui.graphics.SolidColor(Ink),
-                                    singleLine = true,
-                                    modifier = Modifier.fillMaxWidth()
-                                )
-                            }
-
-                            // Row 4: Date selection
-                            val curDate = pending.date ?: System.currentTimeMillis()
-                            val formattedDate = java.text.SimpleDateFormat(
-                                "dd MMM yyyy", 
-                                java.util.Locale.forLanguageTag("id")
-                            ).format(java.util.Date(curDate))
-                            
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(CreamRaised)
-                                    .border(1.dp, Hairline, RoundedCornerShape(8.dp))
-                                    .clickable { showPendingDatePicker = true }
-                                    .padding(horizontal = 8.dp, vertical = 6.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(Icons.Default.CalendarToday, contentDescription = null, tint = InkMuted, modifier = Modifier.size(14.dp))
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text(
-                                    text = "Tanggal: $formattedDate",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = Ink,
-                                    modifier = Modifier.weight(1f)
-                                )
-                                Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = InkMuted, modifier = Modifier.size(14.dp))
-                            }
+                        pendingReceiptConfirmation?.let { receipt ->
+                            PendingReceiptSheet(
+                                receipt = receipt,
+                                viewModel = viewModel,
+                                onPickDate = { showReceiptDatePicker = true }
+                            )
                         }
                     }
-                }
 
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(CreamRaised)
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    EditorialButton(
-                        text = "Ya, Simpan",
-                        onClick = { viewModel.confirmPendingTransaction() },
-                        modifier = Modifier.weight(1f),
-                        // Separuh lebar: panah dimatikan supaya label tetap satu baris.
-                        trailingArrow = false,
-                        testTag = "confirm_yes_button"
-                    )
-
-                    EditorialButton(
-                        text = "Batal",
-                        onClick = { viewModel.cancelPendingTransaction() },
-                        modifier = Modifier.weight(1f),
-                        style = EditorialButtonStyle.Ghost,
-                        trailingArrow = false,
-                        testTag = "confirm_no_button"
-                    )
-                }
-            }
-
-            if (pendingReceiptConfirmation != null) {
-                val receipt = pendingReceiptConfirmation!!
-                var expandedReceiptIndices by remember { mutableStateOf(setOf<Int>()) }
-                var isReceiptCardExpanded by rememberSaveable { mutableStateOf(false) }
-
-                Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = Spacing.lg, vertical = Spacing.xs)
-                        .testTag("receipt_edit_card"),
-                    shape = RoundedCornerShape(CornerRadius.bezelCore),
-                    colors = CardDefaults.cardColors(containerColor = CardCore),
-                    border = BorderStroke(1.dp, Hairline)
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .padding(Spacing.md)
-                            // Alasan sama dengan kartu transaksi: isi dibatasi dan
-                            // digulir sendiri, tombol konfirmasi tetap di luar kartu.
-                            .heightIn(max = 320.dp)
-                            .verticalScroll(rememberScrollState()),
-                        verticalArrangement = Arrangement.spacedBy(Spacing.sm)
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable(
-                                    onClickLabel = if (isReceiptCardExpanded) "Tutup penyesuaian" else "Ubah penyesuaian"
-                                ) { isReceiptCardExpanded = !isReceiptCardExpanded }
-                                .padding(vertical = Spacing.xs),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Eyebrow(text = "Sesuaikan struk belanja AI", color = Ink)
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(
-                                    text = if (isReceiptCardExpanded) "Tutup" else "Ubah",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = InkMuted,
-                                    modifier = Modifier.padding(end = 4.dp)
-                                )
-                                Icon(
-                                    imageVector = if (isReceiptCardExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                                    contentDescription = null,
-                                    tint = InkMuted,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                            }
-                        }
-
-                        if (!isReceiptCardExpanded) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(CreamRaised)
-                                    .padding(8.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(Icons.Default.Store, contentDescription = null, tint = InkMuted, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = receipt.title.ifBlank { "Struk Belanja AI" },
-                                        style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
-                                        color = Ink
-                                    )
-                                    Spacer(modifier = Modifier.height(2.dp))
-                                    Text(
-                                        text = "${receipt.grouped.size} kategori transaksi  •  Total: ${FormatUtils.formatRupiah(receipt.total)}",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = InkMuted
-                                    )
-                                }
-                            }
-                        } else {
-
-                        // 1. Merchant Title
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(Ink.copy(alpha = 0.04f))
-                                .border(1.dp, Hairline, RoundedCornerShape(8.dp))
-                                .padding(horizontal = 8.dp, vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(Icons.Default.Store, contentDescription = null, tint = InkMuted, modifier = Modifier.size(14.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            androidx.compose.foundation.text.BasicTextField(
-                                value = receipt.title,
-                                onValueChange = { newValue ->
-                                    viewModel.updatePendingReceipt(receipt.copy(title = newValue))
-                                },
-                                textStyle = MaterialTheme.typography.bodySmall.copy(color = Ink, fontWeight = FontWeight.Bold),
-                                cursorBrush = androidx.compose.ui.graphics.SolidColor(Ink),
-                                singleLine = true,
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                        }
-
-                        // 2. Date row
-                        val formattedReceiptDate = java.text.SimpleDateFormat(
-                            "dd MMM yyyy",
-                            java.util.Locale.forLanguageTag("id")
-                        ).format(java.util.Date(receipt.dateMillis))
-
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(CreamRaised)
-                                .border(1.dp, Hairline, RoundedCornerShape(8.dp))
-                                .clickable { showReceiptDatePicker = true }
-                                .padding(horizontal = 8.dp, vertical = 6.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(Icons.Default.CalendarToday, contentDescription = null, tint = InkMuted, modifier = Modifier.size(14.dp))
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = "Tanggal: $formattedReceiptDate",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = Ink,
-                                modifier = Modifier.weight(1f)
-                            )
-                            Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = InkMuted, modifier = Modifier.size(14.dp))
-                        }
-
-                        // 3. Collapsible Categories List
-                        Text(
-                            text = "Rencana Catatan Transaksi (Dapat Dibuka-Tutup):",
-                            style = MaterialTheme.typography.labelSmall.copy(color = InkMuted),
-                            modifier = Modifier.padding(top = 4.dp)
+                    // Tombol keputusan tidak ikut tergulir supaya selalu terlihat
+                    // dan tetap menempel di bawah lembarnya.
+                    if (pendingConfirmation != null) {
+                        ConfirmFooter(
+                            onCancel = { viewModel.cancelPendingTransaction() },
+                            onConfirm = { viewModel.confirmPendingTransaction() },
+                            confirmTag = "confirm_yes_button",
+                            cancelTag = "confirm_no_button"
                         )
-
-                        receipt.grouped.forEachIndexed { index, grp ->
-                            val isExpanded = expandedReceiptIndices.contains(index)
-                            Card(
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(10.dp),
-                                colors = CardDefaults.cardColors(containerColor = CreamRaised),
-                                border = BorderStroke(1.dp, Hairline)
-                            ) {
-                                Column(modifier = Modifier.padding(8.dp)) {
-                                    // Header
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .clickable {
-                                                expandedReceiptIndices = if (isExpanded) {
-                                                    expandedReceiptIndices - index
-                                                } else {
-                                                    expandedReceiptIndices + index
-                                                }
-                                            },
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                            modifier = Modifier.weight(1f)
-                                        ) {
-                                            Text(grp.emoji, fontSize = 14.sp)
-                                            Text(
-                                                text = grp.category,
-                                                style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
-                                                color = Ink,
-                                                maxLines = 1
-                                            )
-                                            Text(
-                                                text = grp.description.ifBlank { "" },
-                                                style = MaterialTheme.typography.bodySmall.copy(color = InkMuted),
-                                                maxLines = 1,
-                                                modifier = Modifier.padding(start = 4.dp)
-                                            )
-                                        }
-
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                                        ) {
-                                            Text(
-                                                text = FormatUtils.formatRupiah(grp.amount),
-                                                style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
-                                                color = Ink
-                                            )
-                                            Icon(
-                                                imageVector = if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                                                contentDescription = if (isExpanded) "Sembunyikan" else "Tampilkan",
-                                                tint = InkMuted,
-                                                modifier = Modifier.size(16.dp)
-                                            )
-                                        }
-                                    }
-
-                                    // Content settings if expanded
-                                    if (isExpanded) {
-                                        Spacer(modifier = Modifier.height(10.dp))
-                                        
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            val isItemIncome = grp.type == "income"
-                                            
-                                            // Item Type toggle
-                                            Box(
-                                                modifier = Modifier
-                                                    .clip(RoundedCornerShape(6.dp))
-                                                    .background(CreamRaised)
-                                                    .border(1.dp, Hairline, RoundedCornerShape(6.dp))
-                                                    .clickable {
-                                                        val newType = if (isItemIncome) "expense" else "income"
-                                                        val updatedGrouped = receipt.grouped.toMutableList()
-                                                        updatedGrouped[index] = grp.copy(type = newType)
-                                                        viewModel.updatePendingReceipt(receipt.copy(grouped = updatedGrouped))
-                                                    }
-                                                    .padding(horizontal = 6.dp, vertical = 4.dp),
-                                                contentAlignment = Alignment.Center
-                                            ) {
-                                                Text(
-                                                    text = if (isItemIncome) "🟢 Masuk" else "🔴 Keluar",
-                                                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp, fontWeight = FontWeight.Bold),
-                                                    color = Ink
-                                                )
-                                            }
-
-                                            // Item Category dropdown
-                                            val incomeCategories by viewModel.incomeCategories.collectAsState()
-                                            val expenseCategories by viewModel.expenseCategories.collectAsState()
-                                            val cats = if (isItemIncome) incomeCategories else expenseCategories
-                                            var itemDropdownExpanded by remember { mutableStateOf(false) }
-
-                                            Box {
-                                                Row(
-                                                    modifier = Modifier
-                                                        .clip(RoundedCornerShape(6.dp))
-                                                        .background(CreamRaised)
-                                                        .border(1.dp, Hairline, RoundedCornerShape(6.dp))
-                                                        .clickable { itemDropdownExpanded = true }
-                                                        .padding(horizontal = 6.dp, vertical = 4.dp),
-                                                    verticalAlignment = Alignment.CenterVertically,
-                                                    horizontalArrangement = Arrangement.spacedBy(2.dp)
-                                                ) {
-                                                    Text(
-                                                        text = grp.category,
-                                                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp, fontWeight = FontWeight.Bold),
-                                                        color = Ink,
-                                                        maxLines = 1
-                                                    )
-                                                    Icon(Icons.Default.ArrowDropDown, contentDescription = null, tint = InkMuted, modifier = Modifier.size(12.dp))
-                                                }
-
-                                                DropdownMenu(
-                                                    expanded = itemDropdownExpanded,
-                                                    onDismissRequest = { itemDropdownExpanded = false },
-                                                    modifier = Modifier.background(CreamRaised).border(1.dp, Hairline)
-                                                ) {
-                                                    cats.forEach { categoryLabel ->
-                                                        val (_, label) = CategoryIconMapper.extractEmojiAndLabel(categoryLabel)
-                                                        DropdownMenuItem(
-                                                            text = { Text(categoryLabel, color = Ink, fontSize = 12.sp) },
-                                                            onClick = {
-                                                                val updatedGrouped = receipt.grouped.toMutableList()
-                                                                updatedGrouped[index] = grp.copy(category = label)
-                                                                viewModel.updatePendingReceipt(receipt.copy(grouped = updatedGrouped))
-                                                                itemDropdownExpanded = false
-                                                            }
-                                                        )
-                                                    }
-                                                }
-                                            }
-
-                                            // Item Amount basic numeric field
-                                            val grpAmtStr = if (grp.amount == 0L) "" else FormatUtils.formatInputNumber(grp.amount.toString())
-                                            val grpAmtFieldValue = remember(grpAmtStr) { androidx.compose.ui.text.input.TextFieldValue(grpAmtStr, androidx.compose.ui.text.TextRange(grpAmtStr.length)) }
-                                            Row(
-                                                modifier = Modifier
-                                                    .weight(1f)
-                                                    .clip(RoundedCornerShape(6.dp))
-                                                    .background(CreamRaised)
-                                                    .border(1.dp, Hairline, RoundedCornerShape(6.dp))
-                                                    .padding(horizontal = 6.dp, vertical = 4.dp),
-                                                verticalAlignment = Alignment.CenterVertically
-                                            ) {
-                                                Text("Rp", style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp, fontWeight = FontWeight.Bold), color = InkMuted)
-                                                Spacer(modifier = Modifier.width(3.dp))
-                                                androidx.compose.foundation.text.BasicTextField(
-                                                    value = grpAmtFieldValue,
-                                                    onValueChange = { field ->
-                                                        val clean = field.text.replace(".", "")
-                                                        if (clean.length <= 11) {
-                                                            val parsedAmt = clean.toLongOrNull() ?: 0L
-                                                            val updatedGrouped = receipt.grouped.toMutableList()
-                                                            updatedGrouped[index] = grp.copy(amount = parsedAmt)
-                                                            val newTotal = updatedGrouped.sumOf { it.amount }
-                                                            viewModel.updatePendingReceipt(receipt.copy(grouped = updatedGrouped, total = newTotal))
-                                                        }
-                                                    },
-                                                    textStyle = MaterialTheme.typography.bodySmall.copy(color = Ink, fontSize = 11.sp, fontWeight = FontWeight.Bold),
-                                                    cursorBrush = androidx.compose.ui.graphics.SolidColor(Ink),
-                                                    singleLine = true,
-                                                    keyboardOptions = KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
-                                                    modifier = Modifier.fillMaxWidth()
-                                                )
-                                            }
-                                        }
-
-                                        Spacer(modifier = Modifier.height(6.dp))
-
-                                        // Item Description basic field
-                                        Row(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .clip(RoundedCornerShape(6.dp))
-                                                .background(CreamRaised)
-                                                .border(1.dp, Hairline, RoundedCornerShape(6.dp))
-                                                .padding(horizontal = 6.dp, vertical = 4.dp),
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Icon(Icons.Default.Edit, contentDescription = null, tint = InkMuted, modifier = Modifier.size(12.dp))
-                                            Spacer(modifier = Modifier.width(4.dp))
-                                            androidx.compose.foundation.text.BasicTextField(
-                                                value = grp.description,
-                                                onValueChange = { newValue ->
-                                                    if (newValue.length <= 20) {
-                                                        val updatedGrouped = receipt.grouped.toMutableList()
-                                                        updatedGrouped[index] = grp.copy(description = newValue)
-                                                        viewModel.updatePendingReceipt(receipt.copy(grouped = updatedGrouped))
-                                                    }
-                                                },
-                                                textStyle = MaterialTheme.typography.bodySmall.copy(color = Ink, fontSize = 11.sp),
-                                                cursorBrush = androidx.compose.ui.graphics.SolidColor(Ink),
-                                                singleLine = true,
-                                                modifier = Modifier.fillMaxWidth()
-                                            )
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        }
+                    } else if (pendingReceiptConfirmation != null) {
+                        ConfirmFooter(
+                            onCancel = { viewModel.cancelPendingReceipt() },
+                            onConfirm = { viewModel.confirmPendingReceipt() },
+                            confirmTag = "confirm_receipt_yes_button",
+                            cancelTag = "confirm_receipt_no_button"
+                        )
                     }
                 }
-
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(CreamRaised)
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    EditorialButton(
-                        text = "Ya, Simpan",
-                        onClick = { viewModel.confirmPendingReceipt() },
-                        modifier = Modifier.weight(1f),
-                        // Separuh lebar: panah dimatikan supaya label tetap satu baris.
-                        trailingArrow = false,
-                        testTag = "confirm_receipt_yes_button"
-                    )
-
-                    EditorialButton(
-                        text = "Batal",
-                        onClick = { viewModel.cancelPendingReceipt() },
-                        modifier = Modifier.weight(1f),
-                        style = EditorialButtonStyle.Ghost,
-                        trailingArrow = false,
-                        testTag = "confirm_receipt_no_button"
-                    )
-                }
+            } else {
+                ChatMessageList(
+                    messages = messages,
+                    isAiProcessing = isAiProcessing,
+                    listState = listState,
+                    viewModel = viewModel,
+                    modifier = Modifier.weight(1f)
+                )
             }
 
             HairlineDivider()
@@ -1245,21 +591,7 @@ private fun ChatScreenContent(
                         .testTag("chat_input_field"),
                     // Gaya kolom isian editorial: latar krem, bingkai rambut yang
                     // menyala jingga saat fokus — sama seperti kolom di dialog.
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedTextColor = Ink,
-                        unfocusedTextColor = Ink,
-                        disabledTextColor = InkMuted,
-                        focusedPlaceholderColor = InkMuted,
-                        unfocusedPlaceholderColor = InkMuted,
-                        disabledPlaceholderColor = InkMuted,
-                        focusedBorderColor = BurntOrange,
-                        unfocusedBorderColor = HairlineStrong,
-                        disabledBorderColor = Hairline,
-                        focusedContainerColor = Cream,
-                        unfocusedContainerColor = Cream,
-                        disabledContainerColor = Cream,
-                        cursorColor = BurntOrange
-                    ),
+                    colors = editorialFieldColors(),
                     shape = RoundedCornerShape(CornerRadius.md),
                     maxLines = 3,
                     keyboardOptions = KeyboardOptions(
@@ -1315,3 +647,579 @@ private fun ChatScreenContent(
 
 
 
+
+
+/** Daftar pesan chat. Dipisah dari [ChatScreenContent] karena saat ada
+ *  transaksi menunggu diperiksa, daftar ini diganti lembar konfirmasi. */
+@Composable
+private fun ChatMessageList(
+    messages: List<ChatMessage>,
+    isAiProcessing: Boolean,
+    listState: LazyListState,
+    viewModel: ChatViewModel,
+    modifier: Modifier = Modifier
+) {
+    LazyColumn(
+        state = listState,
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = Spacing.md)
+            .testTag("chat_messages_list"),
+        verticalArrangement = Arrangement.spacedBy(Spacing.md),
+        contentPadding = PaddingValues(top = Spacing.lg, bottom = Spacing.lg),
+        reverseLayout = true
+    ) {
+        // reverseLayout: item pertama tampil paling bawah. Tombol batal
+        // ditaruh paling bawah supaya selalu terlihat saat AI memproses.
+        if (isAiProcessing) {
+            item(key = "cancel_ai_request") {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    TextButton(
+                        onClick = { viewModel.cancelAiProcessing() },
+                        modifier = Modifier.testTag("cancel_ai_request_button")
+                    ) {
+                        Text(
+                            "Batalkan permintaan AI",
+                            color = InkMuted,
+                            style = MaterialTheme.typography.labelMedium
+                        )
+                    }
+                }
+            }
+        }
+        items(messages.asReversed()) { message ->
+            when (message) {
+                is ChatMessage.UserMessage -> {
+                    UserMessageBubble(text = message.text)
+                }
+                is ChatMessage.UserImageMessage -> {
+                    UserImageMessageBubble(bitmap = message.bitmap)
+                }
+                is ChatMessage.AiMessage -> {
+                    AiMessageBubble(
+                        text = message.text,
+                        record = message.record,
+                        isError = message.isError,
+                        // Tombol "Coba Lagi" hanya untuk kegagalan yang
+                        // teks aslinya masih tersimpan.
+                        onRetry = message.retryText?.let { { viewModel.retryMessage(message) } }
+                    )
+                }
+                is ChatMessage.TypingIndicator -> {
+                    TypingIndicatorRow()
+                }
+                is ChatMessage.ScanningReceiptIndicator -> {
+                    ScanningReceiptIndicatorRow()
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Lembar pemeriksaan transaksi hasil pembacaan AI.
+ *
+ * Semua isian selalu terbuka dan berlabel. Sebelumnya kartu ini punya mode
+ * ringkas/Ubah yang harus diketuk dulu, isiannya cuma ditandai ikon tanpa teks,
+ * dan jenis transaksi ditandai satu chip yang tampak seperti label padahal bisa
+ * ditekan. Sekarang bentuknya mengikuti form transaksi di aplikasi: label di
+ * atas tiap isian, nominal paling menonjol, pemilih jenis dua pil terbagi rata.
+ */
+@Composable
+private fun PendingTransactionSheet(
+    pending: ExtractionResult,
+    viewModel: ChatViewModel,
+    onPickDate: () -> Unit
+) {
+    val isIncome = pending.type?.lowercase() == "income" || pending.type?.lowercase() == "pemasukan"
+    val incomeCategories by viewModel.incomeCategories.collectAsState()
+    val expenseCategories by viewModel.expenseCategories.collectAsState()
+    val cats = if (isIncome) incomeCategories else expenseCategories
+    var categoryDropdownExpanded by remember { mutableStateOf(false) }
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("inline_edit_transaction_card"),
+        shape = RoundedCornerShape(CornerRadius.bezelCore),
+        colors = CardDefaults.cardColors(containerColor = CardCore),
+        border = BorderStroke(1.dp, Hairline)
+    ) {
+        Column(
+            modifier = Modifier.padding(Spacing.lg),
+            verticalArrangement = Arrangement.spacedBy(Spacing.md)
+        ) {
+            Eyebrow(text = "Periksa transaksi")
+
+            // Jenis: dua pilihan terbagi rata, yang aktif terlihat jelas.
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
+            ) {
+                EditorialPill(
+                    text = "Pengeluaran",
+                    selected = !isIncome,
+                    onClick = { viewModel.updatePendingTransaction(pending.copy(type = "expense")) },
+                    modifier = Modifier.weight(1f),
+                    textStyle = MaterialTheme.typography.labelLarge,
+                    contentPadding = Spacing.sm
+                )
+                EditorialPill(
+                    text = "Pemasukan",
+                    selected = isIncome,
+                    onClick = { viewModel.updatePendingTransaction(pending.copy(type = "income")) },
+                    modifier = Modifier.weight(1f),
+                    textStyle = MaterialTheme.typography.labelLarge,
+                    contentPadding = Spacing.sm
+                )
+            }
+
+            // Nominal jadi isian paling menonjol: angka serif besar di tengah.
+            LabeledField(label = "Jumlah (Rp)") {
+                val amtStr = if (pending.amount == null || pending.amount == 0L) "" else FormatUtils.formatInputNumber(pending.amount.toString())
+                val amtFieldValue = remember(amtStr) { TextFieldValue(amtStr, TextRange(amtStr.length)) }
+                BasicTextField(
+                    value = amtFieldValue,
+                    onValueChange = { field ->
+                        val clean = field.text.replace(".", "")
+                        if (clean.length <= 11 && (clean.isEmpty() || clean.all { it.isDigit() })) {
+                            viewModel.updatePendingTransaction(pending.copy(amount = clean.toLongOrNull() ?: 0L))
+                        }
+                    },
+                    textStyle = MaterialTheme.typography.displaySmall.copy(color = Ink, textAlign = TextAlign.Center),
+                    cursorBrush = SolidColor(BurntOrange),
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    // Nomor kosong tetap butuh penanda, kalau tidak isiannya
+                    // kelihatan seperti garis kosong tanpa arti.
+                    decorationBox = { isian ->
+                        Box(
+                            modifier = Modifier.fillMaxWidth(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (amtFieldValue.text.isEmpty()) {
+                                Text(
+                                    text = "0",
+                                    style = MaterialTheme.typography.displaySmall.copy(color = InkMuted)
+                                )
+                            }
+                            isian()
+                        }
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = Spacing.xs)
+                        .testTag("pending_transaction_amount_input")
+                )
+            }
+
+            DashedDivider()
+
+            LabeledField(label = "Kategori") {
+                Box {
+                    TapField(
+                        text = pending.category ?: "Pilih kategori",
+                        onClick = { categoryDropdownExpanded = true },
+                        testTag = "pending_transaction_category_field"
+                    )
+                    DropdownMenu(
+                        expanded = categoryDropdownExpanded,
+                        onDismissRequest = { categoryDropdownExpanded = false },
+                        modifier = Modifier.background(CreamRaised).border(1.dp, Hairline)
+                    ) {
+                        cats.forEach { categoryLabel ->
+                            val (_, label) = CategoryIconMapper.extractEmojiAndLabel(categoryLabel)
+                            DropdownMenuItem(
+                                text = { Text(categoryLabel, color = Ink) },
+                                onClick = {
+                                    viewModel.updatePendingTransaction(pending.copy(category = label))
+                                    categoryDropdownExpanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+
+            LabeledField(label = "Deskripsi") {
+                EditorialTextField(
+                    value = pending.description ?: "",
+                    onValueChange = { if (it.length <= 20) viewModel.updatePendingTransaction(pending.copy(description = it)) },
+                    placeholder = "cth: Beli eskrim",
+                    testTag = "pending_transaction_description_input"
+                )
+            }
+
+            LabeledField(label = "Catatan (opsional)") {
+                EditorialTextField(
+                    value = pending.notes ?: "",
+                    onValueChange = { if (it.length <= 100) viewModel.updatePendingTransaction(pending.copy(notes = it)) },
+                    placeholder = "Ketik catatan...",
+                    testTag = "pending_transaction_notes_input"
+                )
+            }
+
+            LabeledField(label = "Tanggal") {
+                TapField(
+                    text = FormatUtils.formatDate(pending.date ?: System.currentTimeMillis()),
+                    onClick = onPickDate,
+                    testTag = "pending_transaction_date_field"
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Lembar pemeriksaan hasil pindai struk.
+ *
+ * Sama seperti lembar transaksi: selalu terbuka, tiap isian berlabel. Tiap
+ * kelompok belanja tetap bisa dibuka-tutup karena struk bisa berisi banyak
+ * kelompok, tapi kepala kelompoknya sekarang menampilkan kategori dan nominal
+ * sekaligus supaya tidak perlu dibuka untuk tahu isinya.
+ */
+@Composable
+private fun PendingReceiptSheet(
+    receipt: ParsedReceipt,
+    viewModel: ChatViewModel,
+    onPickDate: () -> Unit
+) {
+    val expenseCategories by viewModel.expenseCategories.collectAsState()
+    val incomeCategories by viewModel.incomeCategories.collectAsState()
+    var expandedGroups by remember { mutableStateOf(setOf<Int>()) }
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("receipt_edit_card"),
+        shape = RoundedCornerShape(CornerRadius.bezelCore),
+        colors = CardDefaults.cardColors(containerColor = CardCore),
+        border = BorderStroke(1.dp, Hairline)
+    ) {
+        Column(
+            modifier = Modifier.padding(Spacing.lg),
+            verticalArrangement = Arrangement.spacedBy(Spacing.md)
+        ) {
+            Eyebrow(text = "Periksa struk belanja")
+            Text(
+                text = "${receipt.grouped.size} kelompok transaksi  •  Total ${FormatUtils.formatRupiah(receipt.total)}",
+                style = MaterialTheme.typography.bodyMedium,
+                color = InkMuted
+            )
+
+            LabeledField(label = "Nama struk") {
+                EditorialTextField(
+                    value = receipt.title,
+                    onValueChange = { viewModel.updatePendingReceipt(receipt.copy(title = it)) },
+                    placeholder = "cth: Indomaret",
+                    testTag = "receipt_title_input"
+                )
+            }
+
+            LabeledField(label = "Tanggal") {
+                TapField(
+                    text = FormatUtils.formatDate(receipt.dateMillis),
+                    onClick = onPickDate,
+                    testTag = "receipt_date_field"
+                )
+            }
+
+            DashedDivider()
+
+            Eyebrow(text = "Rincian transaksi")
+
+            receipt.grouped.forEachIndexed { index, grp ->
+                val isExpanded = expandedGroups.contains(index)
+                val isItemIncome = grp.type.lowercase() == "income" || grp.type.lowercase() == "pemasukan"
+                val itemCats = if (isItemIncome) incomeCategories else expenseCategories
+                var itemCategoryDropdownExpanded by remember { mutableStateOf(false) }
+
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(CornerRadius.md))
+                        .background(CreamRaised)
+                        .border(1.dp, Hairline, RoundedCornerShape(CornerRadius.md))
+                        .padding(Spacing.md),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.sm)
+                ) {
+                    // Kepala kelompok: kategori + nominal, sekaligus tombol
+                    // buka-tutup. Tanpa dibuka, isinya sudah terbaca.
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable(
+                                onClickLabel = if (isExpanded) "Tutup rincian" else "Ubah rincian"
+                            ) {
+                                expandedGroups = if (isExpanded) expandedGroups - index else expandedGroups + index
+                            }
+                            .padding(vertical = Spacing.xs),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = grp.category.ifBlank { "Tanpa kategori" },
+                                style = MaterialTheme.typography.titleSmall,
+                                color = Ink,
+                                maxLines = 1
+                            )
+                            if (grp.description.isNotBlank()) {
+                                Text(
+                                    text = grp.description,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = InkMuted,
+                                    maxLines = 1
+                                )
+                            }
+                        }
+                        Text(
+                            text = FormatUtils.formatRupiah(grp.amount),
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Ink
+                        )
+                        Icon(
+                            imageVector = if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                            contentDescription = if (isExpanded) "Sembunyikan rincian" else "Tampilkan rincian",
+                            tint = InkMuted,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+
+                    if (isExpanded) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
+                        ) {
+                            EditorialPill(
+                                text = "Pengeluaran",
+                                selected = !isItemIncome,
+                                onClick = {
+                                    val updated = receipt.grouped.toMutableList()
+                                    updated[index] = grp.copy(type = "expense")
+                                    viewModel.updatePendingReceipt(receipt.copy(grouped = updated))
+                                },
+                                modifier = Modifier.weight(1f),
+                                textStyle = MaterialTheme.typography.labelLarge,
+                                contentPadding = Spacing.sm
+                            )
+                            EditorialPill(
+                                text = "Pemasukan",
+                                selected = isItemIncome,
+                                onClick = {
+                                    val updated = receipt.grouped.toMutableList()
+                                    updated[index] = grp.copy(type = "income")
+                                    viewModel.updatePendingReceipt(receipt.copy(grouped = updated))
+                                },
+                                modifier = Modifier.weight(1f),
+                                textStyle = MaterialTheme.typography.labelLarge,
+                                contentPadding = Spacing.sm
+                            )
+                        }
+
+                        LabeledField(label = "Kategori") {
+                            Box {
+                                TapField(
+                                    text = grp.category.ifBlank { "Pilih kategori" },
+                                    onClick = { itemCategoryDropdownExpanded = true },
+                                    testTag = "receipt_item_category_field_$index"
+                                )
+                                DropdownMenu(
+                                    expanded = itemCategoryDropdownExpanded,
+                                    onDismissRequest = { itemCategoryDropdownExpanded = false },
+                                    modifier = Modifier.background(CreamRaised).border(1.dp, Hairline)
+                                ) {
+                                    itemCats.forEach { categoryLabel ->
+                                        val (_, label) = CategoryIconMapper.extractEmojiAndLabel(categoryLabel)
+                                        DropdownMenuItem(
+                                            text = { Text(categoryLabel, color = Ink) },
+                                            onClick = {
+                                                val updated = receipt.grouped.toMutableList()
+                                                updated[index] = grp.copy(category = label)
+                                                viewModel.updatePendingReceipt(receipt.copy(grouped = updated))
+                                                itemCategoryDropdownExpanded = false
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        LabeledField(label = "Jumlah (Rp)") {
+                            val grpAmtStr = if (grp.amount == 0L) "" else FormatUtils.formatInputNumber(grp.amount.toString())
+                            EditorialTextField(
+                                value = grpAmtStr,
+                                onValueChange = { field ->
+                                    val clean = field.replace(".", "")
+                                    if (clean.length <= 11 && (clean.isEmpty() || clean.all { it.isDigit() })) {
+                                        val updated = receipt.grouped.toMutableList()
+                                        updated[index] = grp.copy(amount = clean.toLongOrNull() ?: 0L)
+                                        viewModel.updatePendingReceipt(
+                                            receipt.copy(grouped = updated, total = updated.sumOf { it.amount })
+                                        )
+                                    }
+                                },
+                                placeholder = "0",
+                                testTag = "receipt_item_amount_input_$index",
+                                keyboardType = KeyboardType.Number
+                            )
+                        }
+
+                        LabeledField(label = "Deskripsi") {
+                            EditorialTextField(
+                                value = grp.description,
+                                onValueChange = { newValue ->
+                                    if (newValue.length <= 20) {
+                                        val updated = receipt.grouped.toMutableList()
+                                        updated[index] = grp.copy(description = newValue)
+                                        viewModel.updatePendingReceipt(receipt.copy(grouped = updated))
+                                    }
+                                },
+                                placeholder = "cth: Susu UHT",
+                                testTag = "receipt_item_description_input_$index"
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** Tombol keputusan lembar konfirmasi. Selalu terlihat, tidak ikut tergulir. */
+@Composable
+private fun ConfirmFooter(
+    onCancel: () -> Unit,
+    onConfirm: () -> Unit,
+    confirmTag: String,
+    cancelTag: String
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(CreamRaised)
+            .padding(horizontal = Spacing.lg, vertical = Spacing.sm),
+        horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
+    ) {
+        EditorialButton(
+            text = "Ya, Simpan",
+            onClick = onConfirm,
+            modifier = Modifier.weight(1f),
+            // Separuh lebar: panah dimatikan supaya label tetap satu baris.
+            trailingArrow = false,
+            testTag = confirmTag
+        )
+        EditorialButton(
+            text = "Batal",
+            onClick = onCancel,
+            modifier = Modifier.weight(1f),
+            style = EditorialButtonStyle.Ghost,
+            trailingArrow = false,
+            testTag = cancelTag
+        )
+    }
+}
+
+/** Isian berlabel: label mono di atas kolom isian. */
+@Composable
+private fun LabeledField(
+    label: String,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(Spacing.xs)
+    ) {
+        Eyebrow(text = label)
+        content()
+    }
+}
+
+/** Isian teks editorial: latar krem, bingkai rambut, fokus jingga. */
+@Composable
+private fun EditorialTextField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    placeholder: String,
+    testTag: String,
+    modifier: Modifier = Modifier,
+    keyboardType: KeyboardType = KeyboardType.Text
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        placeholder = {
+            Text(
+                text = placeholder,
+                color = InkMuted,
+                style = MaterialTheme.typography.bodyMedium
+            )
+        },
+        singleLine = true,
+        keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
+        shape = RoundedCornerShape(CornerRadius.md),
+        colors = editorialFieldColors(),
+        modifier = modifier
+            .fillMaxWidth()
+            .testTag(testTag)
+    )
+}
+
+/** Isian yang cuma bisa diketuk: buka daftar pilihan atau pemilih tanggal. */
+@Composable
+private fun TapField(
+    text: String,
+    onClick: () -> Unit,
+    testTag: String,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .heightIn(min = 56.dp)
+            .clip(RoundedCornerShape(CornerRadius.md))
+            .background(Cream)
+            .border(1.dp, HairlineStrong, RoundedCornerShape(CornerRadius.md))
+            .clickable(onClickLabel = text, onClick = onClick)
+            .padding(horizontal = Spacing.md, vertical = Spacing.sm)
+            .testTag(testTag),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodyMedium,
+            color = Ink,
+            maxLines = 1,
+            modifier = Modifier.weight(1f)
+        )
+        Icon(
+            imageVector = Icons.Default.KeyboardArrowDown,
+            contentDescription = null,
+            tint = InkMuted,
+            modifier = Modifier.size(18.dp)
+        )
+    }
+}
+
+/** Warna baku kolom isian editorial, dipakai semua isian di tab Chat. */
+@Composable
+private fun editorialFieldColors() = OutlinedTextFieldDefaults.colors(
+    focusedTextColor = Ink,
+    unfocusedTextColor = Ink,
+    disabledTextColor = InkMuted,
+    focusedPlaceholderColor = InkMuted,
+    unfocusedPlaceholderColor = InkMuted,
+    disabledPlaceholderColor = InkMuted,
+    focusedBorderColor = BurntOrange,
+    unfocusedBorderColor = HairlineStrong,
+    disabledBorderColor = Hairline,
+    focusedContainerColor = Cream,
+    unfocusedContainerColor = Cream,
+    disabledContainerColor = Cream,
+    cursorColor = BurntOrange
+)
