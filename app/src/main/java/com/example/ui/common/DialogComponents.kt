@@ -37,9 +37,14 @@ import com.example.ui.theme.*
 import com.example.ui.components.EditorialButton
 import com.example.ui.components.EditorialButtonStyle
 import com.example.ui.components.EditorialDialog
+import com.example.ui.components.EditorialPill
+import com.example.ui.components.EditorialTextField
 import com.example.ui.components.Eyebrow
 import com.example.ui.components.GlassCard
+import com.example.ui.components.LabeledField
+import com.example.ui.components.TapField
 import com.example.ui.config.FormatUtils
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.TextRange
 import java.util.*
@@ -662,7 +667,6 @@ fun MonthlyBudgetDialog(
     }
 
     var showCategoryPickerPopup by remember { mutableStateOf(false) }
-    var showDeleteConfirmation by remember { mutableStateOf(false) }
     var showMonthlyBudgetInfo by remember { mutableStateOf(false) }
     var showCategoryBudgetInfo by remember { mutableStateOf(false) }
 
@@ -1185,67 +1189,75 @@ fun MonthlyBudgetDialog(
 }
 }
 
-    if (showDeleteConfirmation) {
-        EditorialDialog(onDismissRequest = { showDeleteConfirmation = false }) {
-            Card(
-                modifier = Modifier.fillMaxWidth().padding(Spacing.lg),
-                shape = RoundedCornerShape(CornerRadius.bezel),
-                colors = CardDefaults.cardColors(containerColor = CreamRaised),
-                border = BorderStroke(1.dp, Hairline),
-                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+}
+
+/**
+ * Konfirmasi hapus batas anggaran bulanan beserta semua batas kategori.
+ *
+ * Dipanggil dari ikon tong sampah di kartu anggaran tab Beranda. Dulu isinya
+ * hidup di dalam [MonthlyBudgetDialog] dengan penanda `showDeleteConfirmation`,
+ * tapi tidak ada satu pun tombol yang menyalakannya, jadi dialognya mustahil
+ * dibuka dan anggaran bulanan tidak bisa dihapus.
+ */
+@Composable
+fun DeleteBudgetConfirmDialog(
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    EditorialDialog(onDismissRequest = onDismiss) {
+        Card(
+            modifier = Modifier.fillMaxWidth().padding(Spacing.lg),
+            shape = RoundedCornerShape(CornerRadius.bezel),
+            colors = CardDefaults.cardColors(containerColor = CreamRaised),
+            border = BorderStroke(1.dp, Hairline),
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(Spacing.xl),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Box(modifier = Modifier.background(CreamRaised)) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(Spacing.xl),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.DeleteOutline,
-                            contentDescription = null,
-                            tint = BurntOrange,
-                            modifier = Modifier.size(40.dp).padding(bottom = Spacing.sm)
-                        )
-                        Text(
-                            text = "Hapus Batas Anggaran?",
-                            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Medium),
-                            fontFamily = SerifFamily,
-                            color = Ink,
-                            modifier = Modifier.padding(bottom = 8.dp)
-                        )
-                        Text(
-                            text = "Apakah Anda yakin ingin menghapus semua batasan anggaran bulanan serta batasan kategori yang telah diatur?",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = InkMuted,
-                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                            modifier = Modifier.padding(bottom = Spacing.xl)
-                        )
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                        ) {
-                            EditorialButton(
-                                text = "Batal",
-                                onClick = { showDeleteConfirmation = false },
-                                modifier = Modifier.weight(1f),
-                                style = EditorialButtonStyle.Ghost,
-                                trailingArrow = false,
-                                testTag = "dismiss_delete_budget_confirm"
-                            )
-                            EditorialButton(
-                                text = "Ya, Hapus",
-                                onClick = {
-                                    showDeleteConfirmation = false
-                                    onConfirm(0L, emptyMap())
-                                },
-                                modifier = Modifier.weight(1f),
-                                accent = BurntOrange,
-                                trailingArrow = false,
-                                testTag = "confirm_delete_budget_confirm"
-                            )
-                        }
-                    }
+                Icon(
+                    imageVector = Icons.Default.DeleteOutline,
+                    contentDescription = null,
+                    tint = BurntOrange,
+                    modifier = Modifier.size(40.dp).padding(bottom = Spacing.sm)
+                )
+                Text(
+                    text = "Hapus Batas Anggaran?",
+                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Medium),
+                    fontFamily = SerifFamily,
+                    color = Ink,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+                Text(
+                    text = "Apakah Anda yakin ingin menghapus semua batasan anggaran bulanan serta batasan kategori yang telah diatur?",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = InkMuted,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(bottom = Spacing.xl)
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    EditorialButton(
+                        text = "Batal",
+                        onClick = onDismiss,
+                        modifier = Modifier.weight(1f),
+                        style = EditorialButtonStyle.Ghost,
+                        trailingArrow = false,
+                        testTag = "dismiss_delete_budget_confirm"
+                    )
+                    EditorialButton(
+                        text = "Ya, Hapus",
+                        onClick = onConfirm,
+                        modifier = Modifier.weight(1f),
+                        accent = BurntOrange,
+                        trailingArrow = false,
+                        testTag = "confirm_delete_budget_confirm"
+                    )
                 }
             }
         }
@@ -1267,20 +1279,24 @@ fun RecurringTransactionManagementDialog(
 
     // Form states
     var descInput by remember { mutableStateOf("") }
-    var amountInput by remember { mutableStateOf(TextFieldValue("", TextRange(0))) }
+    // Jumlah disimpan sebagai teks bergaya "1.500.000"; kursor otomatis ke ujung
+    // saat menyunting di tengah, cukup untuk kolom angka maksimal 11 digit.
+    // ponytail: kalau kursor perlu presisi, pakai formatInputNumberPreserveCursor
+    // + TextFieldValue seperti kolom anggaran.
+    var amountInput by remember { mutableStateOf("") }
     var typeInput by remember { mutableStateOf("expense") } // "income" or "expense"
-    
+
     // Choose list based on selected type
     val categories = if (typeInput == "income") incomeCategories else expenseCategories
     var categoryInput by remember(typeInput) { mutableStateOf(categories.firstOrNull() ?: "") }
-    
+
     var dayInput by remember { mutableStateOf(java.time.LocalDate.now().dayOfMonth.toString()) }
     var notesInput by remember { mutableStateOf("") }
 
-    // Errors
-    var descError by remember { mutableStateOf<String?>(null) }
-    var amountError by remember { mutableStateOf<String?>(null) }
-    var dayError by remember { mutableStateOf<String?>(null) }
+    // Kategori dan tanggal sekarang isian ketuk + daftar pilihan, sama seperti
+    // lembar konfirmasi AI di tab Chat.
+    var expandedCategoryMenu by remember { mutableStateOf(false) }
+    var expandedDayMenu by remember { mutableStateOf(false) }
 
     EditorialDialog(onDismissRequest = onDismissRequest) {
         Card(
@@ -1334,209 +1350,113 @@ fun RecurringTransactionManagementDialog(
                         color = InkMuted
                     )
 
-                    // Type Selector
+                    // Jenis: dua pil terbagi rata, sama seperti lembar
+                    // konfirmasi AI di tab Chat.
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
                     ) {
-                        Card(
-                            modifier = Modifier
-                                .weight(1f)
-                                .clickable { typeInput = "expense" },
-                            colors = CardDefaults.cardColors(
-                                containerColor = if (typeInput == "expense") BurntOrange.copy(alpha = 0.15f) else CreamRaised
-                            ),
-                            border = BorderStroke(1.dp, if (typeInput == "expense") BurntOrange else Hairline),
-                            shape = RoundedCornerShape(12.dp)
-                        ) {
-                            Box(modifier = Modifier.fillMaxWidth().padding(10.dp), contentAlignment = Alignment.Center) {
-                                Text("Pengeluaran", color = if (typeInput == "expense") BurntOrange else InkMuted, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                            }
-                        }
-                        Card(
-                            modifier = Modifier
-                                .weight(1f)
-                                .clickable { typeInput = "income" },
-                            colors = CardDefaults.cardColors(
-                                containerColor = if (typeInput == "income") ForestGreen.copy(alpha = 0.15f) else CreamRaised
-                            ),
-                            border = BorderStroke(1.dp, if (typeInput == "income") ForestGreen else Hairline),
-                            shape = RoundedCornerShape(12.dp)
-                        ) {
-                            Box(modifier = Modifier.fillMaxWidth().padding(10.dp), contentAlignment = Alignment.Center) {
-                                Text("Pemasukan", color = if (typeInput == "income") ForestGreen else InkMuted, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-                            }
-                        }
+                        EditorialPill(
+                            text = "Pengeluaran",
+                            selected = typeInput == "expense",
+                            onClick = { typeInput = "expense" },
+                            modifier = Modifier.weight(1f),
+                            textStyle = MaterialTheme.typography.labelLarge,
+                            contentPadding = Spacing.sm
+                        )
+                        EditorialPill(
+                            text = "Pemasukan",
+                            selected = typeInput == "income",
+                            onClick = { typeInput = "income" },
+                            modifier = Modifier.weight(1f),
+                            textStyle = MaterialTheme.typography.labelLarge,
+                            contentPadding = Spacing.sm
+                        )
                     }
 
-                    // Description Input
-                    OutlinedTextField(
-                        value = descInput,
-                        onValueChange = {
-                            if (it.length <= 20) {
-                                descInput = it
-                                descError = null
-                            }
-                        },
-                        label = { Text("Deskripsi/Nama Rutinitas") },
-                        isError = descError != null,
-                        supportingText = descError?.let { { Text(it) } },
-                        modifier = Modifier.fillMaxWidth().testTag("recurring_desc_input"),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = Ink,
-                            unfocusedTextColor = Ink,
-                            focusedLabelColor = Ink,
-                            unfocusedLabelColor = InkMuted,
-                            focusedPlaceholderColor = InkMuted,
-                            unfocusedPlaceholderColor = InkMuted,
-                            focusedBorderColor = BurntOrange,
-                            unfocusedBorderColor = HairlineStrong,
-                            focusedContainerColor = Cream,
-                            unfocusedContainerColor = Cream,
-                            cursorColor = BurntOrange
+                    LabeledField(label = "Deskripsi") {
+                        EditorialTextField(
+                            value = descInput,
+                            onValueChange = { if (it.length <= 20) descInput = it },
+                            placeholder = "cth: Sewa kos",
+                            testTag = "recurring_desc_input"
                         )
-                    )
+                    }
 
-                    // Amount Input
-                    OutlinedTextField(
-                        value = amountInput,
-                        onValueChange = { field ->
-                            // M12: hanya digit + pemisah ribuan; huruf/koma ditolak sejak awal.
-                            val clean = field.text.replace(".", "")
-                            if (clean.length <= 11 && (clean.isEmpty() || clean.all { it.isDigit() })) {
-                                amountInput = FormatUtils.formatInputNumberPreserveCursor(field)
-                            }
-                            amountError = null
-                        },
-                        label = { Text("Jumlah (Rp)") },
-                        isError = amountError != null,
-                        supportingText = amountError?.let { { Text(it) } },
-                        modifier = Modifier.fillMaxWidth().testTag("recurring_amount_input"),
-                        shape = RoundedCornerShape(12.dp),
-                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-                            keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
-                        ),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = Ink,
-                            unfocusedTextColor = Ink,
-                            focusedLabelColor = Ink,
-                            unfocusedLabelColor = InkMuted,
-                            focusedPlaceholderColor = InkMuted,
-                            unfocusedPlaceholderColor = InkMuted,
-                            focusedBorderColor = BurntOrange,
-                            unfocusedBorderColor = HairlineStrong,
-                            focusedContainerColor = Cream,
-                            unfocusedContainerColor = Cream,
-                            cursorColor = BurntOrange
-                        )
-                    )
-
-                    // Category Dropdown/Selector
-                    var expandedCat by remember { mutableStateOf(false) }
-                    ExposedDropdownMenuBox(
-                        expanded = expandedCat,
-                        onExpandedChange = { expandedCat = !expandedCat }
-                    ) {
-                        OutlinedTextField(
-                            value = categoryInput,
-                            onValueChange = {},
-                            readOnly = true,
-                            label = { Text("Kategori") },
-                            trailingIcon = {
-                                Icon(
-                                    imageVector = Icons.Default.ArrowDropDown,
-                                    contentDescription = null,
-                                    tint = InkMuted
-                                )
+                    LabeledField(label = "Jumlah (Rp)") {
+                        EditorialTextField(
+                            value = amountInput,
+                            onValueChange = { text ->
+                                // M12: hanya digit + pemisah ribuan; huruf/koma ditolak sejak awal.
+                                val clean = text.replace(".", "")
+                                if (clean.length <= 11 && (clean.isEmpty() || clean.all { it.isDigit() })) {
+                                    amountInput = FormatUtils.formatInputNumber(clean)
+                                }
                             },
-                            modifier = Modifier.menuAnchor().fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedTextColor = Ink,
-                                unfocusedTextColor = Ink,
-                                focusedLabelColor = Ink,
-                                unfocusedLabelColor = InkMuted,
-                                focusedPlaceholderColor = InkMuted,
-                                unfocusedPlaceholderColor = InkMuted,
-                                focusedBorderColor = BurntOrange,
-                                unfocusedBorderColor = HairlineStrong,
-                                focusedContainerColor = Cream,
-                                unfocusedContainerColor = Cream,
-                                cursorColor = BurntOrange
-                            )
+                            placeholder = "0",
+                            keyboardType = KeyboardType.Number,
+                            testTag = "recurring_amount_input"
                         )
-                        ExposedDropdownMenu(
-                            expanded = expandedCat,
-                            onDismissRequest = { expandedCat = false },
-                            modifier = Modifier.background(CreamRaised)
-                        ) {
-                            categories.forEach { category ->
-                                DropdownMenuItem(
-                                    text = { Text(category, color = Ink) },
-                                    onClick = {
-                                        categoryInput = category
-                                        expandedCat = false
-                                    }
-                                )
+                    }
+
+                    LabeledField(label = "Kategori") {
+                        Box {
+                            TapField(
+                                text = categoryInput.ifBlank { "Pilih kategori" },
+                                onClick = { expandedCategoryMenu = true },
+                                testTag = "recurring_category_input"
+                            )
+                            DropdownMenu(
+                                expanded = expandedCategoryMenu,
+                                onDismissRequest = { expandedCategoryMenu = false },
+                                modifier = Modifier.background(CreamRaised).border(1.dp, Hairline)
+                            ) {
+                                categories.forEach { category ->
+                                    DropdownMenuItem(
+                                        text = { Text(category, color = Ink) },
+                                        onClick = {
+                                            categoryInput = category
+                                            expandedCategoryMenu = false
+                                        }
+                                    )
+                                }
                             }
                         }
                     }
 
-                    // Day of Month Input
-                    OutlinedTextField(
-                        value = dayInput,
-                        onValueChange = {
-                            if (it.length <= 2) {
-                                dayInput = it
-                                dayError = null
+                    LabeledField(label = "Setiap Tanggal") {
+                        Box {
+                            TapField(
+                                text = "Tanggal $dayInput",
+                                onClick = { expandedDayMenu = true },
+                                testTag = "recurring_day_input"
+                            )
+                            DropdownMenu(
+                                expanded = expandedDayMenu,
+                                onDismissRequest = { expandedDayMenu = false },
+                                modifier = Modifier.background(CreamRaised).border(1.dp, Hairline)
+                            ) {
+                                (1..31).forEach { day ->
+                                    DropdownMenuItem(
+                                        text = { Text(day.toString(), color = Ink) },
+                                        onClick = {
+                                            dayInput = day.toString()
+                                            expandedDayMenu = false
+                                        }
+                                    )
+                                }
                             }
-                        },
-                        label = { Text("Setiap Tanggal (1-31)") },
-                        placeholder = { Text("Contoh: 6") },
-                        isError = dayError != null,
-                        supportingText = dayError?.let { { Text(it) } },
-                        modifier = Modifier.fillMaxWidth().testTag("recurring_day_input"),
-                        shape = RoundedCornerShape(12.dp),
-                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-                            keyboardType = androidx.compose.ui.text.input.KeyboardType.Number
-                        ),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = Ink,
-                            unfocusedTextColor = Ink,
-                            focusedLabelColor = Ink,
-                            unfocusedLabelColor = InkMuted,
-                            focusedPlaceholderColor = InkMuted,
-                            unfocusedPlaceholderColor = InkMuted,
-                            focusedBorderColor = BurntOrange,
-                            unfocusedBorderColor = HairlineStrong,
-                            focusedContainerColor = Cream,
-                            unfocusedContainerColor = Cream,
-                            cursorColor = BurntOrange
-                        )
-                    )
+                        }
+                    }
 
-                    // Notes Input
-                    OutlinedTextField(
-                        value = notesInput,
-                        onValueChange = { if (it.length <= 100) notesInput = it },
-                        label = { Text("Catatan Tambahan (Opsional)") },
-                        modifier = Modifier.fillMaxWidth().testTag("recurring_notes_input"),
-                        shape = RoundedCornerShape(12.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = Ink,
-                            unfocusedTextColor = Ink,
-                            focusedLabelColor = Ink,
-                            unfocusedLabelColor = InkMuted,
-                            focusedPlaceholderColor = InkMuted,
-                            unfocusedPlaceholderColor = InkMuted,
-                            focusedBorderColor = BurntOrange,
-                            unfocusedBorderColor = HairlineStrong,
-                            focusedContainerColor = Cream,
-                            unfocusedContainerColor = Cream,
-                            cursorColor = BurntOrange
+                    LabeledField(label = "Catatan (opsional)") {
+                        EditorialTextField(
+                            value = notesInput,
+                            onValueChange = { if (it.length <= 100) notesInput = it },
+                            placeholder = "Ketik catatan...",
+                            testTag = "recurring_notes_input"
                         )
-                    )
+                    }
                 }
             } else {
                 // LIST MODE
@@ -1653,7 +1573,7 @@ fun RecurringTransactionManagementDialog(
             Spacer(modifier = Modifier.height(16.dp))
             if (isAddingNew) {
                 // M12: validasi live; tombol simpan nonaktif sampai semua nilai valid.
-                val recurringAmount = amountInput.text.replace(".", "").trim().toLongOrNull()
+                val recurringAmount = amountInput.replace(".", "").trim().toLongOrNull()
                 val recurringDay = dayInput.trim().toIntOrNull()
                 val recurringFormValid = descInput.trim().isNotEmpty() &&
                     recurringAmount != null &&
@@ -1686,7 +1606,7 @@ fun RecurringTransactionManagementDialog(
                                 )
                                 // Clear fields & go back to list
                                 descInput = ""
-                                amountInput = TextFieldValue("")
+                                amountInput = ""
                                 dayInput = java.time.LocalDate.now().dayOfMonth.toString()
                                 notesInput = ""
                                 isAddingNew = false

@@ -151,6 +151,7 @@ fun FinancialTrackerScreen(
     val showNewFeature by com.example.util.RemoteConfigHelper.showNewFeature.collectAsState()
 
     var showBudgetDialog by rememberSaveable { mutableStateOf(false) }
+    var showDeleteBudgetDialog by rememberSaveable { mutableStateOf(false) }
 
     var showCategoryDialog by rememberSaveable { mutableStateOf(false) }
     var recordToDelete by remember { mutableStateOf<FinancialRecord?>(null) }
@@ -410,6 +411,21 @@ fun FinancialTrackerScreen(
         )
     }
 
+    // Hapus batas anggaran: bulanan + semua batas kategori sekaligus, sama
+    // seperti yang dilakukan dialog pengaturan saat limitnya diisi 0.
+    if (showDeleteBudgetDialog) {
+        DeleteBudgetConfirmDialog(
+            onConfirm = {
+                viewModel.updateMonthlyBudgetLimit(0L)
+                expenseCategoryEntitiesState.forEach { category ->
+                    viewModel.updateCategoryBudget(category.id, 0L)
+                }
+                showDeleteBudgetDialog = false
+            },
+            onDismiss = { showDeleteBudgetDialog = false }
+        )
+    }
+
     // Responsive Adaptive Layout parameters
     BoxWithConstraints(
         modifier = Modifier
@@ -659,6 +675,7 @@ fun FinancialTrackerScreen(
                             selectedBudgetOffset = selectedBudgetOffset,
                             onBudgetOffsetChange = { viewModel.changeBudgetMonthOffset(it) },
                             onSetBudgetClick = { showBudgetDialog = true },
+                            onDeleteBudgetClick = { showDeleteBudgetDialog = true },
                             filteredRecords = filteredRecords,
                             filterType = filterType,
                             sortByNewest = sortByNewest,

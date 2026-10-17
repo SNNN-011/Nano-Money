@@ -68,8 +68,12 @@ import com.example.ui.components.EditorialButton
 import com.example.ui.components.EditorialButtonStyle
 import com.example.ui.components.EditorialDialog
 import com.example.ui.components.EditorialPill
+import com.example.ui.components.EditorialTextField
 import com.example.ui.components.Eyebrow
 import com.example.ui.components.HairlineDivider
+import com.example.ui.components.LabeledField
+import com.example.ui.components.TapField
+import com.example.ui.components.editorialFieldColors
 
 /**
  * Tab Chat memakai palet editorial seperti tab Dashboard.
@@ -1125,102 +1129,7 @@ private fun ConfirmFooter(
     }
 }
 
-/** Isian berlabel: label mono di atas kolom isian. */
-@Composable
-private fun LabeledField(
-    label: String,
-    content: @Composable ColumnScope.() -> Unit
-) {
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(Spacing.xs)
-    ) {
-        Eyebrow(text = label)
-        content()
-    }
-}
+/** Isian berlabel, isian teks, dan isian ketuk dipakai bersama dengan dialog
+ * editorial; definisinya pindah ke `ui/components/Editorial.kt` supaya tab Chat
+ * dan dialog tidak pernah punya dua bentuk isian yang berbeda. */
 
-/** Isian teks editorial: latar krem, bingkai rambut, fokus jingga. */
-@Composable
-private fun EditorialTextField(
-    value: String,
-    onValueChange: (String) -> Unit,
-    placeholder: String,
-    testTag: String,
-    modifier: Modifier = Modifier,
-    keyboardType: KeyboardType = KeyboardType.Text
-) {
-    OutlinedTextField(
-        value = value,
-        onValueChange = onValueChange,
-        placeholder = {
-            Text(
-                text = placeholder,
-                color = InkMuted,
-                style = MaterialTheme.typography.bodyMedium
-            )
-        },
-        singleLine = true,
-        keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
-        shape = RoundedCornerShape(CornerRadius.md),
-        colors = editorialFieldColors(),
-        modifier = modifier
-            .fillMaxWidth()
-            .testTag(testTag)
-    )
-}
-
-/** Isian yang cuma bisa diketuk: buka daftar pilihan atau pemilih tanggal. */
-@Composable
-private fun TapField(
-    text: String,
-    onClick: () -> Unit,
-    testTag: String,
-    modifier: Modifier = Modifier
-) {
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .heightIn(min = 56.dp)
-            .clip(RoundedCornerShape(CornerRadius.md))
-            .background(Cream)
-            .border(1.dp, HairlineStrong, RoundedCornerShape(CornerRadius.md))
-            .clickable(onClickLabel = text, onClick = onClick)
-            .padding(horizontal = Spacing.md, vertical = Spacing.sm)
-            .testTag(testTag),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = text,
-            style = MaterialTheme.typography.bodyMedium,
-            color = Ink,
-            maxLines = 1,
-            modifier = Modifier.weight(1f)
-        )
-        Icon(
-            imageVector = Icons.Default.KeyboardArrowDown,
-            contentDescription = null,
-            tint = InkMuted,
-            modifier = Modifier.size(18.dp)
-        )
-    }
-}
-
-/** Warna baku kolom isian editorial, dipakai semua isian di tab Chat. */
-@Composable
-private fun editorialFieldColors() = OutlinedTextFieldDefaults.colors(
-    focusedTextColor = Ink,
-    unfocusedTextColor = Ink,
-    disabledTextColor = InkMuted,
-    focusedPlaceholderColor = InkMuted,
-    unfocusedPlaceholderColor = InkMuted,
-    disabledPlaceholderColor = InkMuted,
-    focusedBorderColor = BurntOrange,
-    unfocusedBorderColor = HairlineStrong,
-    disabledBorderColor = Hairline,
-    focusedContainerColor = Cream,
-    unfocusedContainerColor = Cream,
-    disabledContainerColor = Cream,
-    cursorColor = BurntOrange
-)

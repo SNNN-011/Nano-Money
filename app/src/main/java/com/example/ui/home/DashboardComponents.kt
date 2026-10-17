@@ -83,6 +83,7 @@ fun DashboardStatsSection(
     selectedBudgetOffset: Int = 0,
     onBudgetOffsetChange: (Int) -> Unit = {},
     onSetBudgetClick: () -> Unit,
+    onDeleteBudgetClick: () -> Unit,
     onRecurringClick: () -> Unit,
     welcomeMessage: String = "",
     welcomeMessageColor: String = "",
@@ -158,7 +159,8 @@ fun DashboardStatsSection(
             categoryBudgets = categoryBudgets,
             categoryNameById = categoryNameById,
             categorySpending = categorySpending,
-            onSetBudgetClick = onSetBudgetClick
+            onSetBudgetClick = onSetBudgetClick,
+            onDeleteBudgetClick = onDeleteBudgetClick
         )
     }
 
@@ -235,7 +237,8 @@ private fun BudgetSlip(
     categoryBudgets: Map<String, Long>,
     categoryNameById: Map<String, String>,
     categorySpending: Map<String, Long>,
-    onSetBudgetClick: () -> Unit
+    onSetBudgetClick: () -> Unit,
+    onDeleteBudgetClick: () -> Unit
 ) {
     BezelCard {
         // ── Bagian saldo ────────────────────────────────────────────────────
@@ -443,18 +446,35 @@ private fun BudgetSlip(
                         color = progressColor
                     )
                 }
-                IconButton(
-                    onClick = onSetBudgetClick,
-                    modifier = Modifier
-                        .size(28.dp)
-                        .testTag("edit_budget_button")
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Edit,
-                        contentDescription = "Edit Anggaran",
-                        tint = InkMuted,
-                        modifier = Modifier.size(15.dp)
-                    )
+                // Pensil dan tong sampah jadi satu pasang, ukuran dan warnanya
+                // sama supaya terbaca sebagai satu kelompok aksi.
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(
+                        onClick = onSetBudgetClick,
+                        modifier = Modifier
+                            .size(28.dp)
+                            .testTag("edit_budget_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Edit,
+                            contentDescription = "Edit Anggaran",
+                            tint = InkMuted,
+                            modifier = Modifier.size(15.dp)
+                        )
+                    }
+                    IconButton(
+                        onClick = onDeleteBudgetClick,
+                        modifier = Modifier
+                            .size(28.dp)
+                            .testTag("delete_budget_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Delete,
+                            contentDescription = "Hapus Anggaran",
+                            tint = InkMuted,
+                            modifier = Modifier.size(15.dp)
+                        )
+                    }
                 }
             }
 

@@ -15,10 +15,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.NorthEast
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -33,9 +37,11 @@ import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import com.example.ui.theme.BurntOrange
 import com.example.ui.theme.CardCore
 import com.example.ui.theme.CardVeil
 import com.example.ui.theme.CornerRadius
@@ -356,3 +362,107 @@ fun EditorialDialog(
         }
     }
 }
+
+// ── Isian ─────────────────────────────────────────────────────────────────────
+// Dipakai bersama tab Chat (lembar konfirmasi AI) dan dialog-dialog editorial,
+// supaya dua isian sejenis tidak pernah kelihatan beda bentuk.
+
+/** Isian berlabel: label mono kecil di atas kolom isian. */
+@Composable
+fun LabeledField(
+    label: String,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(Spacing.xs)
+    ) {
+        Eyebrow(text = label)
+        content()
+    }
+}
+
+/** Isian teks editorial: latar krem, bingkai rambut, fokus jingga. */
+@Composable
+fun EditorialTextField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    placeholder: String,
+    testTag: String,
+    modifier: Modifier = Modifier,
+    keyboardType: KeyboardType = KeyboardType.Text
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        placeholder = {
+            Text(
+                text = placeholder,
+                color = InkMuted,
+                style = MaterialTheme.typography.bodyMedium
+            )
+        },
+        singleLine = true,
+        keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
+        shape = RoundedCornerShape(CornerRadius.md),
+        colors = editorialFieldColors(),
+        modifier = modifier
+            .fillMaxWidth()
+            .testTag(testTag)
+    )
+}
+
+/** Isian yang cuma bisa diketuk: buka daftar pilihan atau pemilih tanggal. */
+@Composable
+fun TapField(
+    text: String,
+    onClick: () -> Unit,
+    testTag: String,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .heightIn(min = 56.dp)
+            .clip(RoundedCornerShape(CornerRadius.md))
+            .background(Cream)
+            .border(1.dp, HairlineStrong, RoundedCornerShape(CornerRadius.md))
+            .clickable(onClickLabel = text, onClick = onClick)
+            .padding(horizontal = Spacing.md, vertical = Spacing.sm)
+            .testTag(testTag),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodyMedium,
+            color = Ink,
+            maxLines = 1,
+            modifier = Modifier.weight(1f)
+        )
+        Icon(
+            imageVector = Icons.Default.KeyboardArrowDown,
+            contentDescription = null,
+            tint = InkMuted,
+            modifier = Modifier.size(18.dp)
+        )
+    }
+}
+
+/** Warna baku kolom isian editorial, dipakai semua isian. */
+@Composable
+fun editorialFieldColors() = OutlinedTextFieldDefaults.colors(
+    focusedTextColor = Ink,
+    unfocusedTextColor = Ink,
+    disabledTextColor = InkMuted,
+    focusedPlaceholderColor = InkMuted,
+    unfocusedPlaceholderColor = InkMuted,
+    disabledPlaceholderColor = InkMuted,
+    focusedBorderColor = BurntOrange,
+    unfocusedBorderColor = HairlineStrong,
+    disabledBorderColor = Hairline,
+    focusedContainerColor = Cream,
+    unfocusedContainerColor = Cream,
+    disabledContainerColor = Cream,
+    cursorColor = BurntOrange
+)
