@@ -2,27 +2,24 @@ package com.example.ui.theme
 
 import androidx.compose.material3.Typography
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.googlefonts.Font
-import androidx.compose.ui.text.googlefonts.GoogleFont
 import androidx.compose.ui.unit.sp
+import com.example.R
 
-private val googleFontProvider = GoogleFont.Provider(
-    providerAuthority = "com.google.android.gms.fonts",
-    providerPackage = "com.google.android.gms",
-    certificates = emptyList()
-)
-
-private val InterFont = GoogleFont("Inter")
-
+// Seluruh keluarga font dibundel di res/font (lisensi OFL, lihat
+// res/raw/ofl_font_licenses.txt), bukan lewat provider font Google.
+// Sebabnya empiris: permintaan ke provider di HP nyata selesai tanpa error
+// tapi typeface-nya tidak pernah terpasang, jadi semua teks jatuh ke font
+// sistem. Berkas statis per bobot ini berasal dari Google Fonts (subset
+// latin), jadi hasilnya pasti dan tetap jalan tanpa jaringan.
 val InterFamily = FontFamily(
-    Font(googleFont = InterFont, fontProvider = googleFontProvider, weight = FontWeight.Light),
-    Font(googleFont = InterFont, fontProvider = googleFontProvider, weight = FontWeight.Normal),
-    Font(googleFont = InterFont, fontProvider = googleFontProvider, weight = FontWeight.Medium),
-    Font(googleFont = InterFont, fontProvider = googleFontProvider, weight = FontWeight.SemiBold),
-    Font(googleFont = InterFont, fontProvider = googleFontProvider, weight = FontWeight.Bold),
+    Font(R.font.inter_light, FontWeight.Light),
+    Font(R.font.inter_regular, FontWeight.Normal),
+    Font(R.font.inter_medium, FontWeight.Medium),
+    Font(R.font.inter_semibold, FontWeight.SemiBold),
+    Font(R.font.inter_bold, FontWeight.Bold),
 )
 
 val Typography = Typography(
@@ -135,40 +132,29 @@ val Typography = Typography(
 
 // ── Tipografi editorial (referensi portfolio) ────────────────────────────────
 // Tiga keluarga yang sama dengan referensi: Fraunces (judul & angka besar),
-// Instrument Sans (teks UI), JetBrains Mono (label kecil). Dipasang lewat
-// provider font Google yang sudah dipakai Inter di atas, jadi tidak ada
-// dependency baru dan ukuran APK tidak bertambah.
+// Instrument Sans (teks UI), JetBrains Mono (label kecil). Berkasnya juga
+// dibundel di res/font, sama seperti keluarga di atas.
 
-private val FrauncesFont = GoogleFont("Fraunces")
-private val InstrumentSansFont = GoogleFont("Instrument Sans")
-private val JetBrainsMonoFont = GoogleFont("JetBrains Mono")
-
-/** --serif: judul dan angka besar. Italic hanya untuk penekanan. */
+/** --serif: judul dan angka besar. Italic tidak dibundel karena tidak dipakai. */
 val SerifFamily = FontFamily(
-    Font(googleFont = FrauncesFont, fontProvider = googleFontProvider, weight = FontWeight.Light),
-    Font(googleFont = FrauncesFont, fontProvider = googleFontProvider, weight = FontWeight.Normal),
-    Font(googleFont = FrauncesFont, fontProvider = googleFontProvider, weight = FontWeight.Medium),
-    Font(googleFont = FrauncesFont, fontProvider = googleFontProvider, weight = FontWeight.SemiBold),
-    Font(
-        googleFont = FrauncesFont,
-        fontProvider = googleFontProvider,
-        weight = FontWeight.Normal,
-        style = FontStyle.Italic
-    ),
+    Font(R.font.fraunces_light, FontWeight.Light),
+    Font(R.font.fraunces_regular, FontWeight.Normal),
+    Font(R.font.fraunces_medium, FontWeight.Medium),
+    Font(R.font.fraunces_semibold, FontWeight.SemiBold),
 )
 
 /** --font: seluruh teks UI, tombol, dan isi. */
 val SansFamily = FontFamily(
-    Font(googleFont = InstrumentSansFont, fontProvider = googleFontProvider, weight = FontWeight.Normal),
-    Font(googleFont = InstrumentSansFont, fontProvider = googleFontProvider, weight = FontWeight.Medium),
-    Font(googleFont = InstrumentSansFont, fontProvider = googleFontProvider, weight = FontWeight.SemiBold),
-    Font(googleFont = InstrumentSansFont, fontProvider = googleFontProvider, weight = FontWeight.Bold),
+    Font(R.font.instrument_sans_regular, FontWeight.Normal),
+    Font(R.font.instrument_sans_medium, FontWeight.Medium),
+    Font(R.font.instrument_sans_semibold, FontWeight.SemiBold),
+    Font(R.font.instrument_sans_bold, FontWeight.Bold),
 )
 
 /** --mono: label kecil (eyebrow, tag, stempel, tanggal). */
 val MonoFamily = FontFamily(
-    Font(googleFont = JetBrainsMonoFont, fontProvider = googleFontProvider, weight = FontWeight.Normal),
-    Font(googleFont = JetBrainsMonoFont, fontProvider = googleFontProvider, weight = FontWeight.Medium),
+    Font(R.font.jetbrains_mono_regular, FontWeight.Normal),
+    Font(R.font.jetbrains_mono_medium, FontWeight.Medium),
 )
 
 /** .eyebrow / .kpi-label — label mono di atas sebuah blok. */
