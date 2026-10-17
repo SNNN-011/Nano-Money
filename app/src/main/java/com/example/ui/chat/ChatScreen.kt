@@ -818,6 +818,16 @@ private fun PendingTransactionSheet(
 
             DashedDivider()
 
+            // Urutan isian detail: deskripsi - kategori - tanggal - catatan.
+            LabeledField(label = "Deskripsi") {
+                EditorialTextField(
+                    value = pending.description ?: "",
+                    onValueChange = { if (it.length <= 20) viewModel.updatePendingTransaction(pending.copy(description = it)) },
+                    placeholder = "cth: Beli eskrim",
+                    testTag = "pending_transaction_description_input"
+                )
+            }
+
             LabeledField(label = "Kategori") {
                 Box {
                     TapField(
@@ -844,12 +854,11 @@ private fun PendingTransactionSheet(
                 }
             }
 
-            LabeledField(label = "Deskripsi") {
-                EditorialTextField(
-                    value = pending.description ?: "",
-                    onValueChange = { if (it.length <= 20) viewModel.updatePendingTransaction(pending.copy(description = it)) },
-                    placeholder = "cth: Beli eskrim",
-                    testTag = "pending_transaction_description_input"
+            LabeledField(label = "Tanggal") {
+                TapField(
+                    text = FormatUtils.formatDate(pending.date ?: System.currentTimeMillis()),
+                    onClick = onPickDate,
+                    testTag = "pending_transaction_date_field"
                 )
             }
 
@@ -859,14 +868,6 @@ private fun PendingTransactionSheet(
                     onValueChange = { if (it.length <= 100) viewModel.updatePendingTransaction(pending.copy(notes = it)) },
                     placeholder = "Ketik catatan...",
                     testTag = "pending_transaction_notes_input"
-                )
-            }
-
-            LabeledField(label = "Tanggal") {
-                TapField(
-                    text = FormatUtils.formatDate(pending.date ?: System.currentTimeMillis()),
-                    onClick = onPickDate,
-                    testTag = "pending_transaction_date_field"
                 )
             }
         }
