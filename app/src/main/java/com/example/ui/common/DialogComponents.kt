@@ -1339,8 +1339,12 @@ fun RecurringTransactionManagementDialog(
                         // Dulu `weight(1f, fill = false)`: form-nya mengambil
                         // seluruh sisa tinggi jendela dialog, jadi dialognya
                         // melar hampir satu layar walau isinya cuma 5 kolom.
-                        // Sekarang tingginya dibatasi ketat dan isinya digulir.
-                        .heightIn(max = 200.dp)
+                        // Sekarang tingginya dibatasi dan isinya digulir.
+                        // 214 dp = kalimat pengantar + pil jenis + dua isian
+                        // penuh, dipilih pas di garis bawah isian "Jumlah".
+                        // Batas 200 dp yang lama jatuh di tengah isian, jadi
+                        // yang kelihatan separuh kotak kosong tanpa garis bawah.
+                        .heightIn(max = 214.dp)
                         .verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
@@ -1570,7 +1574,8 @@ fun RecurringTransactionManagementDialog(
                     }
                 }
             }
-            Spacer(modifier = Modifier.height(16.dp))
+            // Tidak perlu Spacer lagi: kolom induknya sudah memberi jarak 16 dp
+            // antar anak, jadi spacer ini bikin celahnya jadi 32 dp.
             if (isAddingNew) {
                 // M12: validasi live; tombol simpan nonaktif sampai semua nilai valid.
                 val recurringAmount = amountInput.replace(".", "").trim().toLongOrNull()
@@ -1622,8 +1627,7 @@ fun RecurringTransactionManagementDialog(
                     Text(
                         text = "Lengkapi deskripsi, jumlah, kategori, dan tanggal (1-31) sebelum menyimpan.",
                         style = MaterialTheme.typography.labelSmall,
-                        color = InkMuted,
-                        modifier = Modifier.padding(top = 8.dp)
+                        color = InkMuted
                     )
                 }
             } else {
