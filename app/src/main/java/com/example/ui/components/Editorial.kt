@@ -138,10 +138,10 @@ fun EditorialButton(
         modifier = modifier
             .then(if (expanded) Modifier.fillMaxWidth() else Modifier)
             .alpha(if (enabled) 1f else 0.5f)
-            // Tinggi minimum 48 dp: kalau chip panah dimatikan (tombol di dalam
-            // dialog), tombol jadi terlalu pendek karena chip 30 dp itulah yang
+            // Tinggi minimum 44 dp: kalau chip panah dimatikan (tombol di dalam
+            // dialog), tombol jadi terlalu pendek karena chip 26 dp itulah yang
             // biasanya menahan tingginya.
-            .heightIn(min = 48.dp)
+            .heightIn(min = 44.dp)
             .clip(RoundedCornerShape(CornerRadius.pill))
             .background(container)
             .then(
@@ -153,14 +153,21 @@ fun EditorialButton(
             )
             .clickable(enabled = enabled) { onClick() }
             .padding(
-                start = 20.dp,
-                end = if (trailingArrow) 7.dp else 20.dp,
-                top = 7.dp,
-                bottom = 7.dp
+                start = 16.dp,
+                end = if (trailingArrow) 6.dp else 16.dp,
+                top = 6.dp,
+                bottom = 6.dp
             )
             .then(if (testTag.isNotEmpty()) Modifier.testTag(testTag) else Modifier),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = if (expanded) Arrangement.SpaceBetween else Arrangement.spacedBy(11.dp)
+        // Tanpa chip panah, labelnya ditaruh di tengah pil. Sebelumnya label
+        // selalu menempel kiri, jadi tombol selebar separuh dialog kelihatan
+        // seperti pil raksasa dengan teks nyempil di pinggir.
+        horizontalArrangement = when {
+            expanded && trailingArrow -> Arrangement.SpaceBetween
+            trailingArrow -> Arrangement.spacedBy(11.dp)
+            else -> Arrangement.Center
+        }
     ) {
         Text(
             text = text,
@@ -171,7 +178,7 @@ fun EditorialButton(
         if (trailingArrow) {
             Box(
                 modifier = Modifier
-                    .size(30.dp)
+                    .size(26.dp)
                     .clip(CircleShape)
                     .background(contentColor),
                 contentAlignment = Alignment.Center
@@ -180,7 +187,7 @@ fun EditorialButton(
                     imageVector = Icons.Default.NorthEast,
                     contentDescription = null,
                     tint = container,
-                    modifier = Modifier.size(15.dp)
+                    modifier = Modifier.size(13.dp)
                 )
             }
         }

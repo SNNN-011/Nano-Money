@@ -405,6 +405,9 @@ private fun BudgetSlip(
                 EditorialButton(
                     text = "Atur",
                     onClick = onSetBudgetClick,
+                    // Tanpa chip panah: tombolnya cukup selebar label saja,
+                    // tidak jadi pil besar di samping teks ajakan.
+                    trailingArrow = false,
                     testTag = "set_budget_cta_button"
                 )
             }
