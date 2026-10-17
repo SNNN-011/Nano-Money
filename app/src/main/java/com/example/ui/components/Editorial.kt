@@ -367,6 +367,10 @@ fun EditorialDialog(
 // Dipakai bersama tab Chat (lembar konfirmasi AI) dan dialog-dialog editorial,
 // supaya dua isian sejenis tidak pernah kelihatan beda bentuk.
 
+// Tinggi baku kontrol editorial. Tanpa ini kotak isian Material tampil ~52 dp,
+// jadi lebih jangkung dari pil jenis (34 dp) dan tombol (44 dp) di sebelahnya.
+private val FieldHeight = 44.dp
+
 /** Isian berlabel: label mono kecil di atas kolom isian. */
 @Composable
 fun LabeledField(
@@ -408,6 +412,9 @@ fun EditorialTextField(
         colors = editorialFieldColors(),
         modifier = modifier
             .fillMaxWidth()
+            // Dikunci setinggi tombol: kolom isian tidak lagi lebih jangkung
+            // dari kontrol lain di dialog yang sama.
+            .height(FieldHeight)
             .testTag(testTag)
     )
 }
@@ -423,7 +430,9 @@ fun TapField(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .heightIn(min = 56.dp)
+            .heightIn(min = FieldHeight)
+            // Isian ketuk dulu 56 dp, jadi tampil lebih jangkung daripada
+            // isian teks di form yang sama; sekarang dua-duanya 44 dp.
             .clip(RoundedCornerShape(CornerRadius.md))
             .background(Cream)
             .border(1.dp, HairlineStrong, RoundedCornerShape(CornerRadius.md))
