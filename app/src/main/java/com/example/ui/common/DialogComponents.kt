@@ -28,6 +28,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -110,69 +111,63 @@ fun DeleteTransactionDialog(
     onConfirm: () -> Unit,
     onDismiss: () -> Unit
 ) {
-    Dialog(onDismissRequest = onDismiss) {
+    EditorialDialog(onDismissRequest = onDismiss) {
         Card(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(28.dp),
-            colors = CardDefaults.cardColors(containerColor = MidnightAbyss),
-            border = BorderStroke(
-                width = 1.dp,
-                brush = Brush.verticalGradient(
-                    colors = listOf(
-                        GhostWhite.copy(alpha = 0.2f),
-                        GhostWhite.copy(alpha = 0.02f)
-                    )
-                )
-            ),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(Spacing.lg),
+            shape = RoundedCornerShape(CornerRadius.bezel),
+            colors = CardDefaults.cardColors(containerColor = CreamRaised),
+            border = BorderStroke(1.dp, Hairline),
             elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
         ) {
-            Box(modifier = Modifier.background(TranslucentGlass)) {
-                Column(
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(24.dp),
+                    .padding(Spacing.xl),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Icon(
                     imageVector = Icons.Default.DeleteOutline,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.size(48.dp).padding(bottom = 8.dp)
+                    tint = BurntOrange,
+                    modifier = Modifier.size(40.dp).padding(bottom = Spacing.sm)
                 )
                 Text(
                     text = "Hapus Transaksi",
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = GhostWhite,
-                    modifier = Modifier.padding(bottom = 16.dp)
+                    style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Medium),
+                    fontFamily = SerifFamily,
+                    color = Ink,
+                    modifier = Modifier.padding(bottom = Spacing.sm)
                 )
                 Text(
                     text = "Apakah Anda yakin ingin menghapus transaksi \"${record.description}\" senilai ${FormatUtils.formatRupiah(record.amount)}?",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = GhostWhite.copy(alpha = 0.8f),
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                    modifier = Modifier.padding(bottom = 24.dp)
+                    color = InkMuted,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(bottom = Spacing.xl)
                 )
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    PremiumButton(
+                    EditorialButton(
                         text = "Batal",
                         onClick = onDismiss,
                         modifier = Modifier.weight(1f),
-                        isActive = false,
+                        style = EditorialButtonStyle.Ghost,
+                        trailingArrow = false,
                         testTag = "cancel_delete_button"
                     )
-                    PremiumButton(
+                    EditorialButton(
                         text = "Hapus",
                         onClick = onConfirm,
                         modifier = Modifier.weight(1f),
-                        isActive = true,
+                        accent = BurntOrange,
+                        trailingArrow = false,
                         testTag = "confirm_delete_button"
                     )
                 }
-            }
             }
         }
     }
@@ -1326,7 +1321,11 @@ fun RecurringTransactionManagementDialog(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .weight(1f, fill = false)
+                        // Dulu `weight(1f, fill = false)`: form-nya mengambil
+                        // seluruh sisa tinggi jendela dialog, jadi pop up-nya
+                        // melar hampir satu layar walau isinya cuma 5 kolom.
+                        // Sekarang tingginya dibatasi dan isinya yang digulir.
+                        .heightIn(max = 300.dp)
                         .verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
@@ -1650,15 +1649,6 @@ fun RecurringTransactionManagementDialog(
                             }
                         }
                     }
-
-                    EditorialButton(
-                        text = "Tambah Rutinitas Baru",
-                        onClick = { isAddingNew = true },
-                        // Tanpa panah dan tanpa lebar penuh supaya label tetap
-                        // satu baris; rata kanan seperti tombol penutup lain.
-                        trailingArrow = false,
-                        modifier = Modifier.align(Alignment.End).testTag("add_recurring_trigger_button")
-                    )
                 }
             }
             Spacer(modifier = Modifier.height(16.dp))
@@ -1718,13 +1708,26 @@ fun RecurringTransactionManagementDialog(
                     )
                 }
             } else {
-                EditorialButton(
-                    text = "Tutup",
-                    onClick = onDismissRequest,
+                // Tambah dan Tutup sebaris, rata kanan. Sebelumnya keduanya
+                // menumpuk jadi dua baris terpisah.
+                Row(
                     modifier = Modifier.align(Alignment.End),
-                    style = EditorialButtonStyle.Ghost,
-                    trailingArrow = false
-                )
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    EditorialButton(
+                        text = "Tambah Rutinitas",
+                        onClick = { isAddingNew = true },
+                        trailingArrow = false,
+                        testTag = "add_recurring_trigger_button"
+                    )
+                    EditorialButton(
+                        text = "Tutup",
+                        onClick = onDismissRequest,
+                        style = EditorialButtonStyle.Ghost,
+                        trailingArrow = false
+                    )
+                }
             }
         }
     }
