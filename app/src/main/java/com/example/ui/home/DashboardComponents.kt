@@ -405,12 +405,12 @@ private fun BudgetSlip(
                     modifier = Modifier.weight(1f)
                 )
                 Spacer(modifier = Modifier.width(Spacing.md))
-                // Pil, sama seperti pil "Rutin" di kepala kartu. Tombol
-                // editorial (44 dp + padding 16 dp) terlihat kegedean
-                // menempel di sebelah teks ajakan ini.
+                // Pil seukuran pil "Rutin" di kepala kartu (tombol editorial
+                // 44 dp + padding 16 dp terlihat kegedean di sini). Tetap
+                // terisi tinta karena ini ajakan utama, bukan pilihan filter.
                 EditorialPill(
                     text = "Atur",
-                    selected = false,
+                    selected = true,
                     onClick = onSetBudgetClick,
                     testTag = "set_budget_cta_button"
                 )
