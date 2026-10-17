@@ -40,6 +40,7 @@ import com.example.ui.components.BezelCard
 import com.example.ui.components.DashedDivider
 import com.example.ui.components.EditorialButton
 import com.example.ui.components.EditorialButtonStyle
+import com.example.ui.components.EditorialDialog
 import com.example.ui.components.EditorialPill
 import com.example.ui.components.EditorialProgress
 import com.example.ui.components.Eyebrow
@@ -645,7 +646,7 @@ private fun monthLabel(offset: Int): String {
 /** Dialog penjelasan transaksi rutin. */
 @Composable
 private fun RutinInfoDialog(onDismiss: () -> Unit) {
-    Dialog(onDismissRequest = onDismiss) {
+    EditorialDialog(onDismissRequest = onDismiss) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()

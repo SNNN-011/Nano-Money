@@ -35,10 +35,12 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
 import com.example.ui.theme.CardCore
 import com.example.ui.theme.CardVeil
 import com.example.ui.theme.CornerRadius
 import com.example.ui.theme.Cream
+import com.example.ui.theme.EditorialTypography
 import com.example.ui.theme.EyebrowTextStyle
 import com.example.ui.theme.Hairline
 import com.example.ui.theme.HairlineStrong
@@ -318,5 +320,24 @@ fun EditorialProgress(
                 .background(color)
                 .then(if (testTag.isNotEmpty()) Modifier.testTag(testTag) else Modifier)
         )
+    }
+}
+
+/**
+ * Dialog dengan isi bertipografi editorial.
+ *
+ * `MaterialTheme` yang dipasang di luar `Dialog` tidak menyeberang ke isi
+ * dialog (dialog dikomposisi di jendela sendiri), jadi skala tipenya
+ * dipasang di dalam lambda `Dialog` lewat komponen ini.
+ */
+@Composable
+fun EditorialDialog(
+    onDismissRequest: () -> Unit,
+    content: @Composable () -> Unit
+) {
+    Dialog(onDismissRequest = onDismissRequest) {
+        MaterialTheme(typography = EditorialTypography) {
+            content()
+        }
     }
 }

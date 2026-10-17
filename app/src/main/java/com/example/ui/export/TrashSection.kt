@@ -28,6 +28,7 @@ import androidx.compose.ui.window.Dialog
 import com.example.data.FinancialRecord
 import com.example.ui.components.EditorialButton
 import com.example.ui.components.EditorialButtonStyle
+import com.example.ui.components.EditorialDialog
 import com.example.ui.config.FormatUtils
 import com.example.ui.theme.*
 import java.util.Locale
@@ -68,7 +69,7 @@ fun DeleteAllRecordsDialog(
             dismissTestTag = "delete_all_step1_cancel"
         )
     } else {
-        Dialog(onDismissRequest = onDismiss) {
+        EditorialDialog(onDismissRequest = onDismiss) {
             Card(
                 modifier = Modifier.fillMaxWidth().padding(16.dp),
                 shape = RoundedCornerShape(CornerRadius.bezel),
@@ -178,7 +179,7 @@ fun AppConfirmDialog(
     confirmTestTag: String = "",
     dismissTestTag: String = ""
 ) {
-    Dialog(onDismissRequest = onDismiss) {
+    EditorialDialog(onDismissRequest = onDismiss) {
         Card(
             modifier = Modifier.fillMaxWidth().padding(16.dp),
             shape = RoundedCornerShape(CornerRadius.bezel),

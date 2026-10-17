@@ -35,6 +35,7 @@ import com.example.data.FinancialRecord
 import com.example.ui.theme.*
 import com.example.ui.components.EditorialButton
 import com.example.ui.components.EditorialButtonStyle
+import com.example.ui.components.EditorialDialog
 import com.example.ui.components.Eyebrow
 import com.example.ui.components.GlassCard
 import com.example.ui.config.FormatUtils
@@ -670,7 +671,7 @@ fun MonthlyBudgetDialog(
     var showMonthlyBudgetInfo by remember { mutableStateOf(false) }
     var showCategoryBudgetInfo by remember { mutableStateOf(false) }
 
-    Dialog(onDismissRequest = onDismiss) {
+    EditorialDialog(onDismissRequest = onDismiss) {
         Card(
             modifier = Modifier.fillMaxWidth().padding(Spacing.lg),
             shape = RoundedCornerShape(CornerRadius.bezel),
@@ -937,7 +938,7 @@ fun MonthlyBudgetDialog(
                 }
 
                 if (showCategoryPickerPopup) {
-                    Dialog(onDismissRequest = { showCategoryPickerPopup = false }) {
+                    EditorialDialog(onDismissRequest = { showCategoryPickerPopup = false }) {
                         Card(
                             colors = CardDefaults.cardColors(containerColor = CreamRaised),
                             shape = RoundedCornerShape(CornerRadius.bezel),
@@ -1190,7 +1191,7 @@ fun MonthlyBudgetDialog(
 }
 
     if (showDeleteConfirmation) {
-        Dialog(onDismissRequest = { showDeleteConfirmation = false }) {
+        EditorialDialog(onDismissRequest = { showDeleteConfirmation = false }) {
             Card(
                 modifier = Modifier.fillMaxWidth().padding(Spacing.lg),
                 shape = RoundedCornerShape(CornerRadius.bezel),
@@ -1286,7 +1287,7 @@ fun RecurringTransactionManagementDialog(
     var amountError by remember { mutableStateOf<String?>(null) }
     var dayError by remember { mutableStateOf<String?>(null) }
 
-    Dialog(onDismissRequest = onDismissRequest) {
+    EditorialDialog(onDismissRequest = onDismissRequest) {
         Card(
             modifier = Modifier.fillMaxWidth().padding(Spacing.lg),
             shape = RoundedCornerShape(CornerRadius.bezel),
