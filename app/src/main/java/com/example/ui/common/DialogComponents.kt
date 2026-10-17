@@ -1315,22 +1315,21 @@ fun RecurringTransactionManagementDialog(
                     color = Ink
                 )
             }
-            Spacer(modifier = Modifier.height(8.dp))
             if (isAddingNew) {
                 // FORM MODE
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
                         // Dulu `weight(1f, fill = false)`: form-nya mengambil
-                        // seluruh sisa tinggi jendela dialog, jadi pop up-nya
+                        // seluruh sisa tinggi jendela dialog, jadi dialognya
                         // melar hampir satu layar walau isinya cuma 5 kolom.
-                        // Sekarang tingginya dibatasi dan isinya yang digulir.
-                        .heightIn(max = 300.dp)
+                        // Sekarang tingginya dibatasi ketat dan isinya digulir.
+                        .heightIn(max = 200.dp)
                         .verticalScroll(rememberScrollState()),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     Text(
-                        text = "Atur transaksi otomatis yang akan ditambahkan ke catatan keuangan Anda setiap bulan pada tanggal tertentu.",
+                        text = "Ditambahkan otomatis ke catatan tiap bulan.",
                         style = MaterialTheme.typography.bodySmall,
                         color = InkMuted
                     )
@@ -1708,24 +1707,27 @@ fun RecurringTransactionManagementDialog(
                     )
                 }
             } else {
-                // Tambah dan Tutup sebaris, rata kanan. Sebelumnya keduanya
-                // menumpuk jadi dua baris terpisah.
+                // Tutup di kiri, aksi utama di kanan: sama dengan pop up hapus
+                // (Batal kiri, Hapus kanan). Dua-duanya separuh lebar supaya
+                // barisnya simetris, bukan dua pil beda ukuran yang nyempil
+                // di kanan.
                 Row(
-                    modifier = Modifier.align(Alignment.End),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    EditorialButton(
-                        text = "Tambah Rutinitas",
-                        onClick = { isAddingNew = true },
-                        trailingArrow = false,
-                        testTag = "add_recurring_trigger_button"
-                    )
                     EditorialButton(
                         text = "Tutup",
                         onClick = onDismissRequest,
+                        modifier = Modifier.weight(1f),
                         style = EditorialButtonStyle.Ghost,
                         trailingArrow = false
+                    )
+                    EditorialButton(
+                        text = "Tambah",
+                        onClick = { isAddingNew = true },
+                        modifier = Modifier.weight(1f),
+                        trailingArrow = false,
+                        testTag = "add_recurring_trigger_button"
                     )
                 }
             }
