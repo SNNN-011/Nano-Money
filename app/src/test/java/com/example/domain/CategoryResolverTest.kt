@@ -159,4 +159,40 @@ class CategoryResolverTest {
     fun `kata_panjang_yang_berbeda_jauh_tidak_ikut_cocok`() {
         assertEquals("kursus", harusBaru("Kursus", listOf("Konsumsi", "Makanan")))
     }
+
+    // ---- Kategori akhir: dipakai bersama kartu konfirmasi dan penyimpanan ----
+
+    @Test
+    fun `kategori_akhir_memakai_kategori_user_saat_cocok`() {
+        assertEquals("Tagihan", CategoryResolver.finalCategory("tagihan", listOf("Makanan", "Tagihan")))
+    }
+
+    @Test
+    fun `kategori_akhir_masuk_penampung_saat_tidak_cocok`() {
+        // "Belanja" tidak ada di daftar user: jangan dikarang, pakai penampung.
+        assertEquals("Lainnya", CategoryResolver.finalCategory("Belanja", listOf("Makanan", "Tagihan")))
+    }
+
+    @Test
+    fun `kategori_akhir_memakai_penampung_milik_user_jika_ada`() {
+        // Yang dikembalikan harus persis seperti tersimpan di Room (emoji ikut),
+        // supaya kartu dan penyimpanan menulis nama kategori yang sama.
+        // ponytail: cuma emoji yang dikenal CategoryIconMapper yang ikut terbaca;
+        // emoji di luar daftar itu sudah jadi perilaku lama, bukan dari perubahan ini.
+        val penampung = "\uD83D\uDCB0 Lainnya"
+        assertEquals(penampung, CategoryResolver.finalCategory("Belanja", listOf("Makanan", penampung)))
+    }
+
+    @Test
+    fun `kategori_akhir_tetap_penampung_walau_user_menghapusnya`() {
+        // Kategori penampung sengaja tidak dibuatkan diam-diam: nama itu sudah jadi
+        // penanda di tempat lain, dan membuatnya kembali membatalkan pilihan user.
+        assertEquals("Lainnya", CategoryResolver.finalCategory("Belanja", listOf("Makanan")))
+    }
+
+    @Test
+    fun `kategori_akhir_dari_jawaban_kosong_masuk_penampung`() {
+        assertEquals("Lainnya", CategoryResolver.finalCategory(null, listOf("Makanan")))
+        assertEquals("Lainnya", CategoryResolver.finalCategory("   ", listOf("Makanan")))
+    }
 }

@@ -21,6 +21,8 @@ import java.io.IOException
 
 import android.graphics.Bitmap
 import com.example.domain.ParsedReceipt
+import com.example.domain.CategoryResolver
+import com.example.domain.TransactionCorrector
 import com.example.data.remote.ExtractionResult
 import com.example.ui.config.AiModelConfig
 import com.example.ui.config.FormatUtils
@@ -326,14 +328,14 @@ class ChatViewModel(
         val kePenampung = parsed.grouped
             .filter { grp ->
                 val tersedia = if (grp.type == "income") incomeCategories.value else expenseCategories.value
-                com.example.domain.CategoryResolver.resolve(grp.category, tersedia) is
+                CategoryResolver.resolve(grp.category, tersedia) is
                     com.example.domain.CategoryResolution.NeedsNewCategory
             }
             .map { it.category }
             .distinct()
         if (kePenampung.isNotEmpty()) {
             breakdown.append(
-                "\n💡 Yang tidak punya kategori yang cocok, jadi masuk ke $CATCH_ALL_CATEGORY: " +
+                "\n💡 Yang tidak punya kategori yang cocok, jadi masuk ke ${CategoryResolver.CATCH_ALL_NAME}: " +
                     kePenampung.joinToString(", ")
             )
         }
@@ -560,36 +562,19 @@ class ChatViewModel(
      *
      * Hanya kategori SESUAI TIPE yang dicocokkan. Kalau income dan expense digabung,
      * jawaban "Bonus" untuk sebuah pengeluaran akan nyangkut ke kategori income.
-     */
-    private suspend fun resolveCategory(type: String, aiCategory: String?): String {
-        val available = activeCategories(type)
-
-        return when (val result = com.example.domain.CategoryResolver.resolve(aiCategory, available)) {
-            is com.example.domain.CategoryResolution.Matched -> result.category
-            is com.example.domain.CategoryResolution.NeedsNewCategory ->
-                catchAllCategoryName(type, available)
-        }
-    }
-
-    /**
-     * Nama kategori penampung untuk jawaban AI yang tidak cocok dengan kategori user.
      *
-     * Kalau kategori ini tidak ada (user menghapusnya), namanya tetap dikembalikan
-     * apa adanya. Itu disengaja: nama "Lainnya" sudah dipakai sebagai penanda di
-     * beberapa tempat lain, termasuk saat kategori dihapus lalu transaksinya
-     * dipindahkan. Membuatkan kategori ini diam-diem di belakang layar justru
-     * membatalkan pilihan user.
+     * Nama kategori penampung sengaja tidak dibuatkan diam-diam kalau user sudah
+     * menghapusnya: nama "Lainnya" sudah dipakai sebagai penanda di beberapa tempat
+     * lain, termasuk saat kategori dihapus lalu transaksinya dipindahkan.
+     *
+     * Aturannya sendiri ada di [CategoryResolver.finalCategory], supaya kartu
+     * konfirmasi dan penyimpanan tidak pernah berbeda hasil.
      */
-    private fun catchAllCategoryName(type: String, available: List<String>): String {
-        val fallback = CATCH_ALL_CATEGORY
-        return available.firstOrNull {
-            com.example.domain.CategoryResolver.normalize(it) ==
-                com.example.domain.CategoryResolver.normalize(fallback)
-        } ?: fallback
-    }
+    private suspend fun resolveCategory(type: String, aiCategory: String?): String =
+        CategoryResolver.finalCategory(aiCategory, activeCategories(type))
 
     private suspend fun saveAndConfirmTransaction(result: ExtractionResult, userText: String) {
-        val recordType = if (result.type?.uppercase() == "PEMASUKAN" || result.type?.lowercase() == "income") "income" else "expense"
+        val recordType = TransactionCorrector.normalizeType(result.type)
         val recordCategory = resolveCategory(recordType, result.category)
 
         val recordAmount = result.amount ?: 0L
@@ -650,7 +635,7 @@ class ChatViewModel(
         _messages.value = current
     }
 
-    private fun showConfirmation(result: ExtractionResult, userText: String) {
+    private suspend fun showConfirmation(result: ExtractionResult, userText: String) {
         _pendingConfirmation.value = result
         
         val dateVal = result.date ?: System.currentTimeMillis()
@@ -659,18 +644,13 @@ class ChatViewModel(
             java.util.Locale.forLanguageTag("id")
         ).format(java.util.Date(dateVal))
         
-        val rawType = result.type?.lowercase() ?: "expense"
-        val tipe = if (rawType == "pemasukan" || rawType == "income") "Pemasukan" else "Pengeluaran"
+        val recordType = TransactionCorrector.normalizeType(result.type)
+        val tipe = if (recordType == TransactionCorrector.TYPE_INCOME) "Pemasukan" else "Pengeluaran"
         val nominal = FormatUtils.formatRupiah(result.amount ?: 0L)
-        
-        val allCategories = incomeCategories.value + expenseCategories.value
-        val resultCategoryRaw = result.category?.trim() ?: ""
-        val (_, cleanResult) = com.example.ui.util.CategoryIconMapper.extractEmojiAndLabel(resultCategoryRaw)
-        val cleanResultCategory = cleanResult.ifBlank { resultCategoryRaw }.trim()
-        val recordCategory = allCategories.firstOrNull { 
-            val (_, cleanCat) = com.example.ui.util.CategoryIconMapper.extractEmojiAndLabel(it)
-            cleanCat.trim().equals(cleanResultCategory, ignoreCase = true) 
-        } ?: "Lainnya"
+
+        // Kategori di kartu memakai jalur yang sama dengan penyimpanan: yang
+        // ditampilkan ke user harus sama dengan yang nanti tersimpan.
+        val recordCategory = resolveCategory(recordType, result.category)
         
         addAiMessage(
             """
@@ -689,15 +669,6 @@ class ChatViewModel(
 
 
     companion object {
-        /**
-         * Kategori penampung untuk jawaban AI yang tidak cocok dengan kategori user.
-         *
-         * Namanya sama dengan yang dipakai FinancialTrackerViewModel saat kategori
-         * dihapus lalu transaksinya dipindahkan, jadi cukup satu nama penanda di
-         * seluruh aplikasi.
-         */
-        private const val CATCH_ALL_CATEGORY = "Lainnya"
-
         /** Kunci prefs untuk pilihan otak chat (lihat [AiMode]). */
         private const val PREF_AI_MODE = "chat_ai_mode"
 

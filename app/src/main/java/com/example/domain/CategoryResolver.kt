@@ -30,6 +30,14 @@ object CategoryResolver {
     private const val TOKEN_OVERLAP = 55
     private const val MIN_SCORE = 30
 
+    /**
+     * Nama kategori penampung untuk jawaban AI yang tidak cocok dengan kategori user.
+     *
+     * Nama yang sama juga dipakai saat kategori dihapus lalu transaksinya dipindahkan,
+     * jadi cukup satu nama penanda di seluruh aplikasi.
+     */
+    const val CATCH_ALL_NAME = "Lainnya"
+
     /** Jarak huruf maksimum untuk menganggap sebuah kategori cuma salah ketik. */
     private const val TYPO_MAX_DISTANCE = 1
 
@@ -95,6 +103,25 @@ object CategoryResolver {
         }
 
         return CategoryResolution.NeedsNewCategory(cleaned)
+    }
+
+    /**
+     * Kategori akhir untuk satu jawaban AI.
+     *
+     * Kartu konfirmasi dan jalur simpan wajib memakai fungsi ini, bukan salinan
+     * aturannya masing-masing: kalau keduanya berbeda, user menyetujui satu kategori
+     * di kartu lalu yang tersimpan kategori lain.
+     *
+     * Jawaban yang tidak cocok tidak pernah dikarang jadi kategori baru, melainkan
+     * masuk kategori penampung milik user. Kalau kategori penampungnya sudah dihapus,
+     * namanya tetap dikembalikan apa adanya -- sama seperti perilaku lama.
+     */
+    fun finalCategory(aiCategory: String?, availableCategories: List<String>): String {
+        val hasil = resolve(aiCategory, availableCategories)
+        if (hasil is CategoryResolution.Matched) return hasil.category
+
+        val penampung = normalize(CATCH_ALL_NAME)
+        return availableCategories.firstOrNull { normalize(it) == penampung } ?: CATCH_ALL_NAME
     }
 
     /** Buang emoji dan spasi berlebih, lalu huruf kecil semua. */

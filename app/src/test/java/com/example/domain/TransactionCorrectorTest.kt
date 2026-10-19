@@ -137,4 +137,18 @@ class TransactionCorrectorTest {
         assertEquals("expense", jenisAkhir("bla 5000", null, null))
         assertEquals("expense", jenisAkhir("bla 5000", "aneh", "Entah"))
     }
+
+    @Test
+    fun `pemetaan_jenis_bawaan_ai_dinormalkan_dengan_aturan_yang_sama`() {
+        // Dipakai jalur simpan DAN kartu konfirmasi. Satu tempat saja, supaya kartu
+        // tidak pernah menampilkan jenis yang berbeda dari yang akhirnya disimpan.
+        assertEquals("income", TransactionCorrector.normalizeType("PEMASUKAN"))
+        assertEquals("income", TransactionCorrector.normalizeType(" pemasukan "))
+        assertEquals("income", TransactionCorrector.normalizeType("Income"))
+        assertEquals("expense", TransactionCorrector.normalizeType("PENGELUARAN"))
+        assertEquals("expense", TransactionCorrector.normalizeType("expense"))
+        assertEquals("expense", TransactionCorrector.normalizeType(null))
+        assertEquals("expense", TransactionCorrector.normalizeType(""))
+        assertEquals("expense", TransactionCorrector.normalizeType("aneh"))
+    }
 }

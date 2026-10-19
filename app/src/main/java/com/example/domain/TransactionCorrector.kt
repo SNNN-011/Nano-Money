@@ -80,7 +80,15 @@ object TransactionCorrector {
         return jenisAi
     }
 
-    private fun normalizeType(raw: String?): String {
+    /**
+     * Jenis dari jawaban AI, dinormalkan ke "income"/"expense".
+     *
+     * Dipakai jalur simpan dan kartu konfirmasi sekaligus, supaya kartu tidak pernah
+     * menampilkan jenis yang berbeda dari yang akhirnya disimpan. Nilai yang tidak
+     * dikenal dianggap pengeluaran, sama seperti perilaku lama, supaya jawaban aneh
+     * tidak tiba-tiba tercatat sebagai pemasukan.
+     */
+    fun normalizeType(raw: String?): String {
         val teks = raw?.trim()?.lowercase()
         return if (teks == TYPE_INCOME || teks == "pemasukan") TYPE_INCOME else TYPE_EXPENSE
     }
