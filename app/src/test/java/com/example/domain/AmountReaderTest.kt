@@ -1,7 +1,9 @@
 package com.example.domain
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -93,11 +95,67 @@ class AmountReaderTest {
     }
 
     @Test
-    fun angka_telanjang_tidak_dianggap_nominal() {
-        // Nomor tanggal/jam dan angka tanpa satuan jangan tersedot jadi uang.
-        assertNull(AmountReader.fromText("nasi goreng 15000"))
+    fun angka_telanjang_dibaca_kalau_jelas_nominal() {
+        // Nominal tanpa satuan tetap nominal. Sebelumnya sengaja tidak dibaca
+        // karena takut menelan tanggal/jam; sekarang dibaca dengan penjaga.
+        assertEquals(15_000L, AmountReader.fromText("nasi goreng 15000"))
+        assertEquals(50_000L, AmountReader.fromText("bayar bensin 50000"))
+        assertEquals(1_500L, AmountReader.fromText("parkir 1500"))
+        assertEquals(2_000_000L, AmountReader.fromText("uang masuk 2000000,-"))
+    }
+
+    @Test
+    fun angka_kecil_bukan_nominal() {
+        // Di bawah 1000 lebih mungkin jumlah barang/hari daripada uang.
         assertNull(AmountReader.fromText("tanggal 28 beli sesuatu"))
         assertNull(AmountReader.fromText("jam 7 bayar parkir"))
+        assertNull(AmountReader.fromText("beli 999 permen"))
+    }
+
+    @Test
+    fun angka_tanggal_jam_tahun_dan_nomor_hp_tidak_dibaca() {
+        // Penjaganya bukan karangan: 308 baris uji memuat angka tanggal tanpa
+        // nominal ("19-06", "4 hari lalu"), dan angka jam/nomor HP pernah jadi
+        // kandidat nominal.
+        assertNull(AmountReader.fromText("jam 1230 berangkat kerja"))
+        assertNull(AmountReader.fromText("tanggal 1234 catat"))
+        assertNull(AmountReader.fromText("tahun 2026 beli sepeda"))
+        assertNull(AmountReader.fromText("hp 081234567890"))
+        assertNull(AmountReader.fromText("wa 081234567890 bayar utang"))
+    }
+
+    @Test
+    fun angka_empat_digit_di_rentang_tahun_ditolak() {
+        assertNull(AmountReader.fromText("bayar 2026"))
+        // 1500 tidak masuk rentang tahun, jadi tetap dibaca.
+        assertEquals(1_500L, AmountReader.fromText("bayar 1500"))
+    }
+
+    @Test
+    fun semua_nominal_dibaca_urut_posisi() {
+        val teks = "gajian 5jt, beli es 5k, beli bensin 50rbu"
+        assertEquals(
+            listOf(5_000_000L, 5_000L, 50_000L),
+            AmountReader.fromTextAll(teks)
+        )
+    }
+
+    @Test
+    fun satu_nominal_atau_angka_bukan_nominal_tidak_dianggap_banyak() {
+        assertFalse(AmountReader.looksLikeMultiple("beli es 5rb"))
+        assertFalse(AmountReader.looksLikeMultiple("uang 200 ribu"))
+        // "2 porsi" dan "3 hari" bukan nominal, jadi bukan transaksi kedua.
+        assertFalse(AmountReader.looksLikeMultiple("beli 2 bensin 50000"))
+        assertFalse(AmountReader.looksLikeMultiple("bayar kos 3 hari 500000"))
+        assertFalse(AmountReader.looksLikeMultiple("bayar Rp2.500.000"))
+    }
+
+    @Test
+    fun beberapa_nominal_dianggap_banyak_transaksi() {
+        assertTrue(AmountReader.looksLikeMultiple("gajian 5jt, beli es 5k, beli bensin 50rbu"))
+        assertTrue(AmountReader.looksLikeMultiple("bayar wifi 300rb sama beli pulsa 25 ribu"))
+        // Nominal yang sama dua kali tetap dua transaksi.
+        assertTrue(AmountReader.looksLikeMultiple("parkir 5000, parkir lagi 5000"))
     }
 
     @Test
