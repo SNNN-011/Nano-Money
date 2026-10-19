@@ -140,4 +140,23 @@ class CategoryResolverTest {
         // dan transaksi tersimpan tanpa kategori.
         assertEquals("Game", harusCocok("Game", listOf("", "   ", "Game", "Makanan")))
     }
+
+    @Test
+    fun `salah_ketik_satu_huruf_pada_kata_panjang_masih_cocok`() {
+        // Model yang cuma keliru satu huruf tidak layak membuat kategori baru.
+        assertEquals("Makanan", harusCocok("makanana"))
+        assertEquals("Transportasi", harusCocok("trasportasi", listOf("Transportasi", "Makanan")))
+    }
+
+    @Test
+    fun `kata_pendek_beda_satu_huruf_tidak_ikut_cocok`() {
+        // "Kopi" dan "Kopu" terlalu pendek untuk ditebak; salah tebak di sini
+        // memindahkan transaksi ke kategori lain tanpa user sadari.
+        assertEquals("kopu", harusBaru("Kopu", listOf("Kopi", "Makanan")))
+    }
+
+    @Test
+    fun `kata_panjang_yang_berbeda_jauh_tidak_ikut_cocok`() {
+        assertEquals("kursus", harusBaru("Kursus", listOf("Konsumsi", "Makanan")))
+    }
 }

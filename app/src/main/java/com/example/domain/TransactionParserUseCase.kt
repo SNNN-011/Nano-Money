@@ -247,7 +247,18 @@ class TransactionParserUseCase {
             if (rawCategory.length > 100) {
                 return@withContext RequestResult.Error("Kategori terlalu panjang", null)
             }
-            val validType = if (rawType.uppercase() in setOf("PENGELUARAN", "PEMASUKAN", "EXPENSE", "INCOME")) rawType.uppercase() else "PENGELUARAN"
+            // Jenis dari AI diperiksa ulang: model sering menandai uang masuk
+            // ("terima gaji") sebagai pengeluaran. Koreksinya memakai kategori
+            // milik user dan kalimat aslinya -- lihat TransactionCorrector.
+            val correctedType = TransactionCorrector.correctType(
+                userText = inputText,
+                aiType = rawType,
+                aiCategory = rawCategory,
+                incomeCategories = incomeCategories,
+                expenseCategories = expenseCategories
+            )
+            val validType =
+                if (correctedType == TransactionCorrector.TYPE_INCOME) "PEMASUKAN" else "PENGELUARAN"
             val safeEmoji = if (rawEmoji.length <= 4) rawEmoji else "📦"
             // Tanggal di luar jendela wajar (0, tahun ngawur, jauh di masa depan)
             // dipakai "sekarang" supaya tidak menyusup ke bulan yang salah.

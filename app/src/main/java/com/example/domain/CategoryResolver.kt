@@ -21,11 +21,20 @@ sealed interface CategoryResolution {
  * Karena itu jawaban AI tidak dipakai mentah: kalau ada kategori user yang mirip,
  * kategori itu yang dipilih. Ini tidak bisa dicegah hanya lewat prompt, karena
  * model tetap cenderung ke label umum.
+ *
+ * Salah ketik ringan pada nama kategori ("makanana") juga ikut dicocokkan, karena
+ * model yang jawabannya keliru satu huruf tidak layak membuat kategori baru.
  */
 object CategoryResolver {
 
     private const val TOKEN_OVERLAP = 55
     private const val MIN_SCORE = 30
+
+    /** Jarak huruf maksimum untuk menganggap sebuah kategori cuma salah ketik. */
+    private const val TYPO_MAX_DISTANCE = 1
+
+    /** Panjang minimum nama kategori sebelum typo matching dipakai. */
+    private const val TYPO_MIN_LENGTH = 5
 
     fun resolve(
         aiCategory: String?,
@@ -70,6 +79,21 @@ object CategoryResolver {
         }
         best?.let { return CategoryResolution.Matched(it.first) }
 
+        // 4. Salah ketik ringan ("makanana" -> "Makanan"). Hanya untuk kata yang
+        //    cukup panjang: pada kata pendek, beda satu huruf biasanya beda arti
+        //    ("Ojek" vs "Ojol") dan menebaknya memindahkan transaksi ke kategori
+        //    yang salah tanpa user sadari.
+        //    ponytail: jarak 1 huruf & panjang minimal 5. Kalau nanti muncul kasus
+        //    nyata yang beda 2 huruf, tambahkan dari data, bukan dari tebakan.
+        if (cleaned.length >= TYPO_MIN_LENGTH) {
+            normalizedAvailable
+                .filter { it.second.length >= TYPO_MIN_LENGTH }
+                .map { it.first to levenshtein(cleaned, it.second) }
+                .filter { it.second <= TYPO_MAX_DISTANCE }
+                .minByOrNull { it.second }
+                ?.let { return CategoryResolution.Matched(it.first) }
+        }
+
         return CategoryResolution.NeedsNewCategory(cleaned)
     }
 
@@ -85,5 +109,57 @@ object CategoryResolver {
         if (needle.isEmpty()) return false
         val pattern = Regex("(^|[^a-z0-9])${Regex.escape(needle)}([^a-z0-9]|$)")
         return pattern.containsMatchIn(haystack)
+    }
+
+    /**
+     * Benar kalau [text] memuat salah satu [words] sebagai kata utuh.
+     *
+     * Dipakai untuk membaca kalimat user sendiri (mis. kata kerja "terima",
+     * "bayar"), bukan jawaban AI. Pencocokan kata utuh penting di sini: tanpa itu
+     * "dibayar" ikut terhitung sebagai "bayar" yang arahnya berlawanan.
+     */
+    fun containsAnyWord(text: String?, words: List<String>): Boolean {
+        if (text.isNullOrBlank()) return false
+        val haystack = normalize(text)
+        if (haystack.isEmpty()) return false
+        return words.any { containsWholeWord(haystack, it) }
+    }
+
+    /**
+     * Benar kalau [text] menyebut salah satu nama kategori di [categories].
+     *
+     * Dipakai sebagai bukti arah uang: kalimat "terima gaji" menyebut kategori
+     * "Gaji" milik user, sedangkan "bayar gaji karyawan" juga menyebutnya. Yang
+     * membedakan arahnya adalah kata kerjanya, bukan kategori ini.
+     */
+    fun mentionsCategory(text: String?, categories: List<String>): Boolean {
+        if (text.isNullOrBlank()) return false
+        val haystack = normalize(text)
+        if (haystack.isEmpty()) return false
+        return categories.any { kategori ->
+            val norm = normalize(kategori)
+            norm.isNotEmpty() && containsWholeWord(haystack, norm)
+        }
+    }
+
+    /** Jarak edit Levenshtein antara [a] dan [b] (jumlah huruf yang perlu diubah). */
+    private fun levenshtein(a: String, b: String): Int {
+        if (a == b) return 0
+        if (a.isEmpty()) return b.length
+        if (b.isEmpty()) return a.length
+
+        var prev = IntArray(b.length + 1) { it }
+        var cur = IntArray(b.length + 1)
+        for (i in 1..a.length) {
+            cur[0] = i
+            for (j in 1..b.length) {
+                val cost = if (a[i - 1] == b[j - 1]) 0 else 1
+                cur[j] = minOf(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost)
+            }
+            val tmp = prev
+            prev = cur
+            cur = tmp
+        }
+        return prev[b.length]
     }
 }
