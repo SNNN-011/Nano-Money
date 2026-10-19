@@ -21,6 +21,7 @@ import java.io.IOException
 
 import android.graphics.Bitmap
 import com.example.domain.ParsedReceipt
+import com.example.domain.AmountReader
 import com.example.domain.CategoryResolver
 import com.example.domain.TransactionCorrector
 import com.example.data.remote.ExtractionResult
@@ -651,14 +652,23 @@ class ChatViewModel(
         // Kategori di kartu memakai jalur yang sama dengan penyimpanan: yang
         // ditampilkan ke user harus sama dengan yang nanti tersimpan.
         val recordCategory = resolveCategory(recordType, result.category)
-        
+
+        // Model mencatat SATU transaksi per kalimat, jadi kalimat yang memuat
+        // beberapa nominal tetap jadi satu catatan. Sisanya bukan urusan model:
+        // user yang diberi tahu, supaya tidak mengira semuanya sudah tercatat.
+        val catatanBanyak = if (AmountReader.looksLikeMultiple(userText)) {
+            "\n⚠️ Kamu menyebut lebih dari satu nominal. Yang ini dicatat dulu, sisanya tolong catat sendiri ya."
+        } else {
+            ""
+        }
+
         addAiMessage(
             """
             Mau catat ini?
             📝 ${result.description ?: "Transaksi"}
             💰 $tipe $nominal
             🏷️ $recordCategory
-            📅 $tanggal
+            📅 $tanggal$catatanBanyak
             
             Silakan pilih tombol opsi 'Ya, Simpan' atau 'Batal' di bawah ini.
             """.trimIndent()
