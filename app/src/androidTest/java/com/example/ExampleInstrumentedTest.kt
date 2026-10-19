@@ -2,6 +2,7 @@ package com.example
 
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import com.example.BuildConfig
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -15,8 +16,9 @@ import org.junit.runner.RunWith
 class ExampleInstrumentedTest {
   @Test
   fun useAppContext() {
-    // Context of the app under test.
+    // Context of the app under test. Nama paket harus diambil dari BuildConfig,
+    // bukan namespace: keduanya berbeda dan applicationId yang dipakai di HP.
     val appContext = InstrumentationRegistry.getInstrumentation().targetContext
-    assertEquals("com.example", appContext.packageName)
+    assertEquals(BuildConfig.APPLICATION_ID, appContext.packageName)
   }
 }
