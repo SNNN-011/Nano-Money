@@ -77,12 +77,29 @@ class LocalTransactionParser(
             return RequestResult.Error("Otak lokal gagal menjawab. Coba lagi.", e)
         }
 
-        val call = try {
-            firstCall(raw)
+        val envelope = try {
+            JSONObject(trimToObject(raw))
         } catch (e: JSONException) {
             return RequestResult.Error("Jawaban otak lokal tidak sesuai format.", e)
-        } ?: // Tanpa function call: model menilai teks ini bukan transaksi.
-        return RequestResult.Success(ExtractionResult(error = "bukan_transaksi"))
+        }
+
+        val call = firstCall(envelope)
+        if (call == null) {
+            // Tidak ada panggilan yang tepercaya. Dua hal masih bisa dibedakan:
+            // kalimat user sendiri sudah menyebut nominalnya (tinggal tanya arah
+            // uangnya), atau mesin menahan panggilan berkeyakinan rendah (tanya
+            // nominalnya). Isi panggilan yang ditahan tidak pernah dipakai untuk
+            // menyimpan apa pun.
+            return when {
+                readableAmount(query) != null -> RequestResult.Success(
+                    ExtractionResult(error = "klarifikasi", pertanyaan = QUESTION_TYPE)
+                )
+                hasSuppressedCall(envelope) -> RequestResult.Success(
+                    ExtractionResult(error = "klarifikasi", pertanyaan = QUESTION_AMOUNT)
+                )
+                else -> RequestResult.Success(ExtractionResult(error = "bukan_transaksi"))
+            }
+        }
 
         val name = call.optString("name", "").trim()
         val args = call.optJSONObject("arguments") ?: JSONObject()
@@ -139,12 +156,27 @@ class LocalTransactionParser(
      * Balasan berbentuk {"function_calls":[{"name":..,"arguments":{..}}], ...};
      * daftar kosong berarti model tidak menemukan transaksi di teks itu.
      */
-    private fun firstCall(raw: String): JSONObject? {
-        val envelope = JSONObject(trimToObject(raw))
+    private fun firstCall(envelope: JSONObject): JSONObject? {
         val calls = envelope.optJSONArray("function_calls") ?: return null
         if (calls.length() == 0) return null
         return calls.optJSONObject(0)
     }
+
+    /**
+     * Benar kalau mesin menahan sekurang-kurangnya satu panggilan.
+     *
+     * Panggilan yang ditahan berarti keyakinannya di bawah ambang, jadi isinya
+     * tidak layak dipakai. Yang dibaca di sini cuma kehadirannya, sebagai alasan
+     * untuk bertanya.
+     */
+    private fun hasSuppressedCall(envelope: JSONObject): Boolean {
+        val calls = envelope.optJSONArray("suppressed_calls") ?: return false
+        return calls.length() > 0
+    }
+
+    /** Nominal yang jelas terbaca dari kalimat user, dalam rentang yang wajar. */
+    private fun readableAmount(text: String): Long? =
+        AmountReader.fromText(text)?.takeIf { it in 1..AI_MAX_AMOUNT }
 
     /** Membuang teks di luar {...} supaya satu baris basa-basi tidak merusak parsing. */
     private fun trimToObject(raw: String): String {

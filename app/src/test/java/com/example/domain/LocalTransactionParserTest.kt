@@ -133,6 +133,67 @@ class LocalTransactionParserTest {
     }
 
     @Test
+    fun `tanpa_panggilan_tapi_nominalnya_jelas_ditanya_jenisnya`() {
+        // "uang 200 ribu": nominalnya jelas, arah uangnya tidak. Menolaknya sebagai
+        // bukan-transaksi itu salah -- user cuma perlu ditanya satu hal.
+        val engine = FakeEngine("""{"type":"text","function_calls":[]}""")
+        val result = success(parse(engine, "uang 200 ribu"))
+
+        assertEquals("klarifikasi", result.error)
+        assertNotNull(result.pertanyaan)
+        assertTrue(
+            "pertanyaan harus menyinggung arah uang: ${result.pertanyaan}",
+            result.pertanyaan!!.contains("masuk")
+        )
+    }
+
+    @Test
+    fun `tanpa_panggilan_dan_tanpa_nominal_tetap_bukan_transaksi`() {
+        val engine = FakeEngine("""{"type":"text","function_calls":[]}""")
+        val result = success(parse(engine, "apa kabar hari ini?"))
+
+        assertEquals("bukan_transaksi", result.error)
+    }
+
+    @Test
+    fun `panggilan_yang_ditahan_mesin_cuma_dipakai_untuk_bertanya`() {
+        // Mesin menahan panggilan yang keyakinannya rendah. Isinya tidak boleh
+        // disimpan -- nominal dan kategorinya justru yang paling tidak tepercaya.
+        // Kehadirannya cuma cukup jadi alasan menanyakan nominal.
+        val engine = FakeEngine(
+            """{"type":"call","function_calls":[],"suppressed_calls":""" +
+                """[{"name":"catat_pengeluaran","arguments":{"amount":5000,"category":"makanan"}}]}"""
+        )
+        val result = success(parse(engine, "bayar iBox"))
+
+        assertEquals("klarifikasi", result.error)
+        assertNotNull(result.pertanyaan)
+        assertTrue(
+            "pertanyaan harus menyinggung nominal: ${result.pertanyaan}",
+            result.pertanyaan!!.contains("ominal")
+        )
+        assertEquals("nominal ditahan tidak boleh ikut tersimpan", null, result.amount)
+        assertEquals("kategori ditahan tidak boleh ikut tersimpan", null, result.category)
+    }
+
+    @Test
+    fun `nominal_terbaca_menang_atas_panggilan_yang_ditahan_mesin`() {
+        // Dua-duanya ada: yang ditanya arah uangnya, bukan nominalnya, karena
+        // kalimat user sudah menyebut nominalnya sendiri.
+        val engine = FakeEngine(
+            """{"type":"call","function_calls":[],"suppressed_calls":""" +
+                """[{"name":"catat_masuk","arguments":{"amount":200000,"category":"lainnya"}}]}"""
+        )
+        val result = success(parse(engine, "uang 200 ribu"))
+
+        assertEquals("klarifikasi", result.error)
+        assertTrue(
+            "pertanyaan harus menyinggung arah uang: ${result.pertanyaan}",
+            result.pertanyaan!!.contains("masuk")
+        )
+    }
+
+    @Test
     fun `nominal_hilang_ditanyakan_bukan_dikarang`() {
         val engine = FakeEngine(envelope("""{"name":"catat_pengeluaran","arguments":{"category":"makanan"}}"""))
         val result = success(parse(engine, "beli bakso"))
