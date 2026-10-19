@@ -71,6 +71,8 @@ fun ChatScreen(
     // Satu sumber kebenaran: bendera dari ViewModel, bukan hasil hitung ulang isi
     // daftar pesan (dulu keduanya bisa berbeda).
     val isAiProcessing by viewModel.isAiProcessing.collectAsState()
+    // Otak yang sedang dipakai: AI Lokal (tanpa internet) atau AI Gemini (online).
+    val aiMode by viewModel.aiMode.collectAsState()
     val focusManager = LocalFocusManager.current
     var inputText by rememberSaveable { mutableStateOf("") }
     val listState = rememberLazyListState()
@@ -277,9 +279,13 @@ fun ChatScreen(
                         )
 
                         Text(
-                            text = "Nano AI memakai satu model utama. Kalau model itu sedang tidak tersedia, " +
-                                "aplikasi otomatis mencoba dua model cadangan secara berurutan, jadi tidak perlu " +
-                                "memilih model secara manual.",
+                            text = "Nano AI punya dua otak yang bisa dipilih di atas kolom chat:\n" +
+                                "• AI Lokal — jalan tanpa internet dan tanpa kirim data ke mana pun, " +
+                                "tapi belum bisa membaca foto struk.\n" +
+                                "• AI Gemini — butuh internet, bisa membaca foto struk.\n\n" +
+                                "Di AI Gemini, aplikasi memakai satu model utama. Kalau model itu sedang " +
+                                "tidak tersedia, aplikasi otomatis mencoba dua model cadangan secara " +
+                                "berurutan, jadi tidak perlu memilih model secara manual.",
                             color = GhostWhite.copy(alpha = 0.8f),
                             style = MaterialTheme.typography.bodyMedium
                         )
@@ -488,6 +494,29 @@ fun ChatScreen(
             }
 
             HorizontalDivider(color = GhostWhite.copy(alpha = 0.1f), thickness = 1.dp)
+
+            // Dua otak, satu kolom chat. AI Lokal jalan tanpa internet tapi belum
+            // bisa baca foto struk; AI Gemini sebaliknya.
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = Spacing.lg, vertical = Spacing.sm),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
+            ) {
+                AiModeChip(
+                    label = "AI Lokal",
+                    selected = aiMode == AiMode.LOCAL,
+                    onClick = { viewModel.setAiMode(AiMode.LOCAL) },
+                    testTag = "chat_mode_local_chip"
+                )
+                AiModeChip(
+                    label = "AI Gemini",
+                    selected = aiMode == AiMode.GEMINI,
+                    onClick = { viewModel.setAiMode(AiMode.GEMINI) },
+                    testTag = "chat_mode_gemini_chip"
+                )
+            }
 
             // Chat History Area
             LazyColumn(
@@ -1236,9 +1265,14 @@ fun ChatScreen(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
             ) {
+                // Foto struk hanya bisa dibaca otak Gemini. Di mode AI Lokal
+                // tombolnya diredupkan (tidak disembunyikan) supaya tata letak
+                // tidak melompat saat user berganti mode.
+                val receiptDisabled = hasPending || isAiProcessing || aiMode == AiMode.LOCAL
+
                 IconButton(
                     onClick = { showSourceSelector = true },
-                    enabled = !hasPending && !isAiProcessing,
+                    enabled = !receiptDisabled,
                     modifier = Modifier
                         .size(48.dp)
                         .clip(CircleShape)
@@ -1248,7 +1282,7 @@ fun ChatScreen(
                     Icon(
                         imageVector = Icons.Default.AddAPhoto,
                         contentDescription = "Pindai Struk Belanja",
-                        tint = if (hasPending || isAiProcessing) GhostWhite.copy(alpha = 0.45f) else SteelBlue
+                        tint = if (receiptDisabled) GhostWhite.copy(alpha = 0.45f) else SteelBlue
                     )
                 }
 
@@ -1333,6 +1367,63 @@ fun ChatScreen(
                     )
                 }
             }
+        }
+    }
+}
+
+/**
+ * Pilihan otak chat di atas daftar pesan.
+ *
+ * Bentuknya sengaja meniru chip pilihan yang sudah dipakai layar lain
+ * (MonthSelectChip di tab ekspor): kartu tipis, garis gradasi, dan penanda biru
+ * saat terpilih -- supaya dua kontrol sejenis tampil sama di seluruh aplikasi.
+ */
+@Composable
+private fun AiModeChip(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    testTag: String
+) {
+    Card(
+        modifier = Modifier
+            .clip(RoundedCornerShape(CornerRadius.md))
+            .clickable { onClick() }
+            .testTag(testTag),
+        shape = RoundedCornerShape(CornerRadius.md),
+        colors = CardDefaults.cardColors(
+            containerColor = if (selected) SteelBlue.copy(alpha = 0.25f) else TranslucentGlass
+        ),
+        border = BorderStroke(
+            width = 1.dp,
+            brush = Brush.verticalGradient(
+                colors = if (selected) {
+                    listOf(SteelBlue.copy(alpha = 0.6f), SteelBlue.copy(alpha = 0.2f))
+                } else {
+                    listOf(GhostWhite.copy(alpha = 0.15f), GhostWhite.copy(alpha = 0.02f))
+                }
+            )
+        )
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.xs)
+        ) {
+            if (selected) {
+                Icon(
+                    imageVector = Icons.Default.CheckCircle,
+                    contentDescription = "Dipilih",
+                    tint = SteelBlue,
+                    modifier = Modifier.size(14.dp)
+                )
+            }
+            Text(
+                text = label,
+                color = if (selected) GhostWhite else GhostWhite.copy(alpha = 0.7f),
+                fontSize = 12.sp,
+                fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium
+            )
         }
     }
 }

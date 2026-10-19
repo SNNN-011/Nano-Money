@@ -27,3 +27,10 @@ app/google-services.json
 # JVM crash logs
 hs_err_pid*.log
 replay_pid*.log
+
+# Artefak otak lokal (bukan sumber, ukurannya besar):
+# - rank64.cact (63 MB) hasil training; cara mendapatkannya ada di PASANG-LOKAL.md
+# - libneedle_jni.so jembatan JNI; cara membangunnya ada di PASANG-LOKAL.md
+# Keduanya HARUS ada di mesin sebelum `assembleRelease`, tapi tidak ikut git.
+app/src/main/assets/*.cact
+app/src/main/jniLibs/**/*.so

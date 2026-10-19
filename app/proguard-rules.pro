@@ -42,6 +42,14 @@
 -keep class com.example.data.** { *; }
 -keep class com.example.domain.** { *; }
 
+# JNI: nama kelas & method native ikut jadi bagian simbol C (needle_jni.c,
+# Java_com_example_data_local_NeedleNative_*). Dua baris di atas sudah menjaga
+# paket com.example.data.** apa adanya, jadi kelas NeedleNative aman; aturan
+# umum di bawah menutup JNI lain yang mungkin ditambahkan di luar paket itu.
+-keepclasseswithmembernames,includedescriptorclasses class * {
+    native <methods>;
+}
+
 # Retrofit keep rules
 -keep class retrofit2.** { *; }
 -keepclassmembers class * {
