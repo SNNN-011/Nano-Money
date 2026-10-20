@@ -313,17 +313,14 @@ fun TransactionFormCard(
             )
         }
 
-        // ── Aksi: rata kiri seperti tombol kirim di referensi ──────────
+        // ── Aksi: menempel kanan, sama seperti footer dialog ───────────
         Row(
-            modifier = Modifier.padding(top = Spacing.sm),
-            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = Spacing.sm),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.sm, Alignment.End),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            EditorialButton(
-                text = if (isEditing) "Simpan Edit" else "Catat Transaksi",
-                onClick = { onSave() },
-                testTag = "form_submit_button"
-            )
             EditorialButton(
                 text = "Batal",
                 onClick = onReset,
@@ -331,6 +328,11 @@ fun TransactionFormCard(
                 trailingArrow = false,
                 accent = InkMuted,
                 testTag = "form_reset_button"
+            )
+            EditorialButton(
+                text = if (isEditing) "Simpan Edit" else "Catat Transaksi",
+                onClick = { onSave() },
+                testTag = "form_submit_button"
             )
         }
     }
