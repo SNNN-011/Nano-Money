@@ -59,6 +59,18 @@ object TransactionCorrector {
     private val INCOME_PHRASES = listOf("uang kiriman", "kiriman dari", "dikirim")
 
     /**
+     * Frasa uang masuk yang biasanya membuka kalimat.
+     *
+     * Dipakai untuk kalimat bertujuan: "dikasih uang sama ayah 1 juta buat bayar
+     * kuliah". Di situ "bayar" hanya menyebut TUJUAN uangnya, bukan arah
+     * transaksinya, jadi frasa uang masuk yang muncul lebih dulu yang menang.
+     */
+    private val EARLY_INCOME_PHRASES = listOf(
+        "dikasih uang", "dikasih duit", "diberi uang", "diberi duit",
+        "dapat uang", "dapet uang", "dapat duit", "dapet duit", "uang dari"
+    )
+
+    /**
      * Jenis akhir untuk satu jawaban AI.
      *
      * [aiType] boleh berisi "PEMASUKAN"/"PENGELUARAN"/"income"/"expense". Nilai
@@ -84,6 +96,17 @@ object TransactionCorrector {
         //    pengeluaran). Kata kerja dua arah sudah disaring di helper.
         if (adaVerbExpense && !adaVerbIncome && !adaKatIncome) return TYPE_EXPENSE
         if (adaVerbIncome && !adaVerbExpense && !adaKatExpense) return TYPE_INCOME
+
+        // 1b. Dua kata kerja bercampur: kalau frasa uang masuk muncul lebih dulu,
+        //     kata kerja pengeluaran sesudahnya hanya menyebut tujuan uang itu
+        //     ("dikasih uang sama ayah 1 juta buat bayar kuliah" tetap pemasukan).
+        if (adaVerbIncome && adaVerbExpense && !adaKatExpense) {
+            val posisiMasuk = firstPhraseIndex(userText, EARLY_INCOME_PHRASES)
+            val posisiKeluar = firstWordIndex(userText, EXPENSE_VERBS)
+            if (posisiMasuk >= 0 && (posisiKeluar < 0 || posisiMasuk < posisiKeluar)) {
+                return TYPE_INCOME
+            }
+        }
 
         // 2. Kategori pilihan AI sendiri. Kalau kategorinya cuma ada di daftar
         //    pemasukan, jenisnya pemasukan -- model sudah "tahu" isinya, yang
@@ -123,8 +146,26 @@ object TransactionCorrector {
         return CategoryResolver.containsAnyWord(text, EXPENSE_VERBS)
     }
 
-    /** [text] memuat salah satu [phrases] sebagai frasa utuh. */
-    private fun containsAnyPhrase(text: String?, phrases: List<String>): Boolean {
+    /** Posisi awal frasa pertama dari [phrases] di teks ternormalisasi, atau -1. */
+    private fun firstPhraseIndex(text: String?, phrases: List<String>): Int {
+        val haystack = CategoryResolver.normalize(text)
+        if (haystack.isEmpty()) return -1
+        return phrases.map { haystack.indexOf(it) }
+            .filter { it >= 0 }
+            .minOrNull() ?: -1
+    }
+
+    /** Posisi awal kata pertama dari [words] di teks ternormalisasi, atau -1. */
+    private fun firstWordIndex(text: String?, words: List<String>): Int {
+        val haystack = CategoryResolver.normalize(text)
+        if (haystack.isEmpty()) return -1
+        val padded = " $haystack "
+        return words.map { padded.indexOf(" $it ") }
+            .filter { it >= 0 }
+            .minOrNull() ?: -1
+    }
+
+    /** [text] memuat salah satu [phrases] sebagai frasa utuh. */    private fun containsAnyPhrase(text: String?, phrases: List<String>): Boolean {
         val haystack = CategoryResolver.normalize(text)
         if (haystack.isEmpty()) return false
         val padded = " ${haystack} "

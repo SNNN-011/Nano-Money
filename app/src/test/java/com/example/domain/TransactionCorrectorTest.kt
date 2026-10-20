@@ -144,6 +144,25 @@ class TransactionCorrectorTest {
     }
 
     @Test
+    fun `frasa_uang_masuk_menang_atas_kata_kerja_tujuan`() {
+        // "bayar kuliah" di sini cuma menjelaskan uangnya dipakai buat apa,
+        // bukan arah transaksinya. Uangnya tetap MASUK.
+        assertEquals(
+            "income",
+            jenisAkhir("dikasih uang sama ayah 1 juta buat bayar kuliah", "PENGELUARAN", "Makanan")
+        )
+        assertEquals(
+            "income",
+            jenisAkhir("dapat uang 100 ribu buat beli bakso", "PENGELUARAN", "Makanan")
+        )
+        // Kebalikannya tetap pengeluaran: uang masuk disebut sesudah kata kerja keluar.
+        assertEquals(
+            "expense",
+            jenisAkhir("beli baju 300 ribu dapat uang dari kakak", "PENGELUARAN", "Belanja")
+        )
+    }
+
+    @Test
     fun `pemetaan_jenis_bawaan_ai_dinormalkan_dengan_aturan_yang_sama`() {
         // Dipakai jalur simpan DAN kartu konfirmasi. Satu tempat saja, supaya kartu
         // tidak pernah menampilkan jenis yang berbeda dari yang akhirnya disimpan.

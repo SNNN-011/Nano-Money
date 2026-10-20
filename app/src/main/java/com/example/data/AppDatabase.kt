@@ -691,7 +691,9 @@ abstract class AppDatabase : RoomDatabase() {
                 return
             }
 
-            val tempFile = java.io.File(context.cacheDir, "encrypted_temp.db")
+            // File sementara diletakkan di direktori database (bukan cache) supaya
+            // renameTo dijamin satu filesystem dan tidak bergantung izin direktori cache.
+            val tempFile = java.io.File(dbFile.parentFile, "$dbName.pre_encrypt.tmp")
             if (tempFile.exists()) tempFile.delete()
 
             // Cadangan diletakkan di direktori yang sama dengan database asli supaya
@@ -703,39 +705,67 @@ abstract class AppDatabase : RoomDatabase() {
             try {
                 net.sqlcipher.database.SQLiteDatabase.loadLibs(context)
 
-                val database = net.sqlcipher.database.SQLiteDatabase.openDatabase(
-                    dbFile.absolutePath,
-                    "",
+                // Konversi WAJIB memakai API buka yang sama dengan jalur runtime
+                // (byte[] passphrase). Ekspor lewat ATTACH ... KEY x'<hex>' tidak dipakai:
+                // SQLCipher memperlakukan bentuk itu sebagai raw key tanpa KDF, berbeda
+                // dengan SupportFactory(byte[]) yang melewati PBKDF2, sehingga file hasil
+                // ekspor tidak akan pernah bisa dibuka aplikasi.
+                val encryptedDatabase = net.sqlcipher.database.SQLiteDatabase.openDatabase(
+                    tempFile.absolutePath,
+                    passphraseBytes,
                     null,
-                    net.sqlcipher.database.SQLiteDatabase.OPEN_READWRITE
+                    net.sqlcipher.database.SQLiteDatabase.OPEN_READWRITE or
+                        net.sqlcipher.database.SQLiteDatabase.CREATE_IF_NECESSARY,
+                    null,
+                    null
                 )
 
-                // Jumlah tabel database asli (masih plaintext), pembanding verifikasi di bawah.
-                val originalTableCount = countTables(database)
+                // Jumlah tabel & versi skema database asli, pembanding verifikasi di bawah.
+                var originalTableCount = 0
+                try {
+                    // DB lama (masih plaintext) dibuka sebagai database terpasang.
+                    encryptedDatabase.rawExecSQL(
+                        "ATTACH DATABASE '${dbFile.absolutePath}' AS plain KEY ''"
+                    )
 
-                val hexChars = CharArray(passphraseBytes.size * 2)
-                val hexDigits = "0123456789abcdef".toCharArray()
-                for (i in passphraseBytes.indices) {
-                    val v = passphraseBytes[i].toInt() and 0xFF
-                    hexChars[i * 2] = hexDigits[v ushr 4]
-                    hexChars[i * 2 + 1] = hexDigits[v and 0x0F]
+                    val tabel = mutableListOf<Pair<String, String>>()
+                    encryptedDatabase.rawQuery(
+                        "SELECT name, sql FROM plain.sqlite_master " +
+                            "WHERE type='table' AND name NOT LIKE 'sqlite_%' AND sql IS NOT NULL",
+                        null
+                    ).use { cursor ->
+                        while (cursor.moveToNext()) {
+                            tabel += cursor.getString(0) to cursor.getString(1)
+                        }
+                    }
+                    originalTableCount = tabel.size
+
+                    val originalVersion = encryptedDatabase.rawQuery(
+                        "PRAGMA plain.user_version",
+                        null
+                    ).use { cursor -> if (cursor.moveToFirst()) cursor.getInt(0) else 0 }
+
+                    // Salin skema dan isi tabel apa adanya (kolom identik karena CREATE
+                    // diambil dari database asli), lalu samakan versi skema supaya Room
+                    // menjalankan migrasi 3->8 seperti biasa.
+                    encryptedDatabase.beginTransaction()
+                    try {
+                        for ((nama, sql) in tabel) {
+                            encryptedDatabase.execSQL(sql)
+                            encryptedDatabase.execSQL(
+                                "INSERT INTO main.\"$nama\" SELECT * FROM plain.\"$nama\""
+                            )
+                        }
+                        encryptedDatabase.rawExecSQL("PRAGMA main.user_version = $originalVersion")
+                        encryptedDatabase.setTransactionSuccessful()
+                    } finally {
+                        encryptedDatabase.endTransaction()
+                    }
+
+                    encryptedDatabase.rawExecSQL("DETACH DATABASE plain")
+                } finally {
+                    encryptedDatabase.close()
                 }
-                val passphraseHex = String(hexChars)
-                java.util.Arrays.fill(hexChars, '0')
-
-                // TODO(K1-audit): Bukti pada net.zetetic:android-database-sqlcipher:4.5.4 —
-                // byte[] password runtime diteruskan apa adanya ke sqlite3_key (native_key JNI),
-                // dan SQLCipher hanya memperlakukan "raw key tanpa KDF" bila nilainya berbentuk
-                // x'<64 hex>' (67 byte); passphrase runtime (32 byte biner) TIDAK memenuhi pola itu
-                // sehingga diolah lewat PBKDF2. Akibatnya KEY x'...' di baris ATTACH ini memakai
-                // kunci yang BEDA dari jalur buka SupportFactory(passphraseBytes). Format kunci
-                // sengaja tidak diubah di sini (berisiko mematahkan jalur buka yang sudah ada);
-                // verifikasi di bawah akan menangkap ketidakcocokan dan mempertahankan DB lama.
-                // Perbaikan sebenarnya harus mengubah jalur ekspor DAN jalur buka secara bersamaan.
-                database.rawExecSQL("ATTACH DATABASE '${tempFile.absolutePath}' AS encrypted KEY x'${passphraseHex}'")
-                database.rawExecSQL("SELECT sqlcipher_export('encrypted')")
-                database.rawExecSQL("DETACH DATABASE encrypted")
-                database.close()
 
                 // Verifikasi file hasil ekspor lewat API yang sama seperti jalur runtime
                 // (byte[] passphrase). Gagal membuka/membaca dianggap verifikasi gagal.
@@ -784,6 +814,18 @@ abstract class AppDatabase : RoomDatabase() {
                         "AppDatabase",
                         "Gagal menghapus salinan plaintext ${backupFile.absolutePath} setelah konversi."
                     )
+                }
+
+                // WAL/SHM milik database plaintext tidak boleh tertinggal: isinya tidak
+                // cocok dengan file terenkripsi dan bisa membuat Room gagal membuka DB.
+                listOf("-wal", "-shm").forEach { akhiran ->
+                    val sisa = java.io.File(dbFile.absolutePath + akhiran)
+                    if (sisa.exists() && !sisa.delete()) {
+                        com.example.util.SecureLog.e(
+                            "AppDatabase",
+                            "Gagal menghapus berkas sisa ${sisa.absolutePath} setelah konversi."
+                        )
+                    }
                 }
             } catch (e: Exception) {
                 // Sengaja TIDAK ditelan: kalau konversi gagal, jalur buka Room berikutnya pasti
