@@ -114,6 +114,9 @@ fun SummaryStatsCard(
                 title = "Pengeluaran",
                 value = FormatUtils.formatRupiah(totalExpense),
                 valueColor = BurntOrange,
+                // Kolom kanan menempel ke tepi kanan, jadi angka besar tidak
+                // terlihat menggantung di tengah setengah layar.
+                alignment = Alignment.End,
                 modifier = Modifier.weight(1f)
             )
         }
@@ -134,6 +137,7 @@ fun SummaryStatsCard(
                 title = "Transaksi",
                 value = "${totalTransactions}x",
                 valueColor = Ink,
+                alignment = Alignment.End,
                 modifier = Modifier.weight(1f)
             )
         }
@@ -157,8 +161,14 @@ fun SummaryStatsCard(
 
 /** Satu angka ringkasan: label mono di atas, nilai serif di bawah. */
 @Composable
-fun StatItem(title: String, value: String, valueColor: Color, modifier: Modifier = Modifier) {
-    Column(modifier = modifier) {
+fun StatItem(
+    title: String,
+    value: String,
+    valueColor: Color,
+    modifier: Modifier = Modifier,
+    alignment: Alignment.Horizontal = Alignment.Start
+) {
+    Column(modifier = modifier, horizontalAlignment = alignment) {
         Eyebrow(text = title)
         Text(
             text = value,
