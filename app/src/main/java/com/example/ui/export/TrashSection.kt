@@ -6,7 +6,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DeleteForever
@@ -343,11 +343,14 @@ fun TrashSection(
                         .fillMaxWidth()
                         .heightIn(max = 320.dp)
                 ) {
-                    items(deletedRecords, key = { it.id }) { record ->
+                    itemsIndexed(deletedRecords, key = { _, record -> record.id }) { index, record ->
                         TrashItem(
                             record = record,
                             onRestore = { onRestore(record) }
                         )
+                        // Daftar cadangan Drive memakai garis rambut antar baris;
+                        // daftar sampah harus sama supaya dua daftar ini konsisten.
+                        if (index < deletedRecords.lastIndex) HairlineDivider()
                     }
                 }
             }

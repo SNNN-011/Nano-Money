@@ -116,7 +116,7 @@ fun DatabaseBackupSection(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Eyebrow(text = "Sinkronisasi")
+                Eyebrow(text = "Cloud")
                 IconButton(
                     onClick = { showFirestoreHelpInfo = true },
                     modifier = Modifier.size(28.dp)
