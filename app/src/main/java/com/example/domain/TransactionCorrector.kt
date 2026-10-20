@@ -81,6 +81,36 @@ object TransactionCorrector {
     }
 
     /**
+     * Benar kalau [text] mengandung kata kerja transaksi yang jelas.
+     *
+     * Dipakai saat model tidak memanggil alat sama sekali: "isi bensin" bukan
+     * alasan untuk membalas "bukan transaksi" -- nominalnya yang belum ada, jadi
+     * aplikasi harus bertanya nominal. Kalimat tanpa kata kerja ("5jt", "2500000")
+     * tidak ikut terhitung di sini; jalur nominal yang menanganinya.
+     */
+    fun looksLikeTransaction(text: String?): Boolean =
+        CategoryResolver.containsAnyWord(text, INCOME_VERBS) ||
+            CategoryResolver.containsAnyWord(text, EXPENSE_VERBS)
+
+    /**
+     * Arah uang dari kata kerja di [text], atau null kalau buktinya bercampur/tidak ada.
+     *
+     * Hanya kata kerja yang dipakai: ini untuk menjawab pertanyaan aplikasi sendiri
+     * ("Itu uang masuk atau uang keluar?") ketika user cuma mengetik nominalnya.
+     * Kalau kedua arah muncul ("terima lalu bayar"), hasilnya null supaya aplikasi
+     * tetap bertanya, bukan menebak.
+     */
+    fun directionFromVerbs(text: String?): String? {
+        val masuk = CategoryResolver.containsAnyWord(text, INCOME_VERBS)
+        val keluar = CategoryResolver.containsAnyWord(text, EXPENSE_VERBS)
+        return when {
+            masuk && !keluar -> TYPE_INCOME
+            keluar && !masuk -> TYPE_EXPENSE
+            else -> null
+        }
+    }
+
+    /**
      * Jenis dari jawaban AI, dinormalkan ke "income"/"expense".
      *
      * Dipakai jalur simpan dan kartu konfirmasi sekaligus, supaya kartu tidak pernah

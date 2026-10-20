@@ -47,6 +47,20 @@ class LocalTransactionParser(
         const val QUESTION_AMOUNT = "Berapa nominalnya?"
         const val QUESTION_TYPE = "Itu uang masuk atau uang keluar?"
         const val QUESTION_OTHER = "Bisa tolong lengkapi keterangan transaksinya?"
+
+        /** Kata yang boleh menemani jawaban singkat atas pertanyaan aplikasi. */
+        private val CLARIFICATION_WORDS = setOf(
+            "uang", "itu", "tadi", "yang", "ya", "yah", "iya", "sih", "aja", "saja",
+            "nih", "dong", "kok", "kan", "sebesar", "adalah", "nominal", "nominalnya",
+            "masuk", "keluar", "pemasukan", "pengeluaran", "income", "expense", "in", "out"
+        )
+
+        private val INCOME_WORDS = setOf("masuk", "pemasukan", "income", "in")
+        private val EXPENSE_WORDS = setOf("keluar", "pengeluaran", "expense", "out")
+
+        /** Kata satuan uang yang boleh muncul di jawaban nominal murni. */
+        private val AMOUNT_WORDS_PATTERN =
+            Regex("(?i)\\b(rp|idr|rupiah|rb|ribu|ribuan|k|jt|jta|juta|jutaan|m|miliar|milyar|perak)\\b")
     }
 
     suspend fun parseTransaction(
@@ -68,6 +82,14 @@ class LocalTransactionParser(
             ?.takeIf { it.isNotBlank() }
             ?.let { "$it $inputText" }
             ?: inputText
+
+        // Jawaban singkat atas pertanyaan aplikasi sendiri ("masuk", "50rb") tidak
+        // perlu dikirim ke model: pertanyaannya cuma dua (nominal / arah), jadi
+        // isinya bisa disusun dari kalimat sebelumnya. Tanpa jalur ini model kadang
+        // tetap tidak memanggil alat, lalu aplikasi menanyakan hal yang sama sampai
+        // batas 3 kali lalu menyerah.
+        quickAnswer(inputText, pendingContext, incomeCategories, expenseCategories)
+            ?.let { return RequestResult.Success(it) }
 
         // Daftar kategori user diteruskan ke model dulu: otak v5 memilih
         // kategori dari daftar yang DIBERIKAN. Tanpa ini kategori benar
@@ -100,6 +122,12 @@ class LocalTransactionParser(
                     ExtractionResult(error = "klarifikasi", pertanyaan = QUESTION_TYPE)
                 )
                 hasSuppressedCall(envelope) -> RequestResult.Success(
+                    ExtractionResult(error = "klarifikasi", pertanyaan = QUESTION_AMOUNT)
+                )
+                // Ada kata kerja transaksi ("isi bensin") tapi nominalnya belum
+                // disebut. Dulu ini dijawab "bukan transaksi" lalu catatannya
+                // hilang; yang kurang nominal, bukan transaksinya.
+                TransactionCorrector.looksLikeTransaction(query) -> RequestResult.Success(
                     ExtractionResult(error = "klarifikasi", pertanyaan = QUESTION_AMOUNT)
                 )
                 else -> RequestResult.Success(ExtractionResult(error = "bukan_transaksi"))
@@ -140,19 +168,141 @@ class LocalTransactionParser(
             incomeCategories = incomeCategories,
             expenseCategories = expenseCategories
         )
+        val item = args.optString("item", "").trim()
         val validType =
             if (corrected == TransactionCorrector.TYPE_INCOME) "PEMASUKAN" else "PENGELUARAN"
 
+        // Kategori model diperbaiki dengan kata kunci dari data latih ("bensin" ->
+        // Transportasi), tapi hanya kalau kategorinya benar-benar ada di daftar
+        // user untuk jenis yang sudah dikoreksi. Kalau tidak ada yang cocok,
+        // jawaban model dibiarkan (dan nanti jatuh ke "Lainnya" lewat resolver).
+        val candidates =
+            if (corrected == TransactionCorrector.TYPE_INCOME) incomeCategories else expenseCategories
+        val finalCategory = CategoryHints.suggest(item, candidates)
+            ?: CategoryHints.suggest(inputText, candidates)
+            ?: aiCategory.ifBlank { null }
+
         return RequestResult.Success(
             ExtractionResult(
-                description = args.optString("item", "").trim().ifBlank { null }?.capitalizeFirst(),
+                // Deskripsi kosong adalah keluhan nyata di HP: `item` sering tidak
+                // diisi model. Kalimat user (tanpa nominal/tanggal) jauh lebih
+                // berguna daripada kolom kosong.
+                description = item.ifBlank { null }?.capitalizeFirst() ?: describeFrom(query),
                 amount = amount,
                 type = validType,
-                category = aiCategory.ifBlank { null },
+                category = finalCategory,
                 date = clock(),
                 notes = null
             )
         )
+    }
+
+    /**
+     * Jawaban singkat atas pertanyaan aplikasi sendiri, disusun tanpa model.
+     *
+     * Hanya dua pertanyaan yang pernah diajukan aplikasi: nominal dan arah uang.
+     * Jadi kalau user menjawab "masuk" / "50rb", maksudnya sudah pasti dan tidak
+     * perlu ditebak model yang mungkin kembali tidak memanggil alat.
+     */
+    private fun quickAnswer(
+        input: String,
+        pending: String?,
+        incomeCategories: List<String>,
+        expenseCategories: List<String>
+    ): ExtractionResult? {
+        if (pending.isNullOrBlank()) return null
+
+        val tokens = CategoryResolver.normalize(input).split(' ').filter { it.isNotBlank() }
+        if (tokens.isEmpty()) return null
+
+        val arah = directionWord(tokens)
+
+        // "masuk", "uang keluar", "iya keluar" -> nominal diambil dari kalimat awal.
+        if (arah != null && tokens.all { it in CLARIFICATION_WORDS }) {
+            val amount = AmountReader.fromText(pending) ?: AmountReader.fromText(input)
+            return clarificationResult(amount, arah, pending, incomeCategories, expenseCategories)
+        }
+
+        // "50rb", "Rp 50.000" -> arah dibaca dari kata kerja kalimat awal.
+        if (arah == null && isPlainAmount(input)) {
+            val arahLama = TransactionCorrector.directionFromVerbs(pending)
+                ?: return ExtractionResult(error = "klarifikasi", pertanyaan = QUESTION_TYPE)
+            return clarificationResult(
+                AmountReader.fromText(input), arahLama, pending, incomeCategories, expenseCategories
+            )
+        }
+
+        return null
+    }
+
+    /** Hasil transaksi dari jawaban klarifikasi; nominal kosong -> tanya nominal. */
+    private fun clarificationResult(
+        amount: Long?,
+        type: String,
+        source: String,
+        incomeCategories: List<String>,
+        expenseCategories: List<String>
+    ): ExtractionResult {
+        val nominal = amount?.takeIf { it in 1..AI_MAX_AMOUNT }
+            ?: return ExtractionResult(error = "klarifikasi", pertanyaan = QUESTION_AMOUNT)
+
+        val income = type == TransactionCorrector.TYPE_INCOME
+        val candidates = if (income) incomeCategories else expenseCategories
+
+        return ExtractionResult(
+            description = describeFrom(source),
+            amount = nominal,
+            type = if (income) "PEMASUKAN" else "PENGELUARAN",
+            category = CategoryHints.suggest(source, candidates),
+            date = clock(),
+            notes = null
+        )
+    }
+
+    /** Arah uang dari kata yang dipakai user menjawab pertanyaan aplikasi. */
+    private fun directionWord(tokens: List<String>): String? {
+        val masuk = tokens.any { it in INCOME_WORDS }
+        val keluar = tokens.any { it in EXPENSE_WORDS }
+        return when {
+            masuk && !keluar -> TransactionCorrector.TYPE_INCOME
+            keluar && !masuk -> TransactionCorrector.TYPE_EXPENSE
+            else -> null
+        }
+    }
+
+    /**
+     * Benar kalau [input] hanya berisi nominal ("50rb", "Rp 50.000", "50 ribu").
+     *
+     * Selain angka, hanya kata satuan uang yang boleh muncul; satu kata lain
+     * ("masuk 50rb") berarti kalimatnya bukan jawaban nominal murni.
+     */
+    private fun isPlainAmount(input: String): Boolean {
+        if (AmountReader.fromText(input) == null) return false
+        val sisa = input
+            .replace(Regex("[0-9.,]+"), " ")
+            .replace(AMOUNT_WORDS_PATTERN, " ")
+            .replace(Regex("[^\\p{L}]"), " ")
+            .trim()
+        return sisa.isEmpty()
+    }
+
+    /**
+     * Deskripsi cadangan dari kalimat user: nominal dan tanggal dibuang.
+     *
+     * "makan siang 25 ribu" -> "Makan siang". Kalau setelah dibersihkan tidak
+     * tersisa apa pun ("2500000"), hasilnya null dan pemanggil memakai teksnya
+     * sendiri.
+     */
+    private fun describeFrom(text: String): String? {
+        val bersih = text
+            .replace(Regex("(?i)\\b(rp|idr)\\.?"), " ")
+            .replace(Regex("\\b\\d{1,2}/\\d{1,2}(/\\d{2,4})?\\b"), " ")
+            .replace(Regex("(?i)\\b\\d[\\d.,]*\\s*(rb|ribu|ribuan|k|jt|jta|juta|jutaan|m|miliar|milyar)?"), " ")
+            .replace(Regex("[^\\p{L}\\p{N} ]"), " ")
+            .replace(Regex("\\s+"), " ")
+            .trim()
+        if (bersih.isBlank()) return null
+        return bersih.split(' ').take(6).joinToString(" ").take(60).capitalizeFirst()
     }
 
     /**

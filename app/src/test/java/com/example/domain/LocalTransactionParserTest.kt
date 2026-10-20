@@ -81,7 +81,8 @@ class LocalTransactionParserTest {
         assertEquals("Bakso", result.description)
         assertEquals(25_000L, result.amount)
         assertEquals("PENGELUARAN", result.type)
-        assertEquals("makanan", result.category)
+        // Kategori dikembalikan dalam ejaan milik user, bukan ejaan model.
+        assertEquals("Makanan", result.category)
         assertEquals("nominal terbaca", null, result.error)
     }
 
@@ -156,6 +157,92 @@ class LocalTransactionParserTest {
     }
 
     @Test
+    fun `kategori_diperbaiki_dari_kata_kunci_item`() {
+        // Keluhan nyata di HP: "beli bensin" dicatat sebagai Makanan.
+        val engine = FakeEngine(envelope(catat("catat_pengeluaran", "50000", "Makanan", "bensin")))
+        val result = success(parse(engine, "beli bensin 50rb"))
+
+        assertEquals("Transportasi", result.category)
+        assertEquals("PENGELUARAN", result.type)
+    }
+
+    @Test
+    fun `kategori_model_dibiarkan_kalau_tidak_ada_kata_kunci`() {
+        val engine = FakeEngine(envelope(catat("catat_pengeluaran", "20000", "Hiburan", "kado")))
+        val result = success(parse(engine, "beli kado 20rb"))
+
+        assertEquals("Hiburan", result.category)
+    }
+
+    @Test
+    fun `kata_kunci_tidak_memaksa_kategori_yang_tidak_dimiliki_user`() {
+        // User tidak punya kategori Transportasi: saran kata kunci harus dilewati,
+        // bukan membuat kategori baru.
+        val engine = FakeEngine(envelope(catat("catat_pengeluaran", "50000", "Makanan", "bensin")))
+        val result = success(
+            runBlocking {
+                LocalTransactionParser(engine, clock = { 1_700_000_000_000L })
+                    .parseTransaction(
+                        "beli bensin 50rb", null,
+                        listOf("Gaji", "Lainnya"),
+                        listOf("Makanan", "Lainnya")
+                    )
+            }
+        )
+
+        assertEquals("Makanan", result.category)
+    }
+
+    @Test
+    fun `deskripsi_diisi_dari_kalimat_kalau_model_tidak_mengisi_item`() {
+        val engine = FakeEngine(envelope(catat("catat_pengeluaran", "25000", "Makanan")))
+        val result = success(parse(engine, "makan siang 25 ribu"))
+
+        assertEquals("Makan siang", result.description)
+    }
+
+    @Test
+    fun `tanpa_panggilan_tapi_ada_kata_kerja_ditanya_nominal`() {
+        // "isi bensin": dulu dijawab "bukan transaksi" lalu catatannya hilang.
+        val engine = FakeEngine("""{"type":"text","function_calls":[]}""")
+        val result = success(parse(engine, "isi bensin"))
+
+        assertEquals("klarifikasi", result.error)
+        assertNotNull(result.pertanyaan)
+        assertTrue(
+            "pertanyaan harus menyinggung nominal: ${result.pertanyaan}",
+            result.pertanyaan!!.contains("ominal")
+        )
+    }
+
+    @Test
+    fun `jawaban_masuk_disusun_tanpa_memanggil_model`() {
+        // Mesin yang selalu gagal: kalau model ikut dipanggil, tes ini gagal.
+        val result = success(parse(FailingEngine(), "masuk", pending = "5jt"))
+
+        assertEquals("PEMASUKAN", result.type)
+        assertEquals(5_000_000L, result.amount)
+    }
+
+    @Test
+    fun `jawaban_nominal_memakai_arah_dan_kategori_dari_kalimat_awal`() {
+        val result = success(parse(FailingEngine(), "50rb", pending = "isi bensin"))
+
+        assertEquals("PENGELUARAN", result.type)
+        assertEquals(50_000L, result.amount)
+        assertEquals("Transportasi", result.category)
+        assertEquals("Isi bensin", result.description)
+    }
+
+    @Test
+    fun `jawaban_nominal_tanpa_kata_kerja_tetap_ditanya_arahnya`() {
+        val result = success(parse(FailingEngine(), "50rb", pending = "5jt"))
+
+        assertEquals("klarifikasi", result.error)
+        assertNotNull(result.pertanyaan)
+    }
+
+    @Test
     fun `panggilan_yang_ditahan_mesin_cuma_dipakai_untuk_bertanya`() {
         // Mesin menahan panggilan yang keyakinannya rendah. Isinya tidak boleh
         // disimpan -- nominal dan kategorinya justru yang paling tidak tepercaya.
@@ -214,10 +301,12 @@ class LocalTransactionParserTest {
 
     @Test
     fun `jawaban_lanjutan_digabung_jadi_satu_kalimat`() {
+        // Jawaban yang BUKAN nominal/arah murni tetap dikirim ke model, digabung
+        // dengan kalimat awal supaya terbaca utuh.
         val engine = FakeEngine(envelope(catat("catat_pengeluaran", "30000", "makanan", "bakso")))
-        parse(engine, "30 ribu", pending = "beli bakso")
+        parse(engine, "yang tadi", pending = "beli bakso")
 
-        assertEquals("beli bakso 30 ribu", engine.lastText)
+        assertEquals("beli bakso yang tadi", engine.lastText)
         assertEquals(128, engine.lastMaxTokens)
     }
 
