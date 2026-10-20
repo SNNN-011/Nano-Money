@@ -69,6 +69,11 @@ class LocalTransactionParser(
             ?.let { "$it $inputText" }
             ?: inputText
 
+        // Daftar kategori user diteruskan ke model dulu: otak v5 memilih
+        // kategori dari daftar yang DIBERIKAN. Tanpa ini kategori benar
+        // anjlok ke 0,7-4% (lihat vm/CATATAN.md, mode eval `app`).
+        engine.setCategories(incomeCategories, expenseCategories)
+
         val raw = try {
             engine.complete(query, MAX_NEW_TOKENS)
         } catch (e: CancellationException) {

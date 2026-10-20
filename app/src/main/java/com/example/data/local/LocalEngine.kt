@@ -19,6 +19,21 @@ import java.util.Locale
  */
 interface LocalEngine {
     suspend fun complete(text: String, maxNewTokens: Int = 128): String
+
+    /**
+     * Daftar kategori yang aktif milik user.
+     *
+     * Otak v5 (r1..r8) dilatih dengan memilih kategori dari daftar yang
+     * DIBERIKAN di `enum` skema tool. Kalau daftar ini tidak ikut dikirim,
+     * model menjawab dari ingatan dan kategori benarnya anjlok ke 0,7-4%
+     * (lihat vm/CATATAN.md, mode eval `app`). Aplikasi sudah punya daftar ini
+     * di database, jadi masalahnya cuma tidak pernah diteruskan ke model.
+     *
+     * Implementasi yang memang tidak butuh daftar (mis. dummy di test) boleh
+     * mengabaikannya.
+     */
+    suspend fun setCategories(incomeCategories: List<String>, expenseCategories: List<String>) {
+    }
 }
 
 /**
@@ -37,7 +52,19 @@ class NeedleLocalEngine(
 
     private val mutex = Mutex()
     private var modelLoaded = false
-    private var preparedPrefix: String? = null
+    private var preparedKey: String? = null
+    private var incomeCategories: List<String> = emptyList()
+    private var expenseCategories: List<String> = emptyList()
+
+    override suspend fun setCategories(
+        incomeCategories: List<String>,
+        expenseCategories: List<String>
+    ) {
+        mutex.withLock {
+            this.incomeCategories = incomeCategories
+            this.expenseCategories = expenseCategories
+        }
+    }
 
     override suspend fun complete(text: String, maxNewTokens: Int): String =
         withContext(Dispatchers.IO) {
@@ -72,15 +99,19 @@ class NeedleLocalEngine(
             modelLoaded = true
         }
 
-        // Prefix dihitung ulang saat baris tanggalnya berubah (ganti hari).
+        // Prefix dihitung ulang saat baris tanggalnya berubah (ganti hari) ATAU
+        // saat daftar kategori user berubah. Daftar kategori ikut dikirim karena
+        // otak v5 memilih kategori dari daftar yang diberikan.
         val system = systemPrompt(clock())
-        if (system != preparedPrefix) {
-            if (NeedleNative.initModel(system, TOOLS_JSON) < 0) {
+        val tools = LocalToolsJson.build(incomeCategories, expenseCategories)
+        val key = "$system\u0000$tools"
+        if (key != preparedKey) {
+            if (NeedleNative.initModel(system, tools) < 0) {
                 throw IllegalStateException(
                     NeedleNative.lastError() ?: "Model lokal gagal disiapkan."
                 )
             }
-            preparedPrefix = system
+            preparedKey = key
         }
     }
 
@@ -88,15 +119,11 @@ class NeedleLocalEngine(
         /** Nama file model di app/src/main/assets. */
         const val MODEL_ASSET = "rank64.cact"
 
-        /**
-         * Daftar alat yang dikenal model -- HARUS sama dengan data_app/tools.json
-         * yang dipakai saat melatih dan mengevaluasi. Mengubahnya berarti model
-         * menerima prefix yang tidak pernah ia lihat.
-         */
-        const val TOOLS_JSON =
-            """[{"name":"catat_pengeluaran","parameters":{"type":"object","properties":{"amount":{"type":"integer"},"category":{"type":"string"},"item":{"type":"string"},"date":{"type":"string"}},"required":["amount","category"]}},""" +
-                """{"name":"catat_masuk","parameters":{"type":"object","properties":{"amount":{"type":"integer"},"category":{"type":"string"},"item":{"type":"string"},"date":{"type":"string"}},"required":["amount","category"]}},""" +
-                """{"name":"tanya","parameters":{"type":"object","properties":{"field":{"type":"string"}},"required":["field"]}}]"""
+        // Daftar alat tidak lagi konstanta: bentuknya dibangun runtime dari
+        // daftar kategori user (lihat [LocalToolsJson]). Bentuk itu HARUS sama
+        // dengan yang dipakai saat melatih (v5: dua alat, `category` ber-`enum`,
+        // `required` ["category"], pemisah tanpa spasi) -- kalau berbeda, model
+        // menerima prefix yang tidak pernah ia lihat dan kategorinya anjlok.
 
         private val DATE = DateTimeFormatter.ofPattern("yyyy-MM-dd", Locale.US)
         private val DAY = DateTimeFormatter.ofPattern("EEE", Locale.US)
