@@ -39,7 +39,8 @@ object TransactionCorrector {
     /** Kata kerja yang menandakan uang keluar dari user. */
     private val EXPENSE_VERBS = listOf(
         "bayar", "bayarin", "beli", "beliin", "belanja", "sewa", "cicil",
-        "angsuran", "transfer", "kirim", "topup", "isi", "ongkos", "parkir", "tarif"
+        "angsuran", "transfer", "kirim", "topup", "isi", "ongkos", "parkir", "tarif",
+        "jajan", "servis", "cuci", "traktir"
     )
 
     /**
@@ -56,7 +57,10 @@ object TransactionCorrector {
      * "uang kiriman ibu" adalah uang MASUK, sedangkan "kirim uang ke ibu" adalah
      * uang keluar; kata "kirim" saja tidak cukup.
      */
-    private val INCOME_PHRASES = listOf("uang kiriman", "kiriman dari", "dikirim")
+    private val INCOME_PHRASES = listOf(
+        "uang kiriman", "kiriman dari", "dikirim",
+        "bunga tabungan", "bunga deposito"
+    )
 
     /**
      * Frasa uang masuk yang biasanya membuka kalimat.

@@ -157,6 +157,58 @@ class LocalTransactionParserTest {
     }
 
     @Test
+    fun `ada_duit_tanpa_arah_ditanya_jenis_tanpa_memanggil_model`() {
+        // Ditemukan di uji 30 kalimat: "ada duit 750rb" langsung dicatat
+        // pengeluaran karena "duit" belum dianggap kata pengisi seperti "uang".
+        val engine = FakeEngine("""{"type":"text","function_calls":[]}""")
+        val result = success(parse(engine, "ada duit 750rb"))
+
+        assertEquals("klarifikasi", result.error)
+        assertTrue(
+            "pertanyaan harus menyinggung arah uang: ${result.pertanyaan}",
+            result.pertanyaan!!.contains("masuk")
+        )
+        assertEquals("model tidak boleh dipanggil", null, engine.lastText)
+    }
+
+    @Test
+    fun `dua_nominal_dengan_kata_jajan_tetap_pengeluaran`() {
+        // Ditemukan di uji 30 kalimat: dua nominal membuat mesin tidak memanggil
+        // alat, lalu arahnya ditanya padahal kata "jajan" sudah jelas keluar.
+        val engine = FakeEngine("""{"type":"text","function_calls":[]}""")
+        val result = success(parse(engine, "kemarin jajan bakso 15rb sama es teh 5rb"))
+
+        assertEquals("PENGELUARAN", result.type)
+        assertEquals(15_000L, result.amount)
+    }
+
+    @Test
+    fun `servis_tanpa_nominal_ditanya_nominal`() {
+        // "servis ac kamar" dulu ditolak sebagai bukan transaksi karena "servis"
+        // tidak ada di daftar kata kerja.
+        val engine = FakeEngine("""{"type":"text","function_calls":[]}""")
+        val result = success(parse(engine, "servis ac kamar"))
+
+        assertEquals("klarifikasi", result.error)
+        assertTrue(
+            "pertanyaan harus menyinggung nominal: ${result.pertanyaan}",
+            result.pertanyaan!!.contains("nominal")
+        )
+    }
+
+    @Test
+    fun `bunga_tabungan_dibetulkan_jadi_pemasukan`() {
+        // Ditemukan di uji 30 kalimat: model menjawab pengeluaran.
+        val engine = FakeEngine(
+            envelope(catat("catat_pengeluaran", "45000", "Makanan", "bunga tabungan"))
+        )
+        val result = success(parse(engine, "bunga tabungan 45 ribu"))
+
+        assertEquals("PEMASUKAN", result.type)
+        assertEquals(45_000L, result.amount)
+    }
+
+    @Test
     fun `kategori_diperbaiki_dari_kata_kunci_item`() {
         // Keluhan nyata di HP: "beli bensin" dicatat sebagai Makanan.
         val engine = FakeEngine(envelope(catat("catat_pengeluaran", "50000", "Makanan", "bensin")))

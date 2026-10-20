@@ -98,6 +98,35 @@ class TransactionCorrectorTest {
     }
 
     @Test
+    fun `bunga_tabungan_jadi_pemasukan`() {
+        // Ditemukan di uji 30 kalimat: "bunga tabungan 45 ribu" dicatat
+        // pengeluaran karena "bunga" bukan kata kerja dan tidak ada di daftar
+        // frasa pemasukan.
+        assertEquals("income", jenisAkhir("bunga tabungan 45 ribu", "expense", "Lainnya"))
+        assertEquals("income", jenisAkhir("bunga deposito 120 ribu", "expense", "Lainnya"))
+    }
+
+    @Test
+    fun `bayar_bunga_tabungan_tetap_pengeluaran`() {
+        // Frasa "bunga tabungan" tidak boleh menang kalau user jelas membayar.
+        assertEquals(
+            "expense",
+            jenisAkhir("bayar bunga tabungan 100 ribu", "expense", "Lainnya")
+        )
+    }
+
+    @Test
+    fun `jajan_dan_servis_dihitung_kata_kerja_pengeluaran`() {
+        // Ditemukan di uji 30 kalimat: "jajan" dan "servis" tidak dikenali
+        // sebagai kata kerja, sehingga kalimatnya ditolak atau arahnya ditanya.
+        assertEquals("expense", TransactionCorrector.directionFromVerbs("jajan bakso 15rb"))
+        assertEquals("expense", TransactionCorrector.directionFromVerbs("servis motor 150rb"))
+        assertEquals("expense", TransactionCorrector.directionFromVerbs("cuci motor 12rb"))
+        assertEquals("expense", TransactionCorrector.directionFromVerbs("traktir teman 85rb"))
+        assertEquals(true, TransactionCorrector.looksLikeTransaction("servis ac kamar"))
+    }
+
+    @Test
     fun `kata_kerja_dua_arah_tidak_mengubah_jenis`() {
         // Ada sinyal masuk dan keluar sekaligus: buktinya tidak searah, jadi jangan diapa-apakan.
         assertEquals(

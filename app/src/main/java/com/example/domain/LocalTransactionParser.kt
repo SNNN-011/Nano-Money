@@ -70,7 +70,7 @@ class LocalTransactionParser(
          * tebakan model sebagai pemasukan.
          */
         private val AMOUNT_FILLER_WORDS = setOf(
-            "uang", "ada", "nih", "sih", "dong", "aja", "saja", "ya", "yah", "iya",
+            "uang", "duit", "duitnya", "ada", "nih", "sih", "dong", "aja", "saja", "ya", "yah", "iya",
             "itu", "tadi", "yang", "kok", "kan", "doang", "bgt", "banget", "nominal",
             "nominalnya", "sebesar", "adalah", "rp", "idr", "rupiah", "perak"
         )
