@@ -41,6 +41,7 @@ import com.example.ui.components.EditorialPill
 import com.example.ui.components.EditorialTextField
 import com.example.ui.components.Eyebrow
 import com.example.ui.components.GlassCard
+import com.example.ui.components.HairlineDivider
 import com.example.ui.components.LabeledField
 import com.example.ui.components.TapField
 import com.example.ui.config.FormatUtils
@@ -233,328 +234,230 @@ fun CategoryManagementDialog(
         }
     }
 
-    Dialog(onDismissRequest = onDismissRequest) {
+    EditorialDialog(onDismissRequest = onDismissRequest) {
         Card(
             modifier = Modifier.fillMaxWidth().padding(Spacing.lg),
-            shape = RoundedCornerShape(CornerRadius.xl),
-            colors = CardDefaults.cardColors(containerColor = MidnightAbyss),
-            border = BorderStroke(
-                width = 1.dp,
-                brush = Brush.verticalGradient(
-                    colors = listOf(
-                        GhostWhite.copy(alpha = 0.2f),
-                        GhostWhite.copy(alpha = 0.02f)
-                    )
-                )
-            ),
+            shape = RoundedCornerShape(CornerRadius.bezel),
+            colors = CardDefaults.cardColors(containerColor = CreamRaised),
+            border = BorderStroke(1.dp, Hairline),
             elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
         ) {
-            Box(modifier = Modifier.background(TranslucentGlass)) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(Spacing.xl),
+                verticalArrangement = Arrangement.spacedBy(Spacing.md)
+            ) {
+                Eyebrow(text = "Kategori")
+                Text(
+                    text = "Kelola kategori",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontFamily = SerifFamily,
+                    fontWeight = FontWeight.Medium,
+                    color = Ink
+                )
+                Text(
+                    text = "Daftar kategori ${if (formType == "income") "pendapatan" else "pengeluaran"}. Tambah, ubah nama, atau hapus.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = InkMuted
+                )
+
+                // Tambah kategori: isian dan tombol sebaris, sama tinggi. Dulu
+                // isiannya kotak Material gelap dengan tombol ikon 52 dp di
+                // sebelahnya, jadi kelihatan seperti dua benda beda keluarga.
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
+                ) {
+                    EditorialTextField(
+                        value = newCategoryName,
+                        onValueChange = {
+                            if (it.length <= 20) {
+                                newCategoryName = it
+                                categoryNameError = null
+                            }
+                        },
+                        placeholder = "Nama kategori baru",
+                        testTag = "new_category_input",
+                        modifier = Modifier.weight(1f)
+                    )
+                    EditorialButton(
+                        text = "Tambah",
+                        onClick = {
+                            val trimmed = newCategoryName.trim()
+                            when {
+                                trimmed.isEmpty() -> categoryNameError = "Nama tidak boleh kosong"
+                                // M13: cek duplikat case-insensitive SEBELUM submit.
+                                currentCategories.any { it.equals(trimmed, ignoreCase = true) } ->
+                                    categoryNameError = "Kategori sudah ada"
+                                else -> renameScope.launch {
+                                    val added = onAddCategory(trimmed)
+                                    if (added) {
+                                        newCategoryName = ""
+                                        categoryNameError = null
+                                    } else {
+                                        categoryNameError = "Gagal menambah kategori (mungkin sudah ada)"
+                                    }
+                                }
+                            }
+                        },
+                        trailingArrow = false,
+                        testTag = "add_category_confirm_button"
+                    )
+                }
+                if (categoryNameError != null) {
+                    Text(
+                        text = categoryNameError ?: "",
+                        color = ErrorRed,
+                        style = MaterialTheme.typography.labelSmall
+                    )
+                }
+
+                HairlineDivider()
+
+                Eyebrow(text = "Daftar kategori")
+
+                // Satu baris per kategori, dipisah garis rambut. Kartu per
+                // kategori cuma menambah bingkai di dalam bingkai dialog.
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(Spacing.xl),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                        .heightIn(max = 240.dp)
+                        .verticalScroll(rememberScrollState())
                 ) {
-                    Text(
-                        text = "Kelola Kategori ${if (formType == "income") "Pendapatan" else "Pengeluaran"}",
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.ExtraBold,
-                        color = GhostWhite
-                    )
+                    currentCategories.forEachIndexed { index, cat ->
+                        val isRenaming = renamingCategory == cat
 
-                    Text(
-                        text = "Tambah atau hapus kategori kustom sesuai dengan preferensi Anda.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = GhostWhite.copy(alpha = 0.7f),
-                        lineHeight = 20.sp
-                    )
-
-                    // Add Category Input Form
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        OutlinedTextField(
-                            value = newCategoryName,
-                            onValueChange = {
-                                if (it.length <= 20) {
-                                    newCategoryName = it
-                                    categoryNameError = null
-                                }
-                            },
-                            placeholder = { Text("Nama Kategori Baru", style = MaterialTheme.typography.bodyMedium) },
-                            singleLine = true,
-                            isError = categoryNameError != null,
-                            modifier = Modifier.weight(1f).testTag("new_category_input"),
-                            shape = RoundedCornerShape(12.dp),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedTextColor = GhostWhite,
-                                unfocusedTextColor = GhostWhite,
-                                focusedLabelColor = GhostWhite,
-                                unfocusedLabelColor = GhostWhite.copy(alpha = 0.5f),
-                                focusedBorderColor = SteelBlue,
-                                unfocusedBorderColor = GhostWhite.copy(alpha = 0.2f),
-                                focusedContainerColor = TranslucentInput,
-                                unfocusedContainerColor = TranslucentInput,
-                                errorBorderColor = ErrorRed,
-                                errorTextColor = GhostWhite
-                            )
-                        )
-                        Card(
-                            onClick = {
-                                val trimmed = newCategoryName.trim()
-                                when {
-                                    trimmed.isEmpty() -> categoryNameError = "Nama tidak boleh kosong"
-                                    // M13: cek duplikat case-insensitive SEBELUM submit.
-                                    currentCategories.any { it.equals(trimmed, ignoreCase = true) } ->
-                                        categoryNameError = "Kategori sudah ada"
-                                    else -> renameScope.launch {
-                                        val added = onAddCategory(trimmed)
-                                        if (added) {
-                                            newCategoryName = ""
-                                            categoryNameError = null
-                                        } else {
-                                            categoryNameError = "Gagal menambah kategori (mungkin sudah ada)"
-                                        }
-                                    }
-                                }
-                            },
-                            shape = RoundedCornerShape(CornerRadius.xl),
-                            colors = CardDefaults.cardColors(containerColor = TranslucentGlass),
-                            border = BorderStroke(
-                                width = 1.dp,
-                                brush = Brush.verticalGradient(
-                                    colors = listOf(
-                                        GhostWhite.copy(alpha = 0.2f),
-                                        GhostWhite.copy(alpha = 0.02f)
-                                    )
-                                )
-                            ),
-                            modifier = Modifier.size(52.dp).testTag("add_category_confirm_button")
-                        ) {
-                            Box(
+                        if (isRenaming) {
+                            Column(
                                 modifier = Modifier
-                                    .padding(4.dp)
-                                    .fillMaxSize()
-                                    .clip(RoundedCornerShape(CornerRadius.xl))
-                                    .background(
-                                        brush = Brush.verticalGradient(
-                                            colors = listOf(SteelBlue, SteelBlue.copy(alpha = 0.7f))
-                                        ),
-                                        shape = RoundedCornerShape(CornerRadius.xl)
-                                    ),
-                                contentAlignment = Alignment.Center
+                                    .fillMaxWidth()
+                                    .padding(vertical = Spacing.sm),
+                                verticalArrangement = Arrangement.spacedBy(Spacing.xs)
                             ) {
-                                Icon(
-                                    Icons.Default.Add,
-                                    contentDescription = "Tambah",
-                                    tint = MidnightAbyss,
-                                    modifier = Modifier.size(24.dp)
-                                )
-                            }
-                        }
-                    }
-                    if (categoryNameError != null) {
-                        Text(
-                            text = categoryNameError ?: "",
-                            color = MaterialTheme.colorScheme.error,
-                            style = MaterialTheme.typography.labelMedium,
-                            modifier = Modifier.padding(start = 4.dp, top = 2.dp)
-                        )
-                    }
-
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(1.dp)
-                            .background(TranslucentBorder)
-                    )
-
-                    Text(
-                        text = "Daftar Kategori Saat Ini",
-                        style = MaterialTheme.typography.labelLarge.copy(
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = 0.5.sp
-                        ),
-                        color = GhostWhite.copy(alpha = 0.8f)
-                    )
-
-                    // Categories List inside Scrollable column
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(max = 240.dp)
-                            .verticalScroll(rememberScrollState()),
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        currentCategories.forEach { cat ->
-                            val isRenaming = renamingCategory == cat
-
-                            if (isRenaming) {
-                                Card(
+                                Row(
                                     modifier = Modifier.fillMaxWidth(),
-                                    shape = RoundedCornerShape(8.dp),
-                                    colors = CardDefaults.cardColors(containerColor = TranslucentInput),
-                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.4f))
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(Spacing.xs)
                                 ) {
-                                    Column(
+                                    EditorialTextField(
+                                        value = renameInput,
+                                        onValueChange = {
+                                            if (it.length <= 30) {
+                                                renameInput = it
+                                                renameError = null
+                                            }
+                                        },
+                                        placeholder = "Nama baru",
+                                        testTag = "rename_category_input",
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    IconButton(
+                                        onClick = { cancelRename() },
                                         modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(horizontal = 12.dp, vertical = 8.dp),
-                                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                                            .size(36.dp)
+                                            .testTag("cancel_rename_category_button")
                                     ) {
-                                        OutlinedTextField(
-                                            value = renameInput,
-                                            onValueChange = {
-                                                if (it.length <= 30) {
-                                                    renameInput = it
-                                                    renameError = null
-                                                }
-                                            },
-                                            placeholder = { Text("Nama baru", style = MaterialTheme.typography.bodyMedium) },
-                                            singleLine = true,
-                                            isError = renameError != null,
-                                            supportingText = renameError?.let { { Text(it) } },
-                                            modifier = Modifier.fillMaxWidth().testTag("rename_category_input"),
-                                            shape = RoundedCornerShape(10.dp),
-                                            colors = OutlinedTextFieldDefaults.colors(
-                                                focusedTextColor = GhostWhite,
-                                                unfocusedTextColor = GhostWhite,
-                                                focusedBorderColor = MaterialTheme.colorScheme.primary,
-                                                unfocusedBorderColor = GhostWhite.copy(alpha = 0.2f),
-                                                focusedContainerColor = GhostWhite.copy(alpha = 0.05f),
-                                                unfocusedContainerColor = GhostWhite.copy(alpha = 0.02f),
-                                                errorBorderColor = MaterialTheme.colorScheme.error,
-                                                errorTextColor = GhostWhite
-                                            )
+                                        Icon(
+                                            imageVector = Icons.Default.Close,
+                                            contentDescription = "Batal ubah nama",
+                                            tint = InkMuted,
+                                            modifier = Modifier.size(18.dp)
                                         )
-                                        Row(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.End,
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Text(
-                                                text = "Anggaran & transaksi lama tetap tertaut",
-                                                style = MaterialTheme.typography.labelSmall,
-                                                color = GhostWhite.copy(alpha = 0.5f),
-                                                modifier = Modifier.weight(1f)
-                                            )
-                                            IconButton(
-                                                onClick = { cancelRename() },
-                                                modifier = Modifier.size(36.dp).testTag("cancel_rename_category_button")
-                                            ) {
-                                                Icon(
-                                                    imageVector = Icons.Default.Close,
-                                                    contentDescription = "Batal ubah nama",
-                                                    tint = GhostWhite.copy(alpha = 0.7f),
-                                                    modifier = Modifier.size(18.dp)
-                                                )
-                                            }
-                                            IconButton(
-                                                onClick = { confirmRename(cat) },
-                                                modifier = Modifier.size(36.dp).testTag("confirm_rename_category_button")
-                                            ) {
-                                                Icon(
-                                                    imageVector = Icons.Default.Check,
-                                                    contentDescription = "Simpan nama kategori",
-                                                    tint = MaterialTheme.colorScheme.primary,
-                                                    modifier = Modifier.size(18.dp)
-                                                )
-                                            }
-                                        }
+                                    }
+                                    IconButton(
+                                        onClick = { confirmRename(cat) },
+                                        modifier = Modifier
+                                            .size(36.dp)
+                                            .testTag("confirm_rename_category_button")
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Check,
+                                            contentDescription = "Simpan nama kategori",
+                                            tint = Ink,
+                                            modifier = Modifier.size(18.dp)
+                                        )
                                     }
                                 }
-                            } else {
-                                Card(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    shape = RoundedCornerShape(8.dp),
-                                    colors = CardDefaults.cardColors(
-                                        containerColor = TranslucentInput
-                                    ),
-                                    border = BorderStroke(1.dp, GhostWhite.copy(alpha = 0.05f))
+                                Text(
+                                    text = "Anggaran & transaksi lama tetap tertaut",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = InkMuted
+                                )
+                                if (renameError != null) {
+                                    Text(
+                                        text = renameError ?: "",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = ErrorRed
+                                    )
+                                }
+                            }
+                        } else {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = Spacing.xs),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = cat,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    fontWeight = FontWeight.Medium,
+                                    color = Ink,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                IconButton(
+                                    onClick = { startRename(cat) },
+                                    modifier = Modifier
+                                        .size(32.dp)
+                                        .testTag("rename_category_button_${cat.lowercase(Locale.ROOT)}")
                                 ) {
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(start = 12.dp, end = 4.dp, top = 4.dp, bottom = 4.dp),
-                                        horizontalArrangement = Arrangement.SpaceBetween,
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(10.dp)
-                                        ) {
-                                            Box(
-                                                modifier = Modifier
-                                                    .size(8.dp)
-                                                    .background(
-                                                        color = if (formType == "income") Color(0xFF4CAF50) else Color(0xFFF44336),
-                                                        shape = CircleShape
-                                                    )
-                                            )
-                                            Text(
-                                                text = cat,
-                                                style = MaterialTheme.typography.bodyMedium,
-                                                fontWeight = FontWeight.SemiBold,
-                                                color = GhostWhite
-                                            )
+                                    Icon(
+                                        imageVector = Icons.Default.Edit,
+                                        contentDescription = "Ubah nama kategori $cat",
+                                        tint = InkMuted,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                                IconButton(
+                                    onClick = {
+                                        if (currentCategories.size <= 1) {
+                                            categoryNameError = "Tidak bisa menghapus kategori terakhir!"
+                                        } else {
+                                            // H7: selalu lewat dialog konfirmasi,
+                                            // jangan langsung eksekusi.
+                                            pendingDeleteCategory = cat
                                         }
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            IconButton(
-                                                onClick = { startRename(cat) },
-                                                modifier = Modifier
-                                                    .size(32.dp)
-                                                    .testTag("rename_category_button_${cat.lowercase(Locale.ROOT)}")
-                                            ) {
-                                                Icon(
-                                                    imageVector = Icons.Default.Edit,
-                                                    contentDescription = "Ubah nama kategori $cat",
-                                                    tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.8f),
-                                                    modifier = Modifier.size(18.dp)
-                                                )
-                                            }
-                                            IconButton(
-                                                onClick = {
-                                                    if (currentCategories.size <= 1) {
-                                                        categoryNameError = "Tidak bisa menghapus kategori terakhir!"
-                                                    } else {
-                                                        // H7: selalu lewat dialog konfirmasi,
-                                                        // jangan langsung eksekusi.
-                                                        pendingDeleteCategory = cat
-                                                    }
-                                                },
-                                                modifier = Modifier
-                                                    .size(32.dp)
-                                                    .testTag("delete_category_button_${cat.lowercase(Locale.ROOT)}")
-                                            ) {
-                                                Icon(
-                                                    imageVector = Icons.Default.DeleteOutline,
-                                                    contentDescription = "Hapus Kategori $cat",
-                                                    tint = MaterialTheme.colorScheme.error.copy(alpha = 0.8f),
-                                                    modifier = Modifier.size(18.dp)
-                                                )
-                                            }
-                                        }
-                                    }
+                                    },
+                                    modifier = Modifier
+                                        .size(32.dp)
+                                        .testTag("delete_category_button_${cat.lowercase(Locale.ROOT)}")
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.DeleteOutline,
+                                        contentDescription = "Hapus Kategori $cat",
+                                        tint = ErrorRed,
+                                        modifier = Modifier.size(18.dp)
+                                    )
                                 }
                             }
                         }
-                    }
 
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.End
-                    ) {
-                        PremiumButton(
-                            text = "Selesai",
-                            onClick = onDismissRequest,
-                            modifier = Modifier.testTag("close_category_dialog_button"),
-                            isActive = true,
-                            fillMaxWidth = false
-                        )
+                        if (index != currentCategories.lastIndex) HairlineDivider()
                     }
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    EditorialButton(
+                        text = "Selesai",
+                        onClick = onDismissRequest,
+                        trailingArrow = false,
+                        testTag = "close_category_dialog_button"
+                    )
                 }
             }
         }
@@ -565,49 +468,67 @@ fun CategoryManagementDialog(
     if (deletingCategory != null) {
         val movedCount = categoryRecordCounts[deletingCategory] ?: 0
         val fallbackName = FinancialTrackerViewModel.FALLBACK_CATEGORY_NAME
-        AlertDialog(
-            onDismissRequest = { pendingDeleteCategory = null },
-            containerColor = MidnightAbyss,
-            title = {
-                Text(
-                    text = "Hapus Kategori?",
-                    color = GhostWhite,
-                    fontWeight = FontWeight.Bold
-                )
-            },
-            text = {
-                Text(
-                    text = if (movedCount > 0) {
-                        "Kategori \"$deletingCategory\" akan dihapus. $movedCount transaksi akan dipindah ke \"$fallbackName\"."
-                    } else {
-                        "Kategori \"$deletingCategory\" akan dihapus. Transaksi pada kategori ini akan dipindah ke \"$fallbackName\"."
-                    },
-                    color = GhostWhite.copy(alpha = 0.8f)
-                )
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        renameScope.launch {
-                            val deleted = onDeleteCategory(deletingCategory)
-                            pendingDeleteCategory = null
-                            categoryNameError = if (deleted) null else "Gagal menghapus kategori!"
-                        }
-                    },
-                    modifier = Modifier.testTag("confirm_delete_category_button")
+        EditorialDialog(onDismissRequest = { pendingDeleteCategory = null }) {
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(Spacing.lg),
+                shape = RoundedCornerShape(CornerRadius.bezel),
+                colors = CardDefaults.cardColors(containerColor = CreamRaised),
+                border = BorderStroke(1.dp, Hairline),
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(Spacing.xl),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.md)
                 ) {
-                    Text("Ya, Hapus", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
-                }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = { pendingDeleteCategory = null },
-                    modifier = Modifier.testTag("dismiss_delete_category_button")
-                ) {
-                    Text("Batal", color = GhostWhite.copy(alpha = 0.7f))
+                    Text(
+                        text = "Hapus kategori?",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontFamily = SerifFamily,
+                        fontWeight = FontWeight.Medium,
+                        color = Ink
+                    )
+                    Text(
+                        text = if (movedCount > 0) {
+                            "Kategori \"$deletingCategory\" akan dihapus. $movedCount transaksi akan dipindah ke \"$fallbackName\"."
+                        } else {
+                            "Kategori \"$deletingCategory\" akan dihapus. Transaksi pada kategori ini akan dipindah ke \"$fallbackName\"."
+                        },
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = InkMuted
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
+                    ) {
+                        EditorialButton(
+                            text = "Batal",
+                            onClick = { pendingDeleteCategory = null },
+                            modifier = Modifier.weight(1f),
+                            style = EditorialButtonStyle.Ghost,
+                            trailingArrow = false,
+                            accent = InkMuted,
+                            testTag = "dismiss_delete_category_button"
+                        )
+                        EditorialButton(
+                            text = "Ya, hapus",
+                            onClick = {
+                                renameScope.launch {
+                                    val deleted = onDeleteCategory(deletingCategory)
+                                    pendingDeleteCategory = null
+                                    categoryNameError = if (deleted) null else "Gagal menghapus kategori!"
+                                }
+                            },
+                            modifier = Modifier.weight(1f),
+                            accent = BurntOrange,
+                            trailingArrow = false,
+                            testTag = "confirm_delete_category_button"
+                        )
+                    }
                 }
             }
-        )
+        }
     }
 }
 
