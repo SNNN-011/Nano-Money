@@ -52,6 +52,7 @@ import com.example.ui.theme.CardCore
 import com.example.ui.theme.CardVeil
 import com.example.ui.theme.CornerRadius
 import com.example.ui.theme.Cream
+import com.example.ui.theme.CreamRaised
 import com.example.ui.theme.EditorialTypography
 import com.example.ui.theme.EyebrowTextStyle
 import com.example.ui.theme.Hairline
@@ -420,7 +421,9 @@ fun EditorialTextField(
             // isian ketuk di form yang sama selalu tampil sama.
             .height(FieldHeight)
             .clip(shape)
-            .background(Cream)
+            // Latar isian memakai --bg-2 (CreamRaised), bukan latar halaman,
+            // supaya kotaknya tetap terbaca saat form tidak dibungkus kartu.
+            .background(CreamRaised)
             .border(1.dp, if (focused) BurntOrange else HairlineStrong, shape)
             .onFocusChanged { focused = it.isFocused }
             .padding(horizontal = Spacing.md, vertical = Spacing.sm)
@@ -459,7 +462,7 @@ fun TapField(
             // Isian ketuk dulu 56 dp, jadi tampil lebih jangkung daripada
             // isian teks di form yang sama; sekarang dua-duanya 44 dp.
             .clip(RoundedCornerShape(CornerRadius.md))
-            .background(Cream)
+            .background(CreamRaised)
             .border(1.dp, HairlineStrong, RoundedCornerShape(CornerRadius.md))
             .clickable(onClickLabel = text, onClick = onClick)
             .padding(horizontal = Spacing.md, vertical = Spacing.sm)
