@@ -6,6 +6,10 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
@@ -17,6 +21,8 @@ import androidx.compose.ui.unit.sp
 import com.example.data.FinancialRecord
 import com.example.ui.components.EditorialButton
 import com.example.ui.components.EditorialButtonStyle
+import com.example.ui.components.EditorialDialog
+import com.example.ui.components.EditorialDialogCard
 import com.example.ui.components.EditorialToggleRow
 import com.example.ui.components.Eyebrow
 import com.example.ui.components.HairlineDivider
@@ -52,7 +58,6 @@ fun EksporImporTabContent(
 
     // Monthly selection states
     var selectedMonths by remember(availableMonths) { mutableStateOf(availableMonths.toSet()) }
-    var isMonthsExpanded by remember { mutableStateOf(false) }
 
     val securityPrefs = remember { com.example.util.SecurePrefsHelper.getEncryptedPrefs(context, "app_security_prefs") }
 
@@ -71,6 +76,8 @@ fun EksporImporTabContent(
 
     // State PIN
     var showPinDialog by remember { mutableStateOf(false) }
+    // Penjelasan PIN pindah ke ikon (i): halaman tidak lagi penuh teks.
+    var showSecurityInfo by remember { mutableStateOf(false) }
     // H4a: mematikan PIN wajib verifikasi PIN lama dulu
     var showDisablePinDialog by remember { mutableStateOf(false) }
     var pinEnabled by remember { mutableStateOf(com.example.util.PinUtils.isPinEnabled(context)) }
@@ -158,12 +165,6 @@ fun EksporImporTabContent(
                     style = MaterialTheme.typography.displaySmall,
                     color = Ink
                 )
-                Text(
-                    text = "Ekspor laporan ke PDF atau Excel, cadangkan seluruh data ke Google Drive, dan atur keamanan aplikasi.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = InkMuted,
-                    lineHeight = 20.sp
-                )
 
                 HairlineDivider()
 
@@ -172,8 +173,6 @@ fun EksporImporTabContent(
                     availableMonths = availableMonths,
                     selectedMonths = selectedMonths,
                     onSelectedMonthsChanged = { selectedMonths = it },
-                    isMonthsExpanded = isMonthsExpanded,
-                    onIsMonthsExpandedChanged = { isMonthsExpanded = it },
                     onExportPdfFile = onExportPdfFile,
                     onExportCsvFile = onExportCsvFile,
                     onImportCsvFile = onImportCsvFile
@@ -231,7 +230,24 @@ fun EksporImporTabContent(
                     modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(Spacing.sm)
                 ) {
-                    Eyebrow(text = "Keamanan")
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Eyebrow(text = "Keamanan")
+                        IconButton(
+                            onClick = { showSecurityInfo = true },
+                            modifier = Modifier.size(28.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Info,
+                                contentDescription = "Info PIN aplikasi",
+                                tint = InkMuted,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
                     Text(
                         text = "PIN aplikasi",
                         style = MaterialTheme.typography.titleLarge,
@@ -239,8 +255,7 @@ fun EksporImporTabContent(
                         color = Ink
                     )
                     EditorialToggleRow(
-                        title = if (pinEnabled) "PIN aktif" else "PIN belum diaktifkan",
-                        subtitle = "Kunci aplikasi dengan PIN untuk melindungi data Anda.",
+                        title = if (pinEnabled) "PIN aktif" else "Aktifkan PIN",
                         checked = pinEnabled,
                         onCheckedChange = { enabled ->
                             if (enabled) {
@@ -282,6 +297,28 @@ fun EksporImporTabContent(
                             pinEnabled = false
                         }
                     )
+                }
+
+                if (showSecurityInfo) {
+                    EditorialDialog(onDismissRequest = { showSecurityInfo = false }) {
+                        EditorialDialogCard(title = "Tentang PIN aplikasi") {
+                            Text(
+                                text = "PIN mengunci aplikasi saat dibuka, jadi orang lain tidak bisa melihat catatan keuangan Anda.\n\n" +
+                                    "PIN hanya tersimpan di perangkat ini dan tidak ikut tercadang ke Google Drive, sehingga perangkat hasil pemulihan cadangan akan meminta PIN baru.\n\n" +
+                                    "Mematikan PIN meminta PIN lama dimasukkan lebih dulu.",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = InkMuted,
+                                lineHeight = 20.sp
+                            )
+                            EditorialButton(
+                                text = "Mengerti",
+                                onClick = { showSecurityInfo = false },
+                                modifier = Modifier.fillMaxWidth(),
+                                trailingArrow = false,
+                                expanded = true
+                            )
+                        }
+                    }
                 }
 
                 HairlineDivider()

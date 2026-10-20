@@ -558,7 +558,7 @@ fun editorialFieldColors() = OutlinedTextFieldDefaults.colors(
 @Composable
 fun EditorialToggleRow(
     title: String,
-    subtitle: String,
+    subtitle: String = "",
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
@@ -579,11 +579,15 @@ fun EditorialToggleRow(
                 fontWeight = FontWeight.SemiBold,
                 color = Ink
             )
-            Text(
-                text = subtitle,
-                style = MaterialTheme.typography.labelSmall,
-                color = InkMuted
-            )
+            // Keterangan opsional: tab Simpan hanya menampilkan status singkat,
+            // penjelasan panjang ada di dialog (i) tiap bagian.
+            if (subtitle.isNotEmpty()) {
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = InkMuted
+                )
+            }
         }
         Switch(
             checked = checked,

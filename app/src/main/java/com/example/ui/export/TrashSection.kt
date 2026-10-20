@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DeleteForever
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Restore
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material3.*
@@ -29,6 +30,7 @@ import com.example.data.FinancialRecord
 import com.example.ui.components.EditorialButton
 import com.example.ui.components.EditorialButtonStyle
 import com.example.ui.components.EditorialDialog
+import com.example.ui.components.EditorialDialogCard
 import com.example.ui.components.Eyebrow
 import com.example.ui.components.HairlineDivider
 import com.example.ui.components.Tag
@@ -250,6 +252,7 @@ fun TrashSection(
     val context = LocalContext.current
     var showEmptyConfirm by remember { mutableStateOf(false) }
     var showRestoreAllConfirm by remember { mutableStateOf(false) }
+    var showTrashInfo by remember { mutableStateOf(false) }
     
 
     Column(
@@ -271,21 +274,24 @@ fun TrashSection(
                     Spacer(modifier = Modifier.width(Spacing.sm))
                     Tag(text = "${deletedRecords.size}", color = BurntOrange, borderColor = BurntOrange.copy(alpha = 0.4f))
                 }
+                Spacer(modifier = Modifier.weight(1f))
+                IconButton(
+                    onClick = { showTrashInfo = true },
+                    modifier = Modifier.size(28.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Info,
+                        contentDescription = "Info sampah",
+                        tint = InkMuted,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
             }
             Text(
                 text = "Sampah",
                 style = MaterialTheme.typography.titleLarge,
                 fontFamily = SerifFamily,
                 color = Ink
-            )
-            Text(
-                text = if (deletedRecords.isEmpty()) {
-                    "Transaksi yang dihapus akan tersimpan di sini dan bisa dipulihkan."
-                } else {
-                    "Transaksi yang sudah dihapus belum hilang permanen. Pilih untuk mengembalikannya."
-                },
-                style = MaterialTheme.typography.bodySmall,
-                color = InkMuted
             )
         }
 
@@ -354,6 +360,28 @@ fun TrashSection(
                     }
                 }
             }
+    }
+
+    if (showTrashInfo) {
+        EditorialDialog(onDismissRequest = { showTrashInfo = false }) {
+            EditorialDialogCard(title = "Tentang Sampah") {
+                Text(
+                    text = "Transaksi yang dihapus pindah ke Sampah, bukan langsung hilang. " +
+                        "Pulihkan satu per satu, atau semuanya sekaligus.\n\n" +
+                        "Mengosongkan Sampah menghapus permanen dan tidak bisa dibatalkan.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = InkMuted,
+                    lineHeight = 20.sp
+                )
+                EditorialButton(
+                    text = "Mengerti",
+                    onClick = { showTrashInfo = false },
+                    modifier = Modifier.fillMaxWidth(),
+                    trailingArrow = false,
+                    expanded = true
+                )
+            }
+        }
     }
 
     if (showEmptyConfirm) {

@@ -88,6 +88,7 @@ fun DatabaseBackupSection(
     var tempBackupMinute by remember(autoBackupMinute) { mutableStateOf(autoBackupMinute) }
     var tempBackupDayOfWeek by remember(autoBackupDayOfWeek) { mutableStateOf(autoBackupDayOfWeek) }
     var showFirestoreHelpInfo by remember { mutableStateOf(false) }
+    var showBackupInfo by remember { mutableStateOf(false) }
 
     fun getDayNameIndonesian(dayOfWeek: Int): String {
         return when (dayOfWeek) {
@@ -136,17 +137,13 @@ fun DatabaseBackupSection(
                 fontFamily = SerifFamily,
                 color = Ink
             )
-            Text(
-                text = "Sinkronkan catatan transaksi Anda secara otomatis ke cloud.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = InkMuted
-            )
 
             if (connectedGoogleAccount == null) {
                 EditorialButton(
                     text = "Hubungkan akun Google",
                     onClick = onConnectGoogleDrive,
                     modifier = Modifier.fillMaxWidth(),
+                    trailingArrow = false,
                     expanded = true,
                     testTag = "connect_firestore_button"
                 )
@@ -179,11 +176,6 @@ fun DatabaseBackupSection(
                 // lokal yang dikirim ke cloud; menyalakan butuh konfirmasi.
                 EditorialToggleRow(
                     title = "Sinkronisasi Firestore",
-                    subtitle = if (firestoreSyncEnabled) {
-                        "Aktif — data terkirim & tersinkron ke cloud"
-                    } else {
-                        "Nonaktif — data tetap hanya di HP ini"
-                    },
                     checked = firestoreSyncEnabled,
                     onCheckedChange = { enabled ->
                         if (enabled) {
@@ -231,41 +223,45 @@ fun DatabaseBackupSection(
                     previousState = state
                 }
 
-                EditorialButton(
-                    text = if (isSyncingByFirebase) "Menyinkronkan..." else "Sinkronkan transaksi sekarang",
-                    onClick = {
-                        val constraints = Constraints.Builder()
-                            .setRequiredNetworkType(NetworkType.CONNECTED)
-                            .build()
-
-                        val syncWorkRequest = OneTimeWorkRequestBuilder<com.example.worker.SyncWorker>()
-                            .setConstraints(constraints)
-                            .build()
-
-                        workManager.enqueueUniqueWork(
-                            "SyncUniqueWork",
-                            ExistingWorkPolicy.REPLACE,
-                            syncWorkRequest
-                        )
-                    },
+                // Dua aksi cloud berdampingan supaya bagian ini tidak memanjang.
+                Row(
                     modifier = Modifier.fillMaxWidth(),
-                    enabled = !isSyncingByFirebase && firestoreSyncEnabled,
-                    expanded = true,
-                    testTag = "sync_firestore_button"
-                )
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
+                ) {
+                    EditorialButton(
+                        text = "Sinkronkan",
+                        onClick = {
+                            val constraints = Constraints.Builder()
+                                .setRequiredNetworkType(NetworkType.CONNECTED)
+                                .build()
 
-                // Sinkron dulu, aksi hapus data cloud di bawahnya.
-                EditorialButton(
-                    text = if (isDeletingCloud) "Menghapus data cloud..." else "Hapus data cloud",
-                    onClick = { showDeleteCloudConfirm = true },
-                    modifier = Modifier.fillMaxWidth(),
-                    style = EditorialButtonStyle.Ghost,
-                    trailingArrow = false,
-                    accent = BurntOrange,
-                    enabled = !isDeletingCloud,
-                    expanded = true,
-                    testTag = "delete_cloud_data_button"
-                )
+                            val syncWorkRequest = OneTimeWorkRequestBuilder<com.example.worker.SyncWorker>()
+                                .setConstraints(constraints)
+                                .build()
+
+                            workManager.enqueueUniqueWork(
+                                "SyncUniqueWork",
+                                ExistingWorkPolicy.REPLACE,
+                                syncWorkRequest
+                            )
+                        },
+                        modifier = Modifier.weight(1f),
+                        enabled = !isSyncingByFirebase && firestoreSyncEnabled,
+                        trailingArrow = false,
+                        testTag = "sync_firestore_button"
+                    )
+
+                    EditorialButton(
+                        text = if (isDeletingCloud) "Menghapus..." else "Hapus cloud",
+                        onClick = { showDeleteCloudConfirm = true },
+                        modifier = Modifier.weight(1f),
+                        style = EditorialButtonStyle.Ghost,
+                        trailingArrow = false,
+                        accent = BurntOrange,
+                        enabled = !isDeletingCloud,
+                        testTag = "delete_cloud_data_button"
+                    )
+                }
             }
         }
 
@@ -276,7 +272,24 @@ fun DatabaseBackupSection(
             modifier = Modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(Spacing.sm)
         ) {
-            Eyebrow(text = "Cadangan")
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Eyebrow(text = "Cadangan")
+                IconButton(
+                    onClick = { showBackupInfo = true },
+                    modifier = Modifier.size(28.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Info,
+                        contentDescription = "Info cadangan Google Drive",
+                        tint = InkMuted,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
             Text(
                 text = "Cadangan Google Drive",
                 style = MaterialTheme.typography.titleLarge,
@@ -384,6 +397,7 @@ fun DatabaseBackupSection(
                     },
                     modifier = Modifier.fillMaxWidth(),
                     enabled = !isDriveProcessing,
+                    trailingArrow = false,
                     expanded = true,
                     testTag = "backup_to_drive_now_button"
                 )
@@ -393,7 +407,6 @@ fun DatabaseBackupSection(
                 // tersimpan dari versi sebelumnya tetap dipakai.
                 EditorialToggleRow(
                     title = "Pencadangan otomatis",
-                    subtitle = "Unggah berkala ke Google Drive",
                     checked = isAutoBackupEnabled,
                     onCheckedChange = { enabled ->
                         onAutoBackupEnabledChanged(enabled)
@@ -422,8 +435,6 @@ fun DatabaseBackupSection(
                     color = InkMuted
                 )
             } else {
-                Eyebrow(text = "Pilih cadangan untuk dipulihkan")
-
                 driveBackupList.forEachIndexed { index, driveFile ->
                     Row(
                         modifier = Modifier
@@ -486,7 +497,9 @@ fun DatabaseBackupSection(
         EditorialDialog(onDismissRequest = { showFirestoreHelpInfo = false }) {
             EditorialDialogCard(title = "Panduan sinkronisasi realtime") {
                 Text(
-                    text = "Sinkronkan seluruh catatan transaksi finansial Anda secara aman ke database awan Firestore. Data tersinkron otomatis antar perangkat yang terhubung ke akun yang sama.\n\nHubungkan akun Google Anda untuk mengaktifkan sinkronisasi realtime.",
+                    text = "Sinkronkan catatan transaksi secara otomatis ke cloud Firestore, lalu data tersinkron antar perangkat yang memakai akun Google sama.\n\n" +
+                        "Saat sakelar mati, tidak ada data yang diunggah; semuanya tetap di HP ini.\n\n" +
+                        "Hubungkan akun Google dulu untuk memakai fitur ini.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = InkMuted,
                     lineHeight = 20.sp
@@ -494,6 +507,29 @@ fun DatabaseBackupSection(
                 EditorialButton(
                     text = "Tutup",
                     onClick = { showFirestoreHelpInfo = false },
+                    modifier = Modifier.fillMaxWidth(),
+                    trailingArrow = false,
+                    expanded = true
+                )
+            }
+        }
+    }
+
+    // ── Dialog penjelasan cadangan Drive ─────────────────────────────────────
+    if (showBackupInfo) {
+        EditorialDialog(onDismissRequest = { showBackupInfo = false }) {
+            EditorialDialogCard(title = "Tentang cadangan Google Drive") {
+                Text(
+                    text = "Cadangan berisi seluruh data aplikasi (transaksi, kategori, anggaran, dan pengaturan) dan disimpan di Google Drive akun Anda.\n\n" +
+                        "Pencadangan otomatis mengunggah cadangan secara berkala selama akun terhubung.\n\n" +
+                        "Memulihkan cadangan akan menggantikan data di HP dengan isi cadangan. Sebelum menimpa, aplikasi membuat cadangan pengaman ke Drive.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = InkMuted,
+                    lineHeight = 20.sp
+                )
+                EditorialButton(
+                    text = "Mengerti",
+                    onClick = { showBackupInfo = false },
                     modifier = Modifier.fillMaxWidth(),
                     trailingArrow = false,
                     expanded = true

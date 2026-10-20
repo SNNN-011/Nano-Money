@@ -4,11 +4,12 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -58,8 +59,8 @@ fun MonthSelectChip(
 /**
  * Pemilih periode laporan + tombol ekspor/impor.
  *
- * Dulu satu kartu gelap berisi semua kontrol. Sekarang bagian datar: label
- * mono, judul serif, pil bulan, dan tombol pil yang sama dengan tab lain.
+ * Kolom periode tetap di tempat; mengetuknya membuka menu pilihan bulan, jadi
+ * tata letak halaman tidak melompat seperti versi yang melebar di tempat.
  */
 @Composable
 fun UnifiedExportCard(
@@ -67,13 +68,12 @@ fun UnifiedExportCard(
     availableMonths: List<YearMonth>,
     selectedMonths: Set<YearMonth>,
     onSelectedMonthsChanged: (Set<YearMonth>) -> Unit,
-    isMonthsExpanded: Boolean,
-    onIsMonthsExpandedChanged: (Boolean) -> Unit,
     onExportPdfFile: (List<YearMonth>) -> Unit,
     onExportCsvFile: (List<YearMonth>) -> Unit,
     onImportCsvFile: () -> Unit
 ) {
     var showPdfHelpInfo by remember { mutableStateOf(false) }
+    var showMonthPicker by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -86,36 +86,16 @@ fun UnifiedExportCard(
         ) {
             Eyebrow(text = "Ekspor & impor")
 
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(Spacing.xs)
+            IconButton(
+                onClick = { showPdfHelpInfo = true },
+                modifier = Modifier.size(28.dp)
             ) {
-                IconButton(
-                    onClick = { showPdfHelpInfo = true },
-                    modifier = Modifier.size(28.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Info,
-                        contentDescription = "Info Ekspor PDF",
-                        tint = InkMuted,
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
-                IconButton(
-                    onClick = { onIsMonthsExpandedChanged(!isMonthsExpanded) },
-                    modifier = Modifier.size(28.dp).testTag("toggle_months_button")
-                ) {
-                    Icon(
-                        imageVector = if (isMonthsExpanded) {
-                            Icons.Default.KeyboardArrowUp
-                        } else {
-                            Icons.Default.KeyboardArrowDown
-                        },
-                        contentDescription = if (isMonthsExpanded) "Sembunyikan bulan" else "Tampilkan bulan",
-                        tint = InkMuted,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
+                Icon(
+                    imageVector = Icons.Default.Info,
+                    contentDescription = "Info ekspor laporan",
+                    tint = InkMuted,
+                    modifier = Modifier.size(18.dp)
+                )
             }
         }
 
@@ -126,135 +106,50 @@ fun UnifiedExportCard(
             color = Ink
         )
 
-        if (showPdfHelpInfo) {
-            EditorialDialog(onDismissRequest = { showPdfHelpInfo = false }) {
-                EditorialDialogCard(title = "Informasi ekspor PDF") {
-                    Text(
-                        text = "Ekspor laporan keuangan Anda dalam format PDF yang rapi.\n\n" +
-                            "• Pilih satu atau beberapa bulan sekaligus.\n" +
-                            "• Setiap bulan tampil di halaman terpisah.\n" +
-                            "• Isinya ringkasan statistik, grafik arus kas, pie chart kategori pengeluaran, dan tabel transaksi.\n" +
-                            "• File langsung tersimpan di perangkat dan bisa dibagikan kapan saja.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = InkMuted,
-                        lineHeight = 20.sp
-                    )
-                    EditorialButton(
-                        text = "Mengerti",
-                        onClick = { showPdfHelpInfo = false },
-                        modifier = Modifier.fillMaxWidth(),
-                        trailingArrow = false,
-                        expanded = true,
-                        testTag = "pdf_info_dismiss"
-                    )
-                }
-            }
-        }
-
-        if (isMonthsExpanded) {
-            Text(
-                text = "Tentukan bulan transaksi yang ingin di-ekspor atau dicetak sebagai laporan. Bisa satu, beberapa, atau semua bulan.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = InkMuted
-            )
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
-            ) {
-                EditorialButton(
-                    text = "Pilih semua",
-                    onClick = { onSelectedMonthsChanged(availableMonths.toSet()) },
-                    modifier = Modifier.weight(1f),
-                    style = EditorialButtonStyle.Ghost,
-                    trailingArrow = false,
-                    testTag = "select_all_months"
-                )
-                EditorialButton(
-                    text = "Kosongkan",
-                    onClick = { onSelectedMonthsChanged(emptySet()) },
-                    modifier = Modifier.weight(1f),
-                    style = EditorialButtonStyle.Ghost,
-                    trailingArrow = false,
-                    testTag = "clear_all_months"
-                )
+        // Ringkasan periode = kolom isian ketuk. Yang terbuka adalah menu,
+        // bukan isi halaman yang berubah.
+        val shape = RoundedCornerShape(CornerRadius.md)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(shape)
+                .background(CreamRaised)
+                .border(1.dp, HairlineStrong, shape)
+                .clickable { showMonthPicker = true }
+                .padding(horizontal = Spacing.md, vertical = Spacing.sm)
+                .testTag("month_picker_field"),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            val formatter = remember { DateTimeFormatter.ofPattern("MMM yyyy", Locale("id", "ID")) }
+            val displaySelectedStr = if (selectedMonths.isEmpty()) {
+                "Tidak ada bulan terpilih"
+            } else {
+                selectedMonths.sorted().joinToString(", ") { it.format(formatter) }
             }
 
-            val columns = if (isWideScreen) 3 else 2
             Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(Spacing.sm)
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(2.dp)
             ) {
-                availableMonths.chunked(columns).forEach { rowMonths ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
-                    ) {
-                        rowMonths.forEach { month ->
-                            MonthSelectChip(
-                                month = month,
-                                isSelected = selectedMonths.contains(month),
-                                onClick = {
-                                    val updated = if (selectedMonths.contains(month)) {
-                                        selectedMonths - month
-                                    } else {
-                                        selectedMonths + month
-                                    }
-                                    onSelectedMonthsChanged(updated)
-                                },
-                                modifier = Modifier.weight(1f)
-                            )
-                        }
-                        repeat(columns - rowMonths.size) {
-                            Spacer(modifier = Modifier.weight(1f))
-                        }
-                    }
-                }
-            }
-        } else {
-            // Ringkasan periode = satu kolom isian ketuk, bukan blok teks polos.
-            val shape = RoundedCornerShape(CornerRadius.md)
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(shape)
-                    .background(CreamRaised)
-                    .border(1.dp, HairlineStrong, shape)
-                    .clickable { onIsMonthsExpandedChanged(true) }
-                    .padding(horizontal = Spacing.md, vertical = Spacing.sm),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                val formatter = remember { DateTimeFormatter.ofPattern("MMM yyyy", Locale("id", "ID")) }
-                val displaySelectedStr = if (selectedMonths.isEmpty()) {
-                    "Tidak ada bulan terpilih"
-                } else {
-                    selectedMonths.sorted().joinToString(", ") { it.format(formatter) }
-                }
-
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(2.dp)
-                ) {
-                    Text(
-                        text = "Periode terpilih (${selectedMonths.size} bulan)",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = InkMuted
-                    )
-                    Text(
-                        text = displaySelectedStr,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = Ink
-                    )
-                }
-
-                Icon(
-                    imageVector = Icons.Default.KeyboardArrowDown,
-                    contentDescription = null,
-                    tint = InkMuted,
-                    modifier = Modifier.size(18.dp)
+                Text(
+                    text = "Periode terpilih (${selectedMonths.size} bulan)",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = InkMuted
+                )
+                Text(
+                    text = displaySelectedStr,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = Ink
                 )
             }
+
+            Icon(
+                imageVector = Icons.Default.KeyboardArrowDown,
+                contentDescription = null,
+                tint = InkMuted,
+                modifier = Modifier.size(18.dp)
+            )
         }
 
         HairlineDivider()
@@ -264,6 +159,7 @@ fun UnifiedExportCard(
             onClick = { onExportPdfFile(selectedMonths.toList()) },
             modifier = Modifier.fillMaxWidth(),
             enabled = selectedMonths.isNotEmpty(),
+            trailingArrow = false,
             expanded = true,
             testTag = "export_pdf_button"
         )
@@ -289,6 +185,109 @@ fun UnifiedExportCard(
                 trailingArrow = false,
                 testTag = "import_csv_button"
             )
+        }
+    }
+
+    if (showPdfHelpInfo) {
+        EditorialDialog(onDismissRequest = { showPdfHelpInfo = false }) {
+            EditorialDialogCard(title = "Informasi ekspor laporan") {
+                Text(
+                    text = "Pilih bulan lewat kolom periode. Bisa satu atau beberapa bulan.\n\n" +
+                        "PDF: setiap bulan jadi halaman terpisah, berisi ringkasan statistik, grafik arus kas, pie chart kategori pengeluaran, dan tabel transaksi. File langsung tersimpan di perangkat dan bisa dibagikan kapan saja.\n\n" +
+                        "Excel: data mentah transaksi pada bulan terpilih, bisa dibuka di aplikasi lembar kerja.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = InkMuted,
+                    lineHeight = 20.sp
+                )
+                EditorialButton(
+                    text = "Mengerti",
+                    onClick = { showPdfHelpInfo = false },
+                    modifier = Modifier.fillMaxWidth(),
+                    trailingArrow = false,
+                    expanded = true,
+                    testTag = "pdf_info_dismiss"
+                )
+            }
+        }
+    }
+
+    if (showMonthPicker) {
+        EditorialDialog(onDismissRequest = { showMonthPicker = false }) {
+            EditorialDialogCard(title = "Pilih periode laporan") {
+                Text(
+                    text = "${selectedMonths.size} dari ${availableMonths.size} bulan terpilih",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = InkMuted,
+                    modifier = Modifier.testTag("month_picker_count")
+                )
+
+                // Tinggi dibatasi supaya daftar bulan bertahun-tahun tetap muat.
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 360.dp)
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.sm)
+                ) {
+                    val columns = if (isWideScreen) 3 else 2
+                    availableMonths.chunked(columns).forEach { rowMonths ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
+                        ) {
+                            rowMonths.forEach { month ->
+                                MonthSelectChip(
+                                    month = month,
+                                    isSelected = selectedMonths.contains(month),
+                                    onClick = {
+                                        val updated = if (selectedMonths.contains(month)) {
+                                            selectedMonths - month
+                                        } else {
+                                            selectedMonths + month
+                                        }
+                                        onSelectedMonthsChanged(updated)
+                                    },
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
+                            repeat(columns - rowMonths.size) {
+                                Spacer(modifier = Modifier.weight(1f))
+                            }
+                        }
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
+                ) {
+                    EditorialButton(
+                        text = "Pilih semua",
+                        onClick = { onSelectedMonthsChanged(availableMonths.toSet()) },
+                        modifier = Modifier.weight(1f),
+                        style = EditorialButtonStyle.Ghost,
+                        trailingArrow = false,
+                        testTag = "select_all_months"
+                    )
+                    EditorialButton(
+                        text = "Kosongkan",
+                        onClick = { onSelectedMonthsChanged(emptySet()) },
+                        modifier = Modifier.weight(1f),
+                        style = EditorialButtonStyle.Ghost,
+                        trailingArrow = false,
+                        testTag = "clear_all_months"
+                    )
+                }
+
+                EditorialButton(
+                    text = "Selesai",
+                    onClick = { showMonthPicker = false },
+                    modifier = Modifier.fillMaxWidth(),
+                    trailingArrow = false,
+                    expanded = true,
+                    testTag = "month_picker_done"
+                )
+            }
         }
     }
 }
