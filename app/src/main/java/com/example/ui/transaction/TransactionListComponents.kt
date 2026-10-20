@@ -1,251 +1,26 @@
 package com.example.ui.transaction
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ReceiptLong
 import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.FinancialRecord
 import com.example.ui.theme.*
-import com.example.ui.components.GlassCard
 import com.example.ui.config.FormatUtils
 import com.example.ui.util.CategoryIconMapper
 import com.example.ui.util.displayCategoryName
 import java.util.*
-
-@Composable
-fun FilterAndSortHeader(
-    currentFilter: String,
-    isNewest: Boolean,
-    onFilterSelected: (String) -> Unit,
-    onSortToggled: () -> Unit
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = Spacing.md)
-    ) {
-        Spacer(modifier = Modifier.height(Spacing.md))
-
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 4.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.weight(1f)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .width(4.dp)
-                        .height(14.dp)
-                        .background(
-                            color = GhostWhite,
-                            shape = RoundedCornerShape(2.dp)
-                        )
-                )
-                Spacer(modifier = Modifier.width(Spacing.sm))
-                Text(
-                    text = "RIWAYAT TRANSAKSI",
-                    style = MaterialTheme.typography.titleMedium.copy(
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 1.2.sp
-                    ),
-                    color = GhostWhite
-                )
-            }
-        }
-
-        Spacer(modifier = Modifier.height(Spacing.md))
-
-        // Categories toggles row
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 4.dp)
-                .testTag("history_filter_dropdown"),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            val filterOptions = listOf("Semua", "Pendapatan", "Pengeluaran")
-            filterOptions.forEach { opt ->
-                val isSelected = currentFilter == opt
-                
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .clickable(
-                            interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
-                            indication = null
-                        ) { onFilterSelected(opt) }
-                        .padding(vertical = 8.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text(
-                            text = opt,
-                            style = MaterialTheme.typography.titleSmall.copy(
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                fontSize = 14.sp,
-                                letterSpacing = 0.5.sp
-                            ),
-                            color = if (isSelected) GhostWhite else GhostWhite.copy(alpha = 0.4f)
-                        )
-                        Spacer(modifier = Modifier.height(6.dp))
-                        Box(
-                            modifier = Modifier
-                                .height(2.5.dp)
-                                .fillMaxWidth(0.35f)
-                                .background(
-                                    color = if (isSelected) GhostWhite else Color.Transparent,
-                                    shape = RoundedCornerShape(1.5.dp)
-                                )
-                        )
-                    }
-                }
-            }
-        }
-
-
-    }
-}
-
-@Composable
-fun TransactionEmptyState(
-    isFiltered: Boolean,
-    onSeedData: () -> Unit = {},
-    onClearFilters: () -> Unit = {}
-) {
-    Box(
-        modifier = Modifier.fillMaxSize(),
-        contentAlignment = Alignment.Center
-    ) {
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.padding(32.dp)
-        ) {
-            Icon(
-                imageVector = if (isFiltered) Icons.Default.Search else Icons.Default.AddCircleOutline,
-                contentDescription = null,
-                tint = GhostWhite.copy(alpha = 0.3f),
-                modifier = Modifier.size(40.dp)
-            )
-            Spacer(modifier = Modifier.height(Spacing.md))
-            Text(
-                text = if (isFiltered) "Tidak ada yang cocok" else "Belum ada transaksi",
-                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                color = GhostWhite.copy(alpha = 0.7f)
-            )
-            Spacer(modifier = Modifier.height(6.dp))
-            Text(
-                text = if (isFiltered) {
-                    "Coba ganti atau kosongkan filter di atas."
-                } else {
-                    "Mulai catat pengeluaran pertamamu, atau isi dengan data contoh."
-                },
-                style = MaterialTheme.typography.bodySmall,
-                color = GhostWhite.copy(alpha = 0.35f)
-            )
-            if (isFiltered) {
-                Spacer(modifier = Modifier.height(Spacing.md))
-                PremiumButton(
-                    text = "Hapus Filter",
-                    onClick = onClearFilters,
-                    isActive = true,
-                    fillMaxWidth = false,
-                    horizontalPadding = 20.dp,
-                    testTag = "clear_filters_button"
-                )
-            } else {
-                Spacer(modifier = Modifier.height(Spacing.md))
-                PremiumButton(
-                    text = "Isi Data Contoh",
-                    onClick = onSeedData,
-                    isActive = true,
-                    fillMaxWidth = false,
-                    horizontalPadding = 20.dp,
-                    testTag = "seed_data_button"
-                )
-            }
-        }
-    }
-}
-
-@Composable
-fun TransactionList(
-    records: List<FinancialRecord>,
-    onEdit: (FinancialRecord) -> Unit,
-    onDelete: (FinancialRecord) -> Unit,
-    isFilterActive: Boolean = false,
-    onClearFilters: () -> Unit = {},
-    onSeedData: () -> Unit = {},
-    modifier: Modifier = Modifier
-) {
-    // LazyColumn tanpa state eksplisit memakai rememberLazyListState internal.
-    // Saat daftar di-reorder, Compose mempertahankan key yang sedang terlihat agar
-    // tetap terlihat, sehingga memilih filter atau urutan lain melempar daftar
-    // ke bawah. Memakai state sendiri plus scrollToItem(0) setiap kali isi
-    // berubah membuat daftar selalu mulai dari atas.
-    val listState = rememberLazyListState()
-    LaunchedEffect(records) {
-        if (records.isNotEmpty()) listState.scrollToItem(0)
-    }
-
-    if (records.isEmpty()) {
-        TransactionEmptyState(
-            isFiltered = isFilterActive,
-            onSeedData = onSeedData,
-            onClearFilters = onClearFilters
-        )
-    } else {
-        LazyColumn(
-            state = listState,
-            modifier = modifier.fillMaxSize(),
-            verticalArrangement = Arrangement.spacedBy(0.dp)
-        ) {
-            itemsIndexed(records, key = { _, record -> record.id }) { index, record ->
-                TransactionListItem(
-                    record = record,
-                    onEdit = { onEdit(record) },
-                    onDelete = { onDelete(record) }
-                )
-                if (index < records.lastIndex) {
-                    HorizontalDivider(
-                        color = GhostWhite.copy(alpha = 0.05f),
-                        thickness = 1.dp,
-                        modifier = Modifier.padding(vertical = 4.dp, horizontal = 16.dp)
-                    )
-                }
-            }
-        }
-    }
-}
 
 /**
  * Dipakai untuk memecah kata pada judul transaksi.
@@ -425,69 +200,6 @@ fun TransactionListItem(
                     )
                 }
             }
-        }
-    }
-}
-
-@Composable
-fun EmptyStatePlaceholder(onSeedData: (() -> Unit)? = null) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(32.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        Box(
-            modifier = Modifier
-                .size(56.dp)
-                .background(
-                    color = Color.Transparent,
-                    shape = RoundedCornerShape(6.dp)
-                )
-                .border(
-                    width = 1.dp,
-                    color = TranslucentBorder,
-                    shape = RoundedCornerShape(6.dp)
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = Icons.Default.AccountBalanceWallet,
-                contentDescription = null,
-                tint = GhostWhite,
-                modifier = Modifier.size(24.dp)
-            )
-        }
-        Spacer(modifier = Modifier.height(18.dp))
-        Text(
-            text = "Belum Ada Transaksi",
-            style = MaterialTheme.typography.titleMedium.copy(
-                fontWeight = FontWeight.Bold,
-                fontSize = 16.sp,
-                letterSpacing = 0.5.sp
-            ),
-            color = GhostWhite
-        )
-        Spacer(modifier = Modifier.height(6.dp))
-        Text(
-            text = "Ketuk tab Tambah di menu bawah untuk mencatat transaksi baru Anda.",
-            style = MaterialTheme.typography.bodyMedium.copy(
-                fontSize = 13.sp,
-                lineHeight = 18.sp
-            ),
-            color = GhostWhite.copy(alpha = 0.5f),
-            textAlign = TextAlign.Center
-        )
-        if (onSeedData != null) {
-            Spacer(modifier = Modifier.height(16.dp))
-            PremiumButton(
-                text = "Gunakan Data Sampel",
-                onClick = onSeedData,
-                isActive = true,
-                testTag = "seed_data_button",
-                fillMaxWidth = false
-            )
         }
     }
 }

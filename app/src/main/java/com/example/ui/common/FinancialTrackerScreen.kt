@@ -23,7 +23,6 @@ import kotlinx.coroutines.withContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
@@ -43,7 +42,6 @@ import androidx.navigation.compose.rememberNavController
 import com.example.data.FinancialRecord
 import com.example.data.ImportMode
 import com.example.ui.theme.*
-import com.example.ui.components.GlassCard
 import com.example.ui.chat.ChatScreen
 import com.example.ui.chat.ChatViewModel
 import com.example.ui.home.BerandaTabContent
@@ -430,67 +428,20 @@ fun FinancialTrackerScreen(
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
-            .background(MidnightAbyss)
+            .background(Cream)
     ) {
         val isWideScreen = maxWidth > 720.dp
 
-        // Varied atmospheric ambient lights depending on current tab
-        AnimatedContent(
-            targetState = currentRoute,
-            transitionSpec = {
-                fadeIn(animationSpec = androidx.compose.animation.core.tween(700)) togetherWith fadeOut(animationSpec = androidx.compose.animation.core.tween(700))
-            },
-            label = "gradient_transition"
-        ) { route ->
-            when (route) {
-                TrackerTab.BERANDA.name -> {
-                    // Tab Dashboard memakai palet editorial: latarnya krem polos,
-                    // bukan gradien neon seperti tab lain yang belum di-redesign.
-                    Box(modifier = Modifier.fillMaxSize().background(Cream))
-                }
-                TrackerTab.TRANSAKSI_BARU.name -> {
-                    // Tab Tambah ikut palet editorial: latar krem polos, sama
-                    // seperti tab Dashboard dan tab Chat.
-                    Box(modifier = Modifier.fillMaxSize().background(Cream))
-                }
-                TrackerTab.KALENDER.name -> {
-                    // Tab Kalender ikut palet editorial: krem polos. Grafik tren
-                    // bulanan tetap ada, tapi digambar di belakang grid tanggal.
-                    Box(modifier = Modifier.fillMaxSize().background(Cream))
-                }
-                TrackerTab.CHAT.name -> {
-                    // Tab Chat ikut palet editorial (pilihan pengguna): latar krem
-                    // polos, sama seperti tab Dashboard.
-                    Box(modifier = Modifier.fillMaxSize().background(Cream))
-                }
-                TrackerTab.EKSPOR_IMPOR.name -> {
-                    // Tab Simpan ikut palet editorial: krem polos, tanpa gradien.
-                    Box(modifier = Modifier.fillMaxSize().background(Cream))
-                }
-                else -> {
-                    Box(modifier = Modifier.fillMaxSize().background(Brush.radialGradient(colors = listOf(SteelBlueGlow.copy(alpha = 0.08f), Color.Transparent), radius = 600f)))
-                    Box(modifier = Modifier.fillMaxSize().background(Brush.radialGradient(colors = listOf(NeonViolet.copy(alpha = 0.1f), Color.Transparent), radius = 800f)))
-                }
-            }
-        }
-
-        // Tab Dashboard, Chat, Tambah, Kalender, dan Simpan memakai palet
-        // editorial, jadi bar atas dan bar bawah ikut krem-tinta supaya tidak
-        // beradu dengan latar krem halamannya. Tab yang belum di-redesign tetap
-        // memakai warna lama.
-        val isEditorialTab = currentRoute == TrackerTab.BERANDA.name ||
-            currentRoute == TrackerTab.CHAT.name ||
-            currentRoute == TrackerTab.TRANSAKSI_BARU.name ||
-            currentRoute == TrackerTab.KALENDER.name ||
-            currentRoute == TrackerTab.EKSPOR_IMPOR.name
-        val barContainer = if (isEditorialTab) CreamRaised else MidnightAbyss.copy(alpha = 0.95f)
-        val barDivider = if (isEditorialTab) Hairline else GhostWhite.copy(alpha = 0.05f)
-        val barTitleColor = if (isEditorialTab) Ink else GhostWhite
-        val barSubtitleColor = if (isEditorialTab) BurntOrange else SteelBlue
-        val barSelectedColor = if (isEditorialTab) Ink else SteelBlue
-        val barSelectedIconColor = if (isEditorialTab) Cream else SteelBlue
-        val barUnselectedColor = if (isEditorialTab) InkMuted else GhostWhite.copy(alpha = 0.5f)
-        val barIndicatorColor = if (isEditorialTab) Ink else TranslucentGlass
+        // Kelima tab memakai palet editorial, jadi bar atas dan bar bawah ikut
+        // krem-tinta supaya tidak beradu dengan latar krem halamannya.
+        val barContainer = CreamRaised
+        val barDivider = Hairline
+        val barTitleColor = Ink
+        val barSubtitleColor = BurntOrange
+        val barSelectedColor = Ink
+        val barSelectedIconColor = Cream
+        val barUnselectedColor = InkMuted
+        val barIndicatorColor = Ink
 
         Scaffold(
             modifier = Modifier.navigationBarsPadding(),
@@ -503,10 +454,10 @@ fun FinancialTrackerScreen(
                                 Text(
                                     text = "Nano Money ",
                                     style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = if (isEditorialTab) FontWeight.Medium else FontWeight.Black,
-                                    fontFamily = if (isEditorialTab) SerifFamily else null,
+                                    fontWeight = FontWeight.Medium,
+                                    fontFamily = SerifFamily,
                                     color = barTitleColor,
-                                    letterSpacing = if (isEditorialTab) 0.sp else 1.sp
+                                    letterSpacing = 0.sp
                                 )
                                 AnimatedContent(
                                     targetState = currentRoute,
@@ -524,10 +475,10 @@ fun FinancialTrackerScreen(
                                             TrackerTab.EKSPOR_IMPOR.name -> "CADANGKAN & PEMULIHAN"
                                             else -> ""
                                         },
-                                        style = if (isEditorialTab) EyebrowTextStyle else MaterialTheme.typography.labelSmall,
+                                        style = EyebrowTextStyle,
                                         color = barSubtitleColor,
-                                        fontWeight = if (isEditorialTab) FontWeight.Medium else FontWeight.Bold,
-                                        letterSpacing = if (isEditorialTab) 0.7.sp else 2.sp
+                                        fontWeight = FontWeight.Medium,
+                                        letterSpacing = 0.7.sp
                                     )
                                 }
                             }

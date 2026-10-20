@@ -37,10 +37,10 @@ import com.example.ui.theme.*
 import com.example.ui.components.EditorialButton
 import com.example.ui.components.EditorialButtonStyle
 import com.example.ui.components.EditorialDialog
+import com.example.ui.components.EditorialDialogCard
 import com.example.ui.components.EditorialPill
 import com.example.ui.components.EditorialTextField
 import com.example.ui.components.Eyebrow
-import com.example.ui.components.GlassCard
 import com.example.ui.components.HairlineDivider
 import com.example.ui.components.LabeledField
 import com.example.ui.components.TapField
@@ -56,57 +56,25 @@ fun MessageAlertDialog(
     message: String,
     onDismissRequest: () -> Unit
 ) {
-    Dialog(onDismissRequest = onDismissRequest) {
-        Card(
-            modifier = Modifier.fillMaxWidth().padding(Spacing.lg),
-            shape = RoundedCornerShape(CornerRadius.xl),
-            colors = CardDefaults.cardColors(containerColor = MidnightAbyss),
-            border = BorderStroke(
-                width = 1.dp,
-                brush = Brush.verticalGradient(
-                    colors = listOf(
-                        GhostWhite.copy(alpha = 0.2f),
-                        GhostWhite.copy(alpha = 0.02f)
-                    )
-                )
-            ),
-            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
-        ) {
-            Box(modifier = Modifier.background(TranslucentGlass)) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(Spacing.xl),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Info,
-                        contentDescription = null,
-                        tint = SteelBlue,
-                        modifier = Modifier.size(40.dp).padding(bottom = Spacing.sm)
-                    )
-                    Text(
-                        text = title,
-                        style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
-                        color = GhostWhite,
-                        modifier = Modifier.padding(bottom = Spacing.md)
-                    )
-                    Text(
-                        text = message,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = GhostWhite.copy(alpha = 0.8f),
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                        modifier = Modifier.padding(bottom = Spacing.xl)
-                    )
-                    PremiumButton(
-                        text = "OK",
-                        onClick = onDismissRequest,
-                        modifier = Modifier.fillMaxWidth(),
-                        isActive = true,
-                        testTag = "message_dialog_ok"
-                    )
-                }
-            }
+    // Dialog ini muncul untuk kabar gagal (simpan/hapus/impor), jadi pakai
+    // permukaan editorial yang sama dengan dialog lain: krem, garis rambut,
+    // judul serif. Sebelumnya kartunya gelap dan hanya muncul saat error,
+    // sehingga layar tiba-tiba berubah hitam.
+    EditorialDialog(onDismissRequest = onDismissRequest) {
+        EditorialDialogCard(title = title) {
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodyMedium,
+                color = InkMuted,
+                lineHeight = 20.sp
+            )
+            EditorialButton(
+                text = "OK",
+                onClick = onDismissRequest,
+                trailingArrow = false,
+                expanded = true,
+                testTag = "message_dialog_ok"
+            )
         }
     }
 }
