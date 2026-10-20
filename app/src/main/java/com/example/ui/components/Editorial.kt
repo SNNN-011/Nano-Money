@@ -15,25 +15,31 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.NorthEast
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -396,26 +402,45 @@ fun EditorialTextField(
     modifier: Modifier = Modifier,
     keyboardType: KeyboardType = KeyboardType.Text
 ) {
-    OutlinedTextField(
+    val shape = RoundedCornerShape(CornerRadius.md)
+    var focused by remember { mutableStateOf(false) }
+
+    BasicTextField(
         value = value,
         onValueChange = onValueChange,
-        placeholder = {
-            Text(
-                text = placeholder,
-                color = InkMuted,
-                style = MaterialTheme.typography.bodyMedium
-            )
-        },
+        textStyle = MaterialTheme.typography.bodyMedium.copy(color = Ink),
+        cursorBrush = SolidColor(BurntOrange),
         singleLine = true,
         keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
-        shape = RoundedCornerShape(CornerRadius.md),
-        colors = editorialFieldColors(),
         modifier = modifier
             .fillMaxWidth()
-            // Dikunci setinggi tombol: kolom isian tidak lagi lebih jangkung
-            // dari kontrol lain di dialog yang sama.
+            // Kotaknya digambar sendiri, bukan OutlinedTextField: isian Material
+            // punya tinggi bawaan 56 dp dan memotong baris teks kalau dipaksa
+            // 44 dp. Bentuknya disamakan dengan TapField supaya isian teks dan
+            // isian ketuk di form yang sama selalu tampil sama.
             .height(FieldHeight)
-            .testTag(testTag)
+            .clip(shape)
+            .background(Cream)
+            .border(1.dp, if (focused) BurntOrange else HairlineStrong, shape)
+            .onFocusChanged { focused = it.isFocused }
+            .padding(horizontal = Spacing.md, vertical = Spacing.sm)
+            .testTag(testTag),
+        decorationBox = { innerTextField ->
+            Box(
+                modifier = Modifier.fillMaxWidth(),
+                contentAlignment = Alignment.CenterStart
+            ) {
+                if (value.isEmpty()) {
+                    Text(
+                        text = placeholder,
+                        color = InkMuted,
+                        style = MaterialTheme.typography.bodyMedium,
+                        maxLines = 1
+                    )
+                }
+                innerTextField()
+            }
+        }
     )
 }
 
