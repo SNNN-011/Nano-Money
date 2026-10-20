@@ -74,10 +74,10 @@ fun CalendarTrendBackdrop(
         // bisa punya banyak titik dan akan berubah jadi kotak padat.
         if (buckets in 2..40) {
             pointsFor(expenseTrends).forEach { point ->
-                drawCircle(color = Color.White.copy(alpha = 0.20f), radius = 2.dp.toPx(), center = point)
+                drawCircle(color = CalTeksUtama.copy(alpha = 0.22f), radius = 2.dp.toPx(), center = point)
             }
             pointsFor(incomeTrends).forEach { point ->
-                drawCircle(color = Color.White.copy(alpha = 0.16f), radius = 2.dp.toPx(), center = point)
+                drawCircle(color = CalTeksUtama.copy(alpha = 0.16f), radius = 2.dp.toPx(), center = point)
             }
         }
     }

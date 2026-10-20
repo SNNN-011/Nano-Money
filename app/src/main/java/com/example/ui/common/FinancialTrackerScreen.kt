@@ -23,7 +23,6 @@ import kotlinx.coroutines.withContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
@@ -43,7 +42,6 @@ import androidx.navigation.compose.rememberNavController
 import com.example.data.FinancialRecord
 import com.example.data.ImportMode
 import com.example.ui.theme.*
-import com.example.ui.components.GlassCard
 import com.example.ui.chat.ChatScreen
 import com.example.ui.chat.ChatViewModel
 import com.example.ui.home.BerandaTabContent
@@ -151,6 +149,7 @@ fun FinancialTrackerScreen(
     val showNewFeature by com.example.util.RemoteConfigHelper.showNewFeature.collectAsState()
 
     var showBudgetDialog by rememberSaveable { mutableStateOf(false) }
+    var showDeleteBudgetDialog by rememberSaveable { mutableStateOf(false) }
 
     var showCategoryDialog by rememberSaveable { mutableStateOf(false) }
     var recordToDelete by remember { mutableStateOf<FinancialRecord?>(null) }
@@ -410,51 +409,39 @@ fun FinancialTrackerScreen(
         )
     }
 
+    // Hapus batas anggaran: bulanan + semua batas kategori sekaligus, sama
+    // seperti yang dilakukan dialog pengaturan saat limitnya diisi 0.
+    if (showDeleteBudgetDialog) {
+        DeleteBudgetConfirmDialog(
+            onConfirm = {
+                viewModel.updateMonthlyBudgetLimit(0L)
+                expenseCategoryEntitiesState.forEach { category ->
+                    viewModel.updateCategoryBudget(category.id, 0L)
+                }
+                showDeleteBudgetDialog = false
+            },
+            onDismiss = { showDeleteBudgetDialog = false }
+        )
+    }
+
     // Responsive Adaptive Layout parameters
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
-            .background(MidnightAbyss)
+            .background(Cream)
     ) {
         val isWideScreen = maxWidth > 720.dp
 
-        // Varied atmospheric ambient lights depending on current tab
-        AnimatedContent(
-            targetState = currentRoute,
-            transitionSpec = {
-                fadeIn(animationSpec = androidx.compose.animation.core.tween(700)) togetherWith fadeOut(animationSpec = androidx.compose.animation.core.tween(700))
-            },
-            label = "gradient_transition"
-        ) { route ->
-            when (route) {
-                TrackerTab.BERANDA.name -> {
-                    Box(modifier = Modifier.fillMaxSize().background(Brush.radialGradient(colors = listOf(SteelBlueGlow.copy(alpha = 0.08f), Color.Transparent), center = Offset(500f, 300f), radius = 1000f)))
-                    Box(modifier = Modifier.fillMaxSize().background(Brush.radialGradient(colors = listOf(SteelBlueGlow.copy(alpha = 0.06f), Color.Transparent), center = Offset(100f, 1600f), radius = 1200f)))
-                    Box(modifier = Modifier.fillMaxSize().background(Brush.radialGradient(colors = listOf(SteelBlueGlow.copy(alpha = 0.04f), Color.Transparent), center = Offset(1500f, 1000f), radius = 900f)))
-                }
-                TrackerTab.TRANSAKSI_BARU.name -> {
-                    Box(modifier = Modifier.fillMaxSize().background(Brush.radialGradient(colors = listOf(SteelBlueGlow.copy(alpha = 0.12f), Color.Transparent), center = Offset(800f, 0f), radius = 900f)))
-                    Box(modifier = Modifier.fillMaxSize().background(Brush.radialGradient(colors = listOf(NeonViolet.copy(alpha = 0.1f), Color.Transparent), center = Offset(0f, 1500f), radius = 800f)))
-                }
-                TrackerTab.KALENDER.name -> {
-                    Box(modifier = Modifier.fillMaxSize().background(Brush.radialGradient(colors = listOf(NeonViolet.copy(alpha = 0.12f), Color.Transparent), center = Offset(0f, 0f), radius = 800f)))
-                    Box(modifier = Modifier.fillMaxSize().background(Brush.radialGradient(colors = listOf(SteelBlueGlow.copy(alpha = 0.1f), Color.Transparent), center = Offset(800f, 1500f), radius = 1100f)))
-                }
-                TrackerTab.CHAT.name -> {
-                    Box(modifier = Modifier.fillMaxSize().background(Brush.radialGradient(colors = listOf(SteelBlueGlow.copy(alpha = 0.11f), Color.Transparent), center = Offset(800f, 1500f), radius = 800f)))
-                    Box(modifier = Modifier.fillMaxSize().background(Brush.radialGradient(colors = listOf(NeonViolet.copy(alpha = 0.1f), Color.Transparent), center = Offset(800f, 0f), radius = 900f)))
-                    Box(modifier = Modifier.fillMaxSize().background(Brush.radialGradient(colors = listOf(SteelBlueGlow.copy(alpha = 0.08f), Color.Transparent), center = Offset(0f, 1500f), radius = 600f)))
-                }
-                TrackerTab.EKSPOR_IMPOR.name -> {
-                    Box(modifier = Modifier.fillMaxSize().background(Brush.radialGradient(colors = listOf(NeonViolet.copy(alpha = 0.09f), Color.Transparent), center = Offset(0f, 1500f), radius = 900f)))
-                    Box(modifier = Modifier.fillMaxSize().background(Brush.radialGradient(colors = listOf(SteelBlueGlow.copy(alpha = 0.12f), Color.Transparent), center = Offset(800f, 0f), radius = 800f)))
-                }
-                else -> {
-                    Box(modifier = Modifier.fillMaxSize().background(Brush.radialGradient(colors = listOf(SteelBlueGlow.copy(alpha = 0.08f), Color.Transparent), radius = 600f)))
-                    Box(modifier = Modifier.fillMaxSize().background(Brush.radialGradient(colors = listOf(NeonViolet.copy(alpha = 0.1f), Color.Transparent), radius = 800f)))
-                }
-            }
-        }
+        // Kelima tab memakai palet editorial, jadi bar atas dan bar bawah ikut
+        // krem-tinta supaya tidak beradu dengan latar krem halamannya.
+        val barContainer = CreamRaised
+        val barDivider = Hairline
+        val barTitleColor = Ink
+        val barSubtitleColor = BurntOrange
+        val barSelectedColor = Ink
+        val barSelectedIconColor = Cream
+        val barUnselectedColor = InkMuted
+        val barIndicatorColor = Ink
 
         Scaffold(
             modifier = Modifier.navigationBarsPadding(),
@@ -467,9 +454,10 @@ fun FinancialTrackerScreen(
                                 Text(
                                     text = "Nano Money ",
                                     style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Black,
-                                    color = GhostWhite,
-                                    letterSpacing = 1.sp
+                                    fontWeight = FontWeight.Medium,
+                                    fontFamily = SerifFamily,
+                                    color = barTitleColor,
+                                    letterSpacing = 0.sp
                                 )
                                 AnimatedContent(
                                     targetState = currentRoute,
@@ -487,27 +475,27 @@ fun FinancialTrackerScreen(
                                             TrackerTab.EKSPOR_IMPOR.name -> "CADANGKAN & PEMULIHAN"
                                             else -> ""
                                         },
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = SteelBlue,
-                                        fontWeight = FontWeight.Bold,
-                                        letterSpacing = 2.sp
+                                        style = EyebrowTextStyle,
+                                        color = barSubtitleColor,
+                                        fontWeight = FontWeight.Medium,
+                                        letterSpacing = 0.7.sp
                                     )
                                 }
                             }
                         },
                         colors = TopAppBarDefaults.topAppBarColors(
-                            containerColor = MidnightAbyss.copy(alpha = 0.95f),
-                            titleContentColor = GhostWhite
+                            containerColor = barContainer,
+                            titleContentColor = barTitleColor
                         )
                     )
-                    HorizontalDivider(color = GhostWhite.copy(alpha = 0.05f), thickness = 1.dp)
+                    HorizontalDivider(color = barDivider, thickness = 1.dp)
                 }
             },
             bottomBar = {
                 Column {
-                    HorizontalDivider(color = GhostWhite.copy(alpha = 0.05f), thickness = 1.dp)
+                    HorizontalDivider(color = barDivider, thickness = 1.dp)
                 NavigationBar(
-                    containerColor = MidnightAbyss.copy(alpha = 0.95f),
+                    containerColor = barContainer,
                     tonalElevation = 0.dp,
                     modifier = Modifier.testTag("app_navigation_bar")
                 ) {
@@ -525,11 +513,11 @@ fun FinancialTrackerScreen(
                         icon = { Icon(Icons.Default.AccountBalance, contentDescription = "Dashboard", modifier = Modifier.size(20.dp)) },
                         label = { Text("Dashboard", fontSize = 11.sp, fontWeight = FontWeight.Medium) },
                         colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = SteelBlue,
-                            selectedTextColor = SteelBlue,
-                            unselectedIconColor = GhostWhite.copy(alpha = 0.5f),
-                            unselectedTextColor = GhostWhite.copy(alpha = 0.5f),
-                            indicatorColor = TranslucentGlass
+                            selectedIconColor = barSelectedIconColor,
+                            selectedTextColor = barSelectedColor,
+                            unselectedIconColor = barUnselectedColor,
+                            unselectedTextColor = barUnselectedColor,
+                            indicatorColor = barIndicatorColor
                         ),
                         modifier = Modifier.testTag("nav_beranda")
                     )
@@ -545,11 +533,11 @@ fun FinancialTrackerScreen(
                         icon = { Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = "Chat", modifier = Modifier.size(20.dp)) },
                         label = { Text("Chat", fontSize = 11.sp, fontWeight = FontWeight.Medium) },
                         colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = SteelBlue,
-                            selectedTextColor = SteelBlue,
-                            unselectedIconColor = GhostWhite.copy(alpha = 0.5f),
-                            unselectedTextColor = GhostWhite.copy(alpha = 0.5f),
-                            indicatorColor = TranslucentGlass
+                            selectedIconColor = barSelectedIconColor,
+                            selectedTextColor = barSelectedColor,
+                            unselectedIconColor = barUnselectedColor,
+                            unselectedTextColor = barUnselectedColor,
+                            indicatorColor = barIndicatorColor
                         ),
                         modifier = Modifier.testTag("nav_chat")
                     )
@@ -568,11 +556,11 @@ fun FinancialTrackerScreen(
                         icon = { Icon(Icons.Default.AddCircleOutline, contentDescription = "Transaksi Baru", modifier = Modifier.size(20.dp)) },
                         label = { Text("Tambah", fontSize = 11.sp, fontWeight = FontWeight.Medium) },
                         colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = SteelBlue,
-                            selectedTextColor = SteelBlue,
-                            unselectedIconColor = GhostWhite.copy(alpha = 0.5f),
-                            unselectedTextColor = GhostWhite.copy(alpha = 0.5f),
-                            indicatorColor = TranslucentGlass
+                            selectedIconColor = barSelectedIconColor,
+                            selectedTextColor = barSelectedColor,
+                            unselectedIconColor = barUnselectedColor,
+                            unselectedTextColor = barUnselectedColor,
+                            indicatorColor = barIndicatorColor
                         ),
                         modifier = Modifier.testTag("nav_transaksi_baru")
                     )
@@ -588,11 +576,11 @@ fun FinancialTrackerScreen(
                         icon = { Icon(Icons.Default.DateRange, contentDescription = "Kalender", modifier = Modifier.size(20.dp)) },
                         label = { Text("Kalender", fontSize = 11.sp, fontWeight = FontWeight.Medium) },
                         colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = SteelBlue,
-                            selectedTextColor = SteelBlue,
-                            unselectedIconColor = GhostWhite.copy(alpha = 0.5f),
-                            unselectedTextColor = GhostWhite.copy(alpha = 0.5f),
-                            indicatorColor = TranslucentGlass
+                            selectedIconColor = barSelectedIconColor,
+                            selectedTextColor = barSelectedColor,
+                            unselectedIconColor = barUnselectedColor,
+                            unselectedTextColor = barUnselectedColor,
+                            indicatorColor = barIndicatorColor
                         ),
                         modifier = Modifier.testTag("nav_kalender")
                     )
@@ -608,11 +596,11 @@ fun FinancialTrackerScreen(
                         icon = { Icon(Icons.Default.ImportExport, contentDescription = "Ekspor Impor", modifier = Modifier.size(20.dp)) },
                         label = { Text("Simpan", fontSize = 11.sp, fontWeight = FontWeight.Medium) },
                         colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = SteelBlue,
-                            selectedTextColor = SteelBlue,
-                            unselectedIconColor = GhostWhite.copy(alpha = 0.5f),
-                            unselectedTextColor = GhostWhite.copy(alpha = 0.5f),
-                            indicatorColor = TranslucentGlass
+                            selectedIconColor = barSelectedIconColor,
+                            selectedTextColor = barSelectedColor,
+                            unselectedIconColor = barUnselectedColor,
+                            unselectedTextColor = barUnselectedColor,
+                            indicatorColor = barIndicatorColor
                         ),
                         modifier = Modifier.testTag("nav_ekspor_impor")
                     )
@@ -644,6 +632,7 @@ fun FinancialTrackerScreen(
                             selectedBudgetOffset = selectedBudgetOffset,
                             onBudgetOffsetChange = { viewModel.changeBudgetMonthOffset(it) },
                             onSetBudgetClick = { showBudgetDialog = true },
+                            onDeleteBudgetClick = { showDeleteBudgetDialog = true },
                             filteredRecords = filteredRecords,
                             filterType = filterType,
                             sortByNewest = sortByNewest,

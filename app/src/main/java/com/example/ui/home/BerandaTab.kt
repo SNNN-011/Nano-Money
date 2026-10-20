@@ -1,44 +1,35 @@
 package com.example.ui.home
 
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AddCircleOutline
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.KeyboardArrowRight
-import androidx.compose.foundation.border
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.outlined.DeleteOutline
-import androidx.compose.material3.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.example.data.FinancialRecord
 import com.example.data.RecurringTransaction
-import com.example.ui.theme.*
-import com.example.ui.components.GlassCard
 import com.example.ui.common.RecurringTransactionManagementDialog
-import com.example.ui.transaction.TransactionListItem
-import com.example.ui.transaction.FilterAndSortHeader
-import com.example.ui.transaction.EmptyStatePlaceholder
-import com.example.ui.transaction.TransactionList
-import com.example.ui.transaction.TransactionEmptyState
+import com.example.ui.components.BezelCard
+import com.example.ui.components.Eyebrow
+import com.example.ui.components.HairlineDivider
+import com.example.ui.theme.EditorialTypography
+import com.example.ui.theme.InkMuted
+import com.example.ui.theme.Spacing
 
+/**
+ * Tab Dashboard.
+ *
+ * Susunannya mengikuti referensi portfolio: blok hero (label mono + angka
+ * serif besar + daftar fakta bergaris rambut), kartu anggaran double-bezel,
+ * lalu daftar riwayat yang dipisah garis rambut alih-alih kartu per baris.
+ * Latar halaman krem dipasang di FinancialTrackerScreen (lapisan ambient per
+ * tab), jadi di sini tidak ada latar lagi.
+ */
 @Composable
 fun BerandaTabContent(
     isWideScreen: Boolean,
@@ -56,6 +47,7 @@ fun BerandaTabContent(
     selectedBudgetOffset: Int = 0,
     onBudgetOffsetChange: (Int) -> Unit = {},
     onSetBudgetClick: () -> Unit,
+    onDeleteBudgetClick: () -> Unit,
     filteredRecords: List<FinancialRecord>,
     filterType: String,
     sortByNewest: Boolean,
@@ -81,406 +73,213 @@ fun BerandaTabContent(
     modifier: Modifier = Modifier
 ) {
     var showRecurringDialog by remember { mutableStateOf(false) }
-    if (isWideScreen) {
-        // TABLET / WIDE SCREENS LAYOUT
-        Row(
-            modifier = modifier
-                .fillMaxSize()
-                .padding(Spacing.lg),
-            horizontalArrangement = Arrangement.spacedBy(Spacing.lg)
-        ) {
-            // Left column: stats & brief overview
-            Column(
-                modifier = Modifier.weight(4f),
-                verticalArrangement = Arrangement.spacedBy(Spacing.lg)
-            ) {
-                DashboardStatsSection(
-                    totalIncome = totalIncome,
-                    totalExpense = totalExpense,
-                    currentBalance = currentBalance,
-                    monthlySpendingTotal = monthlySpendingTotal,
-                    monthlyBudgetLimit = monthlyBudgetLimit,
-                categoryBudgets = categoryBudgets,
-                    categoryNameById = categoryNameById,
-                    balanceVisible = balanceVisible,
-                    onToggleBalanceVisible = onToggleBalanceVisible,
-                    categorySpending = categorySpending,
-                    selectedBudgetOffset = selectedBudgetOffset,
-                    onBudgetOffsetChange = onBudgetOffsetChange,
-                    onSetBudgetClick = onSetBudgetClick,
-                    onRecurringClick = { showRecurringDialog = true },
-                    welcomeMessage = welcomeMessage,
-                    welcomeMessageColor = welcomeMessageColor,
-                    showNewFeature = showNewFeature
-                )
 
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(CornerRadius.sm),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                    border = BorderStroke(1.dp, GhostWhite.copy(alpha = 0.2f))
+    // Skala tipe editorial hanya dipasang untuk tab ini sampai tab lain ikut
+    // di-redesign. Setelah seluruh aplikasi memakai palet editorial, pindahkan
+    // EditorialTypography ke MyApplicationTheme lalu hapus pembungkus ini.
+    MaterialTheme(typography = EditorialTypography) {
+
+        if (isWideScreen) {
+            // TABLET / WIDE SCREENS LAYOUT
+            Row(
+                modifier = modifier
+                    .fillMaxSize()
+                    .padding(Spacing.lg),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.lg)
+            ) {
+                // Left column: stats & brief overview
+                Column(
+                    modifier = Modifier
+                        .weight(4f)
+                        .verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.xl)
                 ) {
-                    Column(modifier = Modifier.padding(18.dp)) {
-                        Text(
-                            text = "Catatan Keuangan",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
+                    DashboardStatsSection(
+                        totalIncome = totalIncome,
+                        totalExpense = totalExpense,
+                        currentBalance = currentBalance,
+                        monthlySpendingTotal = monthlySpendingTotal,
+                        monthlyBudgetLimit = monthlyBudgetLimit,
+                        categoryBudgets = categoryBudgets,
+                        categoryNameById = categoryNameById,
+                        balanceVisible = balanceVisible,
+                        onToggleBalanceVisible = onToggleBalanceVisible,
+                        categorySpending = categorySpending,
+                        selectedBudgetOffset = selectedBudgetOffset,
+                        onBudgetOffsetChange = onBudgetOffsetChange,
+                        onSetBudgetClick = onSetBudgetClick,
+                        onDeleteBudgetClick = onDeleteBudgetClick,
+                        onRecurringClick = { showRecurringDialog = true },
+                        welcomeMessage = welcomeMessage,
+                        welcomeMessageColor = welcomeMessageColor,
+                        showNewFeature = showNewFeature
+                    )
+
+                    BezelCard {
+                        Eyebrow(text = "Catatan keuangan")
+                        Spacer(modifier = Modifier.height(Spacing.sm))
                         Text(
                             text = "Kelola pemasukan dan pengeluaran harian dalam satu aplikasi yang aman & modern. Data Anda dapat diekspor kapan saja lewat halaman cadangan.",
                             style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            color = InkMuted
                         )
                     }
                 }
-            }
 
-            // Right column: complete filter + searchable transaction list tables
-            Card(
-                modifier = Modifier.weight(6f).fillMaxHeight(),
-                shape = RoundedCornerShape(6.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                border = BorderStroke(1.dp, GhostWhite.copy(alpha = 0.2f))
-            ) {
-                Column(
+                // Right column: complete filter + searchable transaction list tables
+                BezelCard(
                     modifier = Modifier
-                        .fillMaxSize()
-                        .padding(16.dp)
+                        .weight(6f)
+                        .fillMaxHeight(),
+                    contentPadding = Spacing.lg
                 ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().height(48.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .weight(1f)
-                                .fillMaxHeight()
-                                .border(
-                                    width = 1.dp,
-                                    color = GhostWhite.copy(alpha = 0.2f),
-                                    shape = RoundedCornerShape(12.dp)
-                                )
-                                .background(TranslucentInput, RoundedCornerShape(12.dp))
-                                .padding(horizontal = 14.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(Icons.Default.Search, contentDescription = "Cari", tint = GhostWhite.copy(alpha = 0.4f), modifier = Modifier.size(20.dp))
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
-                                if (searchQuery.isEmpty()) {
-                                    Text("Cari...", color = GhostWhite.copy(alpha = 0.4f), style = MaterialTheme.typography.bodyMedium)
-                                }
-                                androidx.compose.foundation.text.BasicTextField(
-                                    value = searchQuery,
-                                    onValueChange = onSearchQueryChange,
-                                    textStyle = MaterialTheme.typography.bodyMedium.copy(color = GhostWhite),
-                                    singleLine = true,
-                                    modifier = Modifier.fillMaxWidth().testTag("search_input"),
-                                    cursorBrush = SolidColor(SteelBlue)
-                                )
-                            }
-                            if (searchQuery.isNotEmpty()) {
-                                IconButton(onClick = { onSearchQueryChange("") }, modifier = Modifier.size(24.dp)) {
-                                    Icon(Icons.Default.Close, contentDescription = "Hapus", tint = GhostWhite.copy(alpha = 0.5f), modifier = Modifier.size(16.dp))
-                                }
-                            }
-                        }
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        DashboardHistoryFilter(
+                            currentFilter = filterType,
+                            onFilterSelected = onFilterSelected,
+                            modifier = Modifier.padding(bottom = Spacing.md)
+                        )
+                        DashboardSearchActions(
+                            searchQuery = searchQuery,
+                            onSearchQueryChange = onSearchQueryChange,
+                            sortByNewest = sortByNewest,
+                            onSortToggled = onSortToggled,
+                            onDeleteAllClick = onDeleteAllClick,
+                            modifier = Modifier.padding(bottom = Spacing.sm)
+                        )
 
-                        // High aesthetic Custom sorting toggle button
-                        Box(
-                            modifier = Modifier
-                                .fillMaxHeight()
-                                .border(
-                                    width = 1.dp,
-                                    color = GhostWhite.copy(alpha = 0.2f),
-                                    shape = RoundedCornerShape(12.dp)
-                                )
-                                .clip(RoundedCornerShape(12.dp))
-                                .clickable { onSortToggled() }
-                                .padding(horizontal = 14.dp)
-                                .testTag("history_sort_button"),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                Text(
-                                    text = if (sortByNewest) "Terbaru" else "Terlama",
-                                    style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                                    color = GhostWhite
-                                )
-                                Icon(
-                                    imageVector = if (sortByNewest) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowUp,
-                                    contentDescription = "Urutkan",
-                                    tint = GhostWhite,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                            }
-                        }
-
-                        // Tombol hapus semua transaksi. Ikon saja supaya tidak
-                        // memakan lebar baris search; areanya tetap 48.dp agar
-                        // mudah ditekan. Merah karena aksi berbahaya, detail
-                        // konfirmasinya ada di DeleteAllRecordsDialog.
-                        Box(
-                            modifier = Modifier
-                                .fillMaxHeight()
-                                .border(
-                                    width = 1.dp,
-                                    color = NeonRed.copy(alpha = 0.45f),
-                                    shape = RoundedCornerShape(12.dp)
-                                )
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(NeonRed.copy(alpha = 0.10f))
-                                .clickable { onDeleteAllClick() }
-                                .width(48.dp)
-                                .testTag("delete_all_button"),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Outlined.DeleteOutline,
-                                contentDescription = "Hapus Semua Transaksi",
-                                tint = NeonRed.copy(alpha = 0.85f),
-                                modifier = Modifier.size(19.dp)
+                        if (filteredRecords.isEmpty()) {
+                            DashboardEmptyState(
+                                isFiltered = isFilterActive,
+                                onSeedData = onSeedSampleData,
+                                onClearFilters = onClearFilters
                             )
+                        } else {
+                            LazyColumn(modifier = Modifier.weight(1f)) {
+                                itemsIndexed(
+                                    items = filteredRecords,
+                                    key = { _, record -> record.id },
+                                    contentType = { _, _ -> "transaction" }
+                                ) { index, record ->
+                                    DashboardTransactionRow(
+                                        record = record,
+                                        categoryNameById = categoryNameById,
+                                        onEdit = { onEditRecord(record) },
+                                        onDelete = { onDeleteRecord(record) }
+                                    )
+                                    if (index < filteredRecords.lastIndex) HairlineDivider()
+                                }
+                            }
                         }
                     }
+                }
+            }
+        } else {
+            // MOBILE COMFORT LAYOUT
+            // Satu permukaan scroll untuk seluruh halaman. Sebelumnya header memakai banyak
+            // ruang dan daftar transaksi memakai weight(1f), jadi sisa ruang untuk daftar
+            // bisa tinggal setinggi satu-dua baris. Semua transaksi jadi item dalam satu
+            // LazyColumn supaya halaman bisa digulir utuh.
+            val listState = rememberLazyListState()
+            LaunchedEffect(filteredRecords) {
+                if (filteredRecords.isNotEmpty()) listState.scrollToItem(0)
+            }
 
-                    Spacer(modifier = Modifier.height(8.dp))
+            // Tanpa verticalArrangement: jarak antar blok diatur di dalam tiap item,
+            // karena baris transaksi harus rapat (dipisah garis rambut, bukan jarak).
+            LazyColumn(
+                state = listState,
+                modifier = modifier
+                    .fillMaxSize()
+                    .padding(horizontal = Spacing.lg),
+                contentPadding = PaddingValues(top = Spacing.lg, bottom = Spacing.xxl)
+            ) {
+                // Item header dipisah dari daftar transaksi. Kalau satu item memuat seluruh
+                // blok statistik beserta anggaran per kategori, setiap perubahan data di
+                // dashboard membuat subtree besar itu ikut recomposition.
+                item(key = "dashboard_stats", contentType = "header") {
+                    DashboardStatsSection(
+                        totalIncome = totalIncome,
+                        totalExpense = totalExpense,
+                        currentBalance = currentBalance,
+                        monthlySpendingTotal = monthlySpendingTotal,
+                        monthlyBudgetLimit = monthlyBudgetLimit,
+                        categoryBudgets = categoryBudgets,
+                        categoryNameById = categoryNameById,
+                        balanceVisible = balanceVisible,
+                        onToggleBalanceVisible = onToggleBalanceVisible,
+                        categorySpending = categorySpending,
+                        selectedBudgetOffset = selectedBudgetOffset,
+                        onBudgetOffsetChange = onBudgetOffsetChange,
+                        onSetBudgetClick = onSetBudgetClick,
+                        onDeleteBudgetClick = onDeleteBudgetClick,
+                        onRecurringClick = { showRecurringDialog = true },
+                        welcomeMessage = welcomeMessage,
+                        welcomeMessageColor = welcomeMessageColor,
+                        showNewFeature = showNewFeature,
+                        modifier = Modifier.padding(bottom = Spacing.xl)
+                    )
+                }
 
-                    FilterAndSortHeader(
+                item(key = "filter_sort", contentType = "header") {
+                    DashboardHistoryFilter(
                         currentFilter = filterType,
-                        isNewest = sortByNewest,
                         onFilterSelected = onFilterSelected,
-                        onSortToggled = onSortToggled
-                    )
-
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    TransactionList(
-                        records = filteredRecords,
-                        onEdit = onEditRecord,
-                        onDelete = onDeleteRecord,
-                        isFilterActive = isFilterActive,
-                        onClearFilters = onClearFilters,
-                        onSeedData = onSeedSampleData,
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.padding(bottom = Spacing.md)
                     )
                 }
-            }
-        }
-    } else {
-        // MOBILE COMFORT LAYOUT
-        // Satu permukaan scroll untuk seluruh halaman. Sebelumnya header memakai banyak
-        // ruang dan daftar transaksi memakai weight(1f), jadi sisa ruang untuk daftar
-        // bisa tinggal setinggi satu-dua baris. Semua transaksi jadi item dalam satu
-        // LazyColumn supaya halaman bisa digulir utuh.
-        val listState = rememberLazyListState()
-        LaunchedEffect(filteredRecords) {
-            if (filteredRecords.isNotEmpty()) listState.scrollToItem(0)
-        }
 
-        LazyColumn(
-            state = listState,
-            modifier = modifier
-                .fillMaxSize()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            // Item header dipisah dari daftar transaksi. Kalau satu item memuat seluruh
-            // blok statistik beserta anggaran per kategori, setiap perubahan data di
-            // dashboard membuat subtree besar itu ikut recomposition.
-            item(key = "dashboard_stats", contentType = "header") {
-                DashboardStatsSection(
-                    totalIncome = totalIncome,
-                    totalExpense = totalExpense,
-                    currentBalance = currentBalance,
-                    monthlySpendingTotal = monthlySpendingTotal,
-                    monthlyBudgetLimit = monthlyBudgetLimit,
-                    categoryBudgets = categoryBudgets,
-                    categoryNameById = categoryNameById,
-                    balanceVisible = balanceVisible,
-                    onToggleBalanceVisible = onToggleBalanceVisible,
-                    categorySpending = categorySpending,
-                    selectedBudgetOffset = selectedBudgetOffset,
-                    onBudgetOffsetChange = onBudgetOffsetChange,
-                    onSetBudgetClick = onSetBudgetClick,
-                    onRecurringClick = { showRecurringDialog = true },
-                    welcomeMessage = welcomeMessage,
-                    welcomeMessageColor = welcomeMessageColor,
-                    showNewFeature = showNewFeature
-                )
-            }
-
-            item(key = "filter_sort", contentType = "header") {
-                FilterAndSortHeader(
-                    currentFilter = filterType,
-                    isNewest = sortByNewest,
-                    onFilterSelected = onFilterSelected,
-                    onSortToggled = onSortToggled
-                )
-            }
-
-            item(key = "search_actions", contentType = "header") {
-                Row(
-                    modifier = Modifier.fillMaxWidth().height(48.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                // Minimalist Search Bar
-                Row(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight()
-                        .border(
-                            width = 1.dp,
-                            color = GhostWhite.copy(alpha = 0.2f),
-                            shape = RoundedCornerShape(12.dp)
-                        )
-                        .background(TranslucentInput, RoundedCornerShape(12.dp))
-                        .padding(horizontal = 14.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(Icons.Default.Search, contentDescription = "Cari", tint = GhostWhite.copy(alpha = 0.4f), modifier = Modifier.size(20.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
-                        if (searchQuery.isEmpty()) {
-                            Text("Cari...", color = GhostWhite.copy(alpha = 0.4f), style = MaterialTheme.typography.bodyMedium)
-                        }
-                        androidx.compose.foundation.text.BasicTextField(
-                            value = searchQuery,
-                            onValueChange = onSearchQueryChange,
-                            textStyle = MaterialTheme.typography.bodyMedium.copy(color = GhostWhite),
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth().testTag("search_input"),
-                            cursorBrush = SolidColor(SteelBlue)
-                        )
-                    }
-                    if (searchQuery.isNotEmpty()) {
-                        IconButton(onClick = { onSearchQueryChange("") }, modifier = Modifier.size(24.dp)) {
-                            Icon(Icons.Default.Close, contentDescription = "Hapus", tint = GhostWhite.copy(alpha = 0.5f), modifier = Modifier.size(16.dp))
-                        }
-                    }
-                }
-
-                // High aesthetic Custom sorting toggle button
-                Box(
-                    modifier = Modifier
-                        .fillMaxHeight()
-                        .border(
-                            width = 1.dp,
-                            color = GhostWhite.copy(alpha = 0.2f),
-                            shape = RoundedCornerShape(12.dp)
-                        )
-                        .clip(RoundedCornerShape(12.dp))
-                        .clickable { onSortToggled() }
-                        .padding(horizontal = 14.dp)
-                        .testTag("history_sort_button"),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        Text(
-                            text = if (sortByNewest) "Terbaru" else "Terlama",
-                            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                            color = GhostWhite
-                        )
-                        Icon(
-                            imageVector = if (sortByNewest) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowUp,
-                            contentDescription = "Urutkan",
-                            tint = GhostWhite,
-                            modifier = Modifier.size(16.dp)
-                        )
-                    }
-                }
-
-                // Tombol hapus semua transaksi. Ikon saja supaya tidak
-                // memakan lebar baris search; areanya tetap 48.dp agar
-                // mudah ditekan. Merah karena aksi berbahaya, detail
-                // konfirmasinya ada di DeleteAllRecordsDialog.
-                Box(
-                    modifier = Modifier
-                        .fillMaxHeight()
-                        .border(
-                            width = 1.dp,
-                            color = NeonRed.copy(alpha = 0.45f),
-                            shape = RoundedCornerShape(12.dp)
-                        )
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(NeonRed.copy(alpha = 0.10f))
-                        .clickable { onDeleteAllClick() }
-                        .width(48.dp)
-                        .testTag("delete_all_button"),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Outlined.DeleteOutline,
-                        contentDescription = "Hapus Semua Transaksi",
-                        tint = NeonRed.copy(alpha = 0.85f),
-                        modifier = Modifier.size(19.dp)
+                item(key = "search_actions", contentType = "header") {
+                    DashboardSearchActions(
+                        searchQuery = searchQuery,
+                        onSearchQueryChange = onSearchQueryChange,
+                        sortByNewest = sortByNewest,
+                        onSortToggled = onSortToggled,
+                        onDeleteAllClick = onDeleteAllClick,
+                        modifier = Modifier.padding(bottom = Spacing.sm)
                     )
                 }
-                }
-            }
 
-            if (filteredRecords.isEmpty()) {
-                item(key = "empty_state", contentType = "header") {
-                    Box(
-                        modifier = Modifier.fillMaxWidth().height(240.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        TransactionEmptyState(
+                if (filteredRecords.isEmpty()) {
+                    item(key = "empty_state", contentType = "header") {
+                        DashboardEmptyState(
                             isFiltered = isFilterActive,
                             onSeedData = onSeedSampleData,
                             onClearFilters = onClearFilters
                         )
                     }
-                }
-            } else {
-                // contentType wajib diisi: tanpa itu Compose menganggap semua slot
-                // item berbeda jenis dan tidak bisa memakai ulang node yang sama
-                // saat item berganti masuk viewport, sehingga setiap gulir menyusun
-                // ulang subtree dari nol.
-                items(
-                    items = filteredRecords,
-                    key = { it.id },
-                    contentType = { "transaction" }
-                ) { rec ->
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = TranslucentGlass),
-                        border = BorderStroke(1.dp, GhostWhite.copy(alpha = 0.05f))
-                    ) {
-                        TransactionListItem(
-                            record = rec,
-                            onEdit = { onEditRecord(rec) },
-                            onDelete = { onDeleteRecord(rec) },
-                            categoryNameById = categoryNameById
+                } else {
+                    // contentType wajib diisi: tanpa itu Compose menganggap semua slot
+                    // item berbeda jenis dan tidak bisa memakai ulang node yang sama
+                    // saat item berganti masuk viewport, sehingga setiap gulir menyusun
+                    // ulang subtree dari nol.
+                    itemsIndexed(
+                        items = filteredRecords,
+                        key = { _, record -> record.id },
+                        contentType = { _, _ -> "transaction" }
+                    ) { index, record ->
+                        DashboardTransactionRow(
+                            record = record,
+                            categoryNameById = categoryNameById,
+                            onEdit = { onEditRecord(record) },
+                            onDelete = { onDeleteRecord(record) }
                         )
+                        if (index < filteredRecords.lastIndex) HairlineDivider()
                     }
                 }
             }
         }
-    }
 
-    if (showRecurringDialog) {
-        RecurringTransactionManagementDialog(
-            recurringTransactions = recurringTransactions,
-            incomeCategories = incomeCategories,
-            expenseCategories = expenseCategories,
-            onAddRecurring = onAddRecurring,
-            onDeleteRecurring = onDeleteRecurring,
-            onToggleRecurringActive = onToggleRecurringActive,
-            onDismissRequest = { showRecurringDialog = false }
-        )
+        if (showRecurringDialog) {
+            RecurringTransactionManagementDialog(
+                recurringTransactions = recurringTransactions,
+                incomeCategories = incomeCategories,
+                expenseCategories = expenseCategories,
+                onAddRecurring = onAddRecurring,
+                onDeleteRecurring = onDeleteRecurring,
+                onToggleRecurringActive = onToggleRecurringActive,
+                onDismissRequest = { showRecurringDialog = false }
+            )
+        }
     }
 }
-
-

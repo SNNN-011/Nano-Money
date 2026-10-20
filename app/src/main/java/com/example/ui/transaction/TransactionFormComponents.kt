@@ -1,40 +1,73 @@
 package com.example.ui.transaction
 
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CalendarToday
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.TextFieldValue
-import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.ui.theme.*
-import com.example.ui.components.GlassCard
+import com.example.ui.components.EditorialButton
+import com.example.ui.components.EditorialButtonStyle
+import com.example.ui.components.EditorialPill
+import com.example.ui.components.EditorialTextField
+import com.example.ui.components.Eyebrow
+import com.example.ui.components.HairlineDivider
+import com.example.ui.components.LabeledField
+import com.example.ui.components.TapField
 import com.example.ui.config.FormatUtils
+import com.example.ui.theme.BurntOrange
+import com.example.ui.theme.CornerRadius
+import com.example.ui.theme.Cream
+import com.example.ui.theme.ErrorRed
+import com.example.ui.theme.ForestGreen
+import com.example.ui.theme.HairlineStrong
+import com.example.ui.theme.Ink
+import com.example.ui.theme.InkMuted
+import com.example.ui.theme.Spacing
 import com.example.ui.util.CategoryIconMapper
 
+/**
+ * Form transaksi memakai palet editorial, sama seperti tab Dashboard dan tab
+ * Chat: label mono kecil di atas tiap isian, nominal serif besar di tengah,
+ * dan pemilih jenis berupa dua pil tinta.
+ *
+ * Tidak ada kartu pembungkus: isian menempel langsung di halaman dan dipisah
+ * garis rambut. Kartu di dalam kartu hanya menambah bingkai tanpa menambah
+ * informasi.
+ */
+
+/** Pil kategori: yang terpilih terisi tinta, sisanya hanya berbingkai rambut. */
 @Composable
 fun CategorySelectionChip(
     selected: Boolean,
@@ -43,73 +76,52 @@ fun CategorySelectionChip(
     modifier: Modifier = Modifier
 ) {
     val (parsedEmoji, cleanLabel) = CategoryIconMapper.extractEmojiAndLabel(label)
-    val icon = CategoryIconMapper.getIcon(label)
+    val shape = RoundedCornerShape(CornerRadius.pill)
 
-    Card(
-        modifier = modifier,
-        shape = RoundedCornerShape(CornerRadius.xl),
-        colors = CardDefaults.cardColors(containerColor = TranslucentGlass),
-        border = BorderStroke(
-            width = 1.dp,
-            brush = Brush.verticalGradient(
-                colors = listOf(
-                    if (selected) SteelBlue.copy(alpha = 0.5f) else GhostWhite.copy(alpha = 0.2f),
-                    if (selected) SteelBlue.copy(alpha = 0.1f) else GhostWhite.copy(alpha = 0.02f)
-                )
+    Row(
+        modifier = modifier
+            .clip(shape)
+            .background(if (selected) Ink else Color.Transparent)
+            .then(
+                if (selected) Modifier
+                else Modifier.border(1.dp, HairlineStrong, shape)
             )
-        )
+            .clickable { onClick() }
+            .padding(horizontal = Spacing.md, vertical = Spacing.sm),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.xs)
     ) {
-        Box(
-            modifier = Modifier
-                .padding(4.dp)
-                .clip(RoundedCornerShape(CornerRadius.lg))
-                .then(
-                    if (selected) {
-                        Modifier.background(
-                            brush = Brush.verticalGradient(
-                                colors = listOf(SteelBlue, SteelBlue.copy(alpha = 0.7f))
-                            ),
-                            shape = RoundedCornerShape(16.dp)
-                        )
-                    } else {
-                        Modifier.background(Color.Transparent)
-                    }
-                )
-                .clickable { onClick() }
-                .padding(horizontal = 16.dp, vertical = 10.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                if (parsedEmoji != null) {
-                    Text(
-                        text = parsedEmoji,
-                        fontSize = 16.sp
-                    )
-                } else {
-                    Icon(
-                        imageVector = icon,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp),
-                        tint = if (selected) MidnightAbyss else GhostWhite.copy(alpha = 0.8f)
-                    )
-                }
-                Text(
-                    text = cleanLabel,
-                    style = MaterialTheme.typography.labelMedium.copy(
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 0.5.sp
-                    ),
-                    color = if (selected) MidnightAbyss else GhostWhite.copy(alpha = 0.8f)
-                )
-            }
+        if (parsedEmoji != null) {
+            Text(text = parsedEmoji, fontSize = 13.sp)
+        } else {
+            Icon(
+                imageVector = CategoryIconMapper.getIcon(label),
+                contentDescription = null,
+                modifier = Modifier.size(13.dp),
+                tint = if (selected) Cream else InkMuted
+            )
         }
+        Text(
+            text = cleanLabel,
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+            color = if (selected) Cream else InkMuted
+        )
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
+/** Galat isian: mono kecil, tepat di bawah kolom yang bermasalah. */
+@Composable
+private fun FieldError(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelSmall,
+        color = ErrorRed,
+        modifier = Modifier.padding(top = Spacing.xs)
+    )
+}
+
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun TransactionFormCard(
     description: String,
@@ -133,381 +145,195 @@ fun TransactionFormCard(
     onSave: () -> Boolean,
     onReset: () -> Unit
 ) {
-    var isCategoryExpanded by remember { mutableStateOf(false) }
+    val incomeSelected = type == "income"
+    val amountColor = if (incomeSelected) ForestGreen else BurntOrange
 
-    // Premium Acrylic Panel Design
-    Box(modifier = Modifier.fillMaxWidth()) {
-        // Soft Light Leaks behind panel
-        Box(
-             modifier = Modifier
-                .matchParentSize()
-                .background(
-                    brush = Brush.radialGradient(
-                        colors = listOf(SteelBlueGlow.copy(alpha = 0.3f), Color.Transparent),
-                        radius = 600f
-                    )
-                )
-                .padding(20.dp)
-        )
-        
-        Card(
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(Spacing.md)
+    ) {
+
+        // ── Jenis transaksi: dua pil terbagi rata ──────────────────────
+        Eyebrow(text = "Jenis transaksi")
+        Row(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(28.dp),
-            colors = CardDefaults.cardColors(containerColor = TranslucentForm),
-            border = BorderStroke(
-                width = 1.dp,
-                brush = Brush.verticalGradient(
-                    colors = listOf(
-                        GhostWhite.copy(alpha = 0.15f),
-                        GhostWhite.copy(alpha = 0.02f)
-                    )
-                )
-            )
+            horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
         ) {
-            Column(
-                modifier = Modifier.padding(vertical = 16.dp, horizontal = 20.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                // Segmented Control (Pemasukan / Pengeluaran) - Stylized like Chat Tab's model switch
-                val incomeSelected = type == "income"
-                val expenseSelected = type == "expense"
-                
-                Card(
-                    shape = RoundedCornerShape(CornerRadius.xl),
-                    colors = CardDefaults.cardColors(containerColor = TranslucentGlass),
-                    border = BorderStroke(
-                        width = 1.dp,
-                        brush = Brush.verticalGradient(
-                            colors = listOf(
-                                GhostWhite.copy(alpha = 0.2f),
-                                GhostWhite.copy(alpha = 0.02f)
-                            )
-                        )
-                    ),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Row(
-                        modifier = Modifier.padding(4.dp).fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        // Segment: Pemasukan
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(40.dp)
-                                .clip(RoundedCornerShape(CornerRadius.lg))
-                                .then(
-                                    if (incomeSelected) {
-                                        Modifier.background(
-                                            brush = Brush.verticalGradient(
-                                                colors = listOf(SteelBlue, SteelBlue.copy(alpha = 0.7f))
-                                            ),
-                                            shape = RoundedCornerShape(16.dp)
-                                        )
-                                    } else {
-                                        Modifier.background(Color.Transparent)
-                                    }
-                                )
-                                .clickable { onTypeChanged("income") }
-                                .testTag("form_type_income_radio"),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "Pemasukan",
-                                color = if (incomeSelected) MidnightAbyss else GhostWhite.copy(alpha = 0.5f),
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                        
-                        // Segment: Pengeluaran
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .height(40.dp)
-                                .clip(RoundedCornerShape(CornerRadius.lg))
-                                .then(
-                                    if (expenseSelected) {
-                                        Modifier.background(
-                                            brush = Brush.verticalGradient(
-                                                colors = listOf(NeonRed, NeonRed.copy(alpha = 0.7f))
-                                            ),
-                                            shape = RoundedCornerShape(16.dp)
-                                        )
-                                    } else {
-                                        Modifier.background(Color.Transparent)
-                                    }
-                                )
-                                .clickable { onTypeChanged("expense") }
-                                .testTag("form_type_expense_radio"),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = "Pengeluaran",
-                                color = if (expenseSelected) MidnightAbyss else GhostWhite.copy(alpha = 0.5f),
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
-                }
+            EditorialPill(
+                text = "Pemasukan",
+                selected = incomeSelected,
+                onClick = { onTypeChanged("income") },
+                modifier = Modifier.weight(1f),
+                textStyle = MaterialTheme.typography.labelLarge,
+                contentPadding = Spacing.sm,
+                testTag = "form_type_income_radio"
+            )
+            EditorialPill(
+                text = "Pengeluaran",
+                selected = !incomeSelected,
+                onClick = { onTypeChanged("expense") },
+                modifier = Modifier.weight(1f),
+                textStyle = MaterialTheme.typography.labelLarge,
+                contentPadding = Spacing.sm,
+                testTag = "form_type_expense_radio"
+            )
+        }
 
-                // Amount field - Jumbo & Centered
-                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
-                    Text("Jumlah (Rp)", color = MutedExpense, style = MaterialTheme.typography.labelMedium)
-                    val amountFieldValue = remember(amount) {
-                        TextFieldValue(text = amount, selection = TextRange(amount.length))
-                    }
-                    TextField(
-                        value = amountFieldValue,
-                        onValueChange = { field ->
-                            val cleanInput = field.text.replace(".", "")
-                            if (cleanInput.length <= 11 && (cleanInput.isEmpty() || cleanInput.all { it.isDigit() })) {
-                                val formatted = FormatUtils.formatInputNumber(cleanInput)
-                                // Preserve cursor position: count digits before cursor, then find same position in formatted string
-                                val digitsBeforeCursor = field.text.substring(0, field.selection.start.coerceAtMost(field.text.length)).count { it.isDigit() }
-                                var digitCount = 0
-                                var newCursorPos = formatted.length
-                                for (i in formatted.indices) {
-                                    if (formatted[i].isDigit()) {
-                                        digitCount++
-                                        if (digitCount > digitsBeforeCursor) {
-                                            newCursorPos = i
-                                            break
-                                        }
-                                    }
-                                    if (i == formatted.length - 1) newCursorPos = formatted.length
-                                }
-                                onAmountChanged(formatted)
-                            }
-                        },
-                        textStyle = MaterialTheme.typography.displayMedium.copy(
-                            color = GhostWhite, 
-                            textAlign = TextAlign.Center, 
-                            fontWeight = FontWeight.Light,
-                            letterSpacing = (-1).sp
-                        ),
-                        placeholder = {
-                            Text(
-                                "0",
-                                style = MaterialTheme.typography.displayMedium.copy(
-                                    color = GhostWhite.copy(alpha = 0.2f), 
-                                    textAlign = TextAlign.Center,
-                                    fontWeight = FontWeight.Light
-                                ),
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                        },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp).testTag("form_amount_input"),
-                        colors = TextFieldDefaults.colors(
-                            focusedTextColor = GhostWhite,
-                            unfocusedTextColor = GhostWhite,
-                            focusedContainerColor = Color.Transparent,
-                            unfocusedContainerColor = Color.Transparent,
-                            disabledContainerColor = Color.Transparent,
-                            focusedIndicatorColor = Color.Transparent,
-                            unfocusedIndicatorColor = Color.Transparent,
-                            disabledIndicatorColor = Color.Transparent,
-                            errorIndicatorColor = Color.Transparent,
-                            cursorColor = GhostWhite
-                        )
-                    )
-                    if (amountError != null) {
-                        Text(
-                            text = amountError,
-                            color = ErrorRed,
-                            style = MaterialTheme.typography.labelSmall,
-                            modifier = Modifier.padding(top = 4.dp)
-                        )
-                    }
-                }
+        HairlineDivider()
 
-                // Category selection
-                Column {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { isCategoryExpanded = !isCategoryExpanded }
-                            .padding(vertical = 4.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            Text(
-                                text = "Kategori",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MutedExpense
-                            )
-                            Icon(
-                                imageVector = if (isCategoryExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                                contentDescription = if (isCategoryExpanded) "Tutup" else "Buka",
-                                tint = MutedExpense,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
-                        TextButton(
-                            onClick = onManageCategoriesClick,
-                            modifier = Modifier.height(28.dp).testTag("manage_categories_button"),
-                            contentPadding = PaddingValues(0.dp)
-                        ) {
-                            Text("Kelola", color = SteelBlue, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(6.dp))
-                    
-                    if (isCategoryExpanded) {
-                        FlowRow(
-                            modifier = Modifier.fillMaxWidth().testTag("form_category_selection_grid"),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            categories.forEach { cat ->
-                                CategorySelectionChip(
-                                    selected = category == cat,
-                                    label = cat,
-                                    onClick = { onCategoryChanged(cat) }
-                                )
-                            }
-                        }
-                    } else {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { isCategoryExpanded = true }
-                                .testTag("form_category_selection_grid"),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            CategorySelectionChip(
-                                selected = true,
-                                label = category,
-                                onClick = { isCategoryExpanded = true }
-                            )
-                            Text(
-                                text = "(Ketuk untuk memilih kategori lain)",
-                                color = MutedExpense.copy(alpha = 0.6f),
-                                style = MaterialTheme.typography.bodySmall
-                            )
-                        }
-                    }
-                }
-
-                // Description field
-                Column {
-                    Text("Deskripsi", color = MutedExpense, style = MaterialTheme.typography.labelSmall)
-                    Spacer(modifier = Modifier.height(4.dp))
-                    OutlinedTextField(
-                        value = description,
-                        onValueChange = { if (it.length <= 20) onDescriptionChanged(it) },
-                        isError = descriptionError != null,
-                        placeholder = { Text("cth: Makan Siang Restoran") },
-                        modifier = Modifier.fillMaxWidth().testTag("form_description_input"),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = GhostWhite,
-                            unfocusedTextColor = GhostWhite,
-                            focusedBorderColor = SteelBlue,
-                            unfocusedBorderColor = GhostWhite.copy(alpha = 0.2f),
-                            focusedContainerColor = TranslucentInput,
-                            unfocusedContainerColor = TranslucentInput,
-                            errorBorderColor = ErrorRed
-                        )
-                    )
-                    if (descriptionError != null) {
-                        Text(descriptionError, color = ErrorRed, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(top = 4.dp))
-                    }
-                }
-
-                // Date Picker row triggering Dialog - Redesigned to be a separate premium glass button
-                Column {
-                    Text("Tanggal", color = MutedExpense, style = MaterialTheme.typography.labelSmall)
-                    Spacer(modifier = Modifier.height(4.dp))
-                    
-                    Card(
-                        shape = RoundedCornerShape(CornerRadius.xl),
-                        colors = CardDefaults.cardColors(containerColor = TranslucentGlass),
-                        border = BorderStroke(
-                            width = 1.dp,
-                            brush = Brush.verticalGradient(
-                                colors = listOf(
-                                    GhostWhite.copy(alpha = 0.2f),
-                                    GhostWhite.copy(alpha = 0.02f)
-                                )
-                            )
-                        ),
-                        modifier = Modifier.fillMaxWidth().testTag("form_date_picker_button")
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { onDateClick() }
-                                .padding(horizontal = 16.dp, vertical = 10.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                text = if (date == 0L) "Pilih Tanggal" else FormatUtils.formatDate(date),
-                                color = GhostWhite,
-                                style = MaterialTheme.typography.bodyMedium
-                            )
-                            Icon(Icons.Default.CalendarToday, contentDescription = "Kalender", tint = SteelBlue, modifier = Modifier.size(18.dp))
-                        }
-                    }
-                    if (dateError != null) {
-                        Text(dateError, color = ErrorRed, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(top = 4.dp))
-                    }
-                }
-
-                // Notes input field
-                Column {
-                    Text("Catatan (Opsional)", color = MutedExpense, style = MaterialTheme.typography.labelSmall)
-                    Spacer(modifier = Modifier.height(4.dp))
-                    OutlinedTextField(
-                        value = notes,
-                        onValueChange = { if (it.length <= 100) onNotesChanged(it) },
-                        placeholder = { Text("Ketik catatan di sini...") },
-                        modifier = Modifier.fillMaxWidth().testTag("form_notes_input"),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedTextColor = GhostWhite,
-                            unfocusedTextColor = GhostWhite,
-                            focusedBorderColor = SteelBlue,
-                            unfocusedBorderColor = GhostWhite.copy(alpha = 0.2f),
-                            focusedContainerColor = TranslucentInput,
-                            unfocusedContainerColor = TranslucentInput
-                        )
-                    )
-                }
-
-                // Actions Button footer - Separated premium glass buttons styled like model switch segments
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    // Batal Button (Inactive segmented style inside glass card)
-                    PremiumButton(
-                        text = "Batal",
-                        onClick = onReset,
-                        modifier = Modifier.weight(1f),
-                        isActive = false,
-                        testTag = "form_reset_button"
-                    )
-
-                    // Simpan Button (Active segmented style inside glass card)
-                    PremiumButton(
-                        text = if (isEditing) "Simpan Edit" else "Catat Transaksi",
-                        onClick = { onSave() },
-                        modifier = Modifier.weight(1f),
-                        isActive = true,
-                        testTag = "form_submit_button"
+        // ── Nominal: isian paling menonjol di halaman ini ──────────────
+        LabeledField(label = "Jumlah (Rp)") {
+            var fieldValue by remember {
+                mutableStateOf(TextFieldValue(text = amount, selection = TextRange(amount.length)))
+            }
+            // Nilai bisa datang dari luar komposisi ini (mode ubah, atau form
+            // yang di-reset), jadi isian disamakan lagi saat berubah.
+            LaunchedEffect(amount) {
+                if (fieldValue.text != amount) {
+                    fieldValue = TextFieldValue(
+                        text = amount,
+                        selection = TextRange(amount.length)
                     )
                 }
             }
+
+            BasicTextField(
+                value = fieldValue,
+                onValueChange = { raw ->
+                    // Posisi kursor dipertahankan lewat pemformat yang sama
+                    // dengan isian nominal di tempat lain, supaya menyisipkan
+                    // angka di tengah tidak melempar kursor ke ujung.
+                    val next = FormatUtils.formatInputNumberPreserveCursor(raw)
+                    if (next.text.count { it.isDigit() } <= 11) {
+                        fieldValue = next
+                        onAmountChanged(next.text)
+                    }
+                },
+                textStyle = MaterialTheme.typography.displaySmall.copy(
+                    color = amountColor,
+                    textAlign = TextAlign.Center
+                ),
+                cursorBrush = SolidColor(amountColor),
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                // Angka kosong tetap butuh penanda, kalau tidak isiannya
+                // kelihatan seperti garis kosong tanpa arti.
+                decorationBox = { isian ->
+                    Box(
+                        modifier = Modifier.fillMaxWidth(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        if (fieldValue.text.isEmpty()) {
+                            Text(
+                                text = "0",
+                                style = MaterialTheme.typography.displaySmall.copy(
+                                    color = InkMuted
+                                )
+                            )
+                        }
+                        isian()
+                    }
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = Spacing.xs)
+                    .testTag("form_amount_input")
+            )
+            if (amountError != null) FieldError(amountError)
+        }
+
+        HairlineDivider()
+
+        // ── Kategori: semua pil terbuka, tidak perlu diketuk dulu ──────
+        Column {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Eyebrow(text = "Kategori")
+                Text(
+                    text = "Kelola",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = BurntOrange,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(CornerRadius.pill))
+                        .clickable(onClick = onManageCategoriesClick)
+                        .padding(horizontal = Spacing.sm, vertical = Spacing.xs)
+                        .testTag("manage_categories_button")
+                )
+            }
+            FlowRow(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = Spacing.sm)
+                    .testTag("form_category_selection_grid"),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                verticalArrangement = Arrangement.spacedBy(Spacing.sm)
+            ) {
+                categories.forEach { cat ->
+                    CategorySelectionChip(
+                        selected = category == cat,
+                        label = cat,
+                        onClick = { onCategoryChanged(cat) }
+                    )
+                }
+            }
+        }
+
+        HairlineDivider()
+
+        // ── Detail: deskripsi, tanggal, catatan ────────────────────────
+        LabeledField(label = "Deskripsi") {
+            EditorialTextField(
+                value = description,
+                onValueChange = { if (it.length <= 20) onDescriptionChanged(it) },
+                placeholder = "cth: Makan siang",
+                testTag = "form_description_input"
+            )
+            if (descriptionError != null) FieldError(descriptionError)
+        }
+
+        LabeledField(label = "Tanggal") {
+            TapField(
+                text = if (date == 0L) "Pilih tanggal" else FormatUtils.formatDate(date),
+                onClick = onDateClick,
+                testTag = "form_date_picker_button"
+            )
+            if (dateError != null) FieldError(dateError)
+        }
+
+        LabeledField(label = "Catatan (opsional)") {
+            EditorialTextField(
+                value = notes,
+                onValueChange = { if (it.length <= 100) onNotesChanged(it) },
+                placeholder = "Ketik catatan...",
+                testTag = "form_notes_input"
+            )
+        }
+
+        // ── Aksi: menempel kanan, sama seperti footer dialog ───────────
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = Spacing.sm),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.sm, Alignment.End),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            EditorialButton(
+                text = "Batal",
+                onClick = onReset,
+                style = EditorialButtonStyle.Ghost,
+                trailingArrow = false,
+                accent = InkMuted,
+                testTag = "form_reset_button"
+            )
+            EditorialButton(
+                text = if (isEditing) "Simpan Edit" else "Catat Transaksi",
+                onClick = { onSave() },
+                testTag = "form_submit_button"
+            )
         }
     }
 }
