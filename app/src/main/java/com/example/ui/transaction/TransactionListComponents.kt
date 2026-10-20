@@ -282,15 +282,15 @@ fun TransactionListItem(
 
     // Dynamic coloring
     val badgeBgColor = if (isIncome) {
-        NeonGreen.copy(alpha = 0.1f)
+        ForestGreen.copy(alpha = 0.12f)
     } else {
-        NeonRed.copy(alpha = 0.1f)
+        BurntOrange.copy(alpha = 0.12f)
     }
 
     val badgeIconColor = if (isIncome) {
-        NeonGreen
+        ForestGreen
     } else {
-        NeonRed
+        BurntOrange
     }
 
     // Capitalize each word in the title/description
@@ -346,10 +346,10 @@ fun TransactionListItem(
                     Text(
                         text = capitalizedDescription,
                         style = MaterialTheme.typography.bodyMedium.copy(
-                            fontWeight = FontWeight.Bold,
+                            fontWeight = FontWeight.SemiBold,
                             fontSize = 14.sp
                         ),
-                        color = GhostWhite,
+                        color = Ink,
                         modifier = Modifier.weight(1f)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
@@ -375,18 +375,18 @@ fun TransactionListItem(
                         Text(
                             text = cleanCategory,
                             style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.SemiBold),
-                            color = GhostWhite.copy(alpha = 0.6f)
+                            color = InkMuted
                         )
                         Box(
                             modifier = Modifier
                                 .padding(horizontal = 6.dp)
                                 .size(3.dp)
-                                .background(GhostWhite.copy(alpha = 0.3f), CircleShape)
+                                .background(HairlineStrong, CircleShape)
                         )
                         Text(
                             text = FormatUtils.formatDate(record.date),
                             style = MaterialTheme.typography.labelSmall,
-                            color = GhostWhite.copy(alpha = 0.4f)
+                            color = InkMuted.copy(alpha = 0.8f)
                         )
                     }
 
@@ -399,7 +399,7 @@ fun TransactionListItem(
                             modifier = Modifier
                                 .size(24.dp)
                                 .testTag("edit_record_button"),
-                            colors = IconButtonDefaults.iconButtonColors(contentColor = GhostWhite.copy(alpha = 0.4f))
+                            colors = IconButtonDefaults.iconButtonColors(contentColor = InkMuted.copy(alpha = 0.7f))
                         ) {
                             Icon(Icons.Default.Edit, contentDescription = "Edit Transaksi", modifier = Modifier.size(14.dp))
                         }
@@ -408,7 +408,7 @@ fun TransactionListItem(
                             modifier = Modifier
                                 .size(24.dp)
                                 .testTag("delete_record_button"),
-                            colors = IconButtonDefaults.iconButtonColors(contentColor = GhostWhite.copy(alpha = 0.4f))
+                            colors = IconButtonDefaults.iconButtonColors(contentColor = ErrorRed.copy(alpha = 0.8f))
                         ) {
                             Icon(Icons.Default.Delete, contentDescription = "Hapus Transaksi", modifier = Modifier.size(14.dp))
                         }
@@ -420,7 +420,7 @@ fun TransactionListItem(
                     Text(
                         text = "Catatan: ${record.notes}",
                         style = MaterialTheme.typography.labelMedium.copy(fontSize = 11.sp),
-                        color = GhostWhite.copy(alpha = 0.4f),
+                        color = InkMuted,
                         modifier = Modifier.fillMaxWidth()
                     )
                 }

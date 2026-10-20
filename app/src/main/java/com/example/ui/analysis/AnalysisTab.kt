@@ -1,91 +1,66 @@
 package com.example.ui.analysis
 
-import androidx.compose.animation.*
-import androidx.compose.animation.core.*
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.ui.draw.clip
-import androidx.compose.foundation.clickable
-import com.example.data.CategoryAggregation
-import com.example.ui.theme.*
-import com.example.ui.components.GlassCard
-import com.example.ui.config.FormatUtils
 import androidx.compose.ui.platform.testTag
-import com.example.ui.calendar.CalPemasukan
-import com.example.ui.calendar.CalPengeluaran
+import androidx.compose.ui.text.font.FontWeight
+import com.example.data.CategoryAggregation
+import com.example.ui.components.EditorialPill
+import com.example.ui.components.Eyebrow
+import com.example.ui.components.HairlineDivider
+import com.example.ui.config.FormatUtils
+import com.example.ui.theme.BurntOrange
+import com.example.ui.theme.ForestGreen
+import com.example.ui.theme.Ink
+import com.example.ui.theme.InkMuted
+import com.example.ui.theme.SerifFamily
+import com.example.ui.theme.Spacing
+import com.example.ui.util.CategoryIconMapper
 
+/**
+ * Ringkasan periode: angka utama, kategori terbesar, lalu rincian per kategori.
+ *
+ * Grafik tren tidak lagi dirender di sini. Satu-satunya pemakai komponen ini
+ * adalah tab Kalender, dan grafiknya sudah jadi latar di belakang grid tanggal.
+ */
 @Composable
 fun AnalysisTabContent(
     viewModel: AnalysisViewModel,
-    modifier: Modifier = Modifier,
-    showCharts: Boolean = true
+    modifier: Modifier = Modifier
 ) {
-    val selectedPeriod by viewModel.selectedPeriod.collectAsState()
     val categoryAggregations by viewModel.categoryAggregations.collectAsState()
     val totalExpense by viewModel.totalExpense.collectAsState()
     val totalIncome by viewModel.totalIncome.collectAsState()
     val topCategory by viewModel.topCategory.collectAsState()
     val totalTransactions by viewModel.totalTransactions.collectAsState()
-    val dailyTrends by viewModel.dailyTrends.collectAsState()
 
-    Column(
+    SummaryStatsCard(
+        totalIncome = totalIncome,
+        totalExpense = totalExpense,
+        topCategoryName = topCategory?.category ?: "-",
+        totalTransactions = totalTransactions,
+        aggregations = categoryAggregations,
+        showCategoryList = true,
         modifier = modifier
-            .fillMaxWidth()
-            .padding(vertical = Spacing.lg),
-        verticalArrangement = Arrangement.spacedBy(Spacing.lg)
-    ) {
-        // Pemilih periode hanya dipakai di tab Analisa. Di tab Kalender sudah ada
-        // pengalih dua mode sendiri karena grafiknya jadi latar kalender.
-        if (showCharts) {
-            PeriodFilterRow(
-                selectedPeriod = selectedPeriod,
-                onPeriodSelect = { viewModel.setPeriod(it) }
-            )
-        }
-
-        SummaryStatsCard(
-            totalIncome = totalIncome,
-            totalExpense = totalExpense,
-            topCategoryName = topCategory?.category ?: "-",
-            totalTransactions = totalTransactions,
-            aggregations = categoryAggregations,
-            showCategoryList = !showCharts
-        )
-
-        if (showCharts) {
-            CombinedChartsCard(
-                dailyTrends = dailyTrends,
-                aggregations = categoryAggregations,
-                totalExpense = totalExpense
-            )
-        }
-    }
+    )
 }
 
+/** Pemilih periode: pil yang sama dengan filter riwayat di Dashboard. */
 @Composable
 fun PeriodFilterRow(
     selectedPeriod: AnalysisViewModel.PeriodFilter,
@@ -94,50 +69,18 @@ fun PeriodFilterRow(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 4.dp)
+            .horizontalScroll(rememberScrollState())
             .testTag("period_filter_row"),
-        horizontalArrangement = Arrangement.SpaceEvenly,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
         verticalAlignment = Alignment.CenterVertically
     ) {
         AnalysisViewModel.PeriodFilter.values().forEach { period ->
-            val isSelected = selectedPeriod == period
-            
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .clickable(
-                        interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
-                        indication = null
-                    ) { onPeriodSelect(period) }
-                    .padding(vertical = 8.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text(
-                        text = period.displayName,
-                        style = MaterialTheme.typography.titleSmall.copy(
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                            fontSize = 14.sp,
-                            letterSpacing = 0.5.sp
-                        ),
-                        color = if (isSelected) GhostWhite else GhostWhite.copy(alpha = 0.4f),
-                        textAlign = TextAlign.Center,
-                        maxLines = 1
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Box(
-                        modifier = Modifier
-                            .height(2.5.dp)
-                            .fillMaxWidth(0.35f)
-                            .background(
-                                color = if (isSelected) GhostWhite else Color.Transparent,
-                                shape = RoundedCornerShape(1.5.dp)
-                            )
-                    )
-                }
-            }
+            EditorialPill(
+                text = period.displayName,
+                selected = selectedPeriod == period,
+                onClick = { onPeriodSelect(period) },
+                textStyle = MaterialTheme.typography.labelMedium
+            )
         }
     }
 }
@@ -149,355 +92,116 @@ fun SummaryStatsCard(
     topCategoryName: String,
     totalTransactions: Int,
     aggregations: List<CategoryAggregation> = emptyList(),
-    showCategoryList: Boolean = false
+    showCategoryList: Boolean = false,
+    modifier: Modifier = Modifier
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = TranslucentGlass),
-        border = BorderStroke(
-            width = 1.dp,
-            brush = Brush.verticalGradient(
-                colors = listOf(GhostWhite.copy(alpha = 0.1f), GhostWhite.copy(alpha = 0.02f))
+    Column(modifier = modifier.fillMaxWidth()) {
+        Eyebrow(text = "Ringkasan")
+
+        Spacer(modifier = Modifier.height(Spacing.sm))
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.lg)
+        ) {
+            StatItem(
+                title = "Pemasukan",
+                value = FormatUtils.formatRupiah(totalIncome),
+                valueColor = ForestGreen,
+                modifier = Modifier.weight(1f)
             )
-        )
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                "Ringkasan Statistik",
-                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                color = GhostWhite,
-                modifier = Modifier.padding(bottom = 12.dp)
+            StatItem(
+                title = "Pengeluaran",
+                value = FormatUtils.formatRupiah(totalExpense),
+                valueColor = BurntOrange,
+                modifier = Modifier.weight(1f)
             )
+        }
 
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                StatItem(
-                    title = "Total Pemasukan",
-                    value = FormatUtils.formatRupiah(totalIncome),
-                    valueColor = CalPemasukan,
-                    modifier = Modifier.weight(1f)
-                )
-                StatItem(
-                    title = "Total Pengeluaran",
-                    value = FormatUtils.formatRupiah(totalExpense),
-                    valueColor = CalPengeluaran,
-                    modifier = Modifier.weight(1f)
-                )
-            }
-            Spacer(modifier = Modifier.height(12.dp))
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                StatItem(
-                    title = "Kategori Terbesar",
-                    value = topCategoryName,
-                    valueColor = GhostWhite,
-                    modifier = Modifier.weight(1f)
-                )
-                StatItem(
-                    title = "Total Transaksi",
-                    value = "${totalTransactions}x",
-                    valueColor = GhostWhite,
-                    modifier = Modifier.weight(1f)
-                )
-            }
+        Spacer(modifier = Modifier.height(Spacing.sm))
 
-            // Rincian kategori disatukan ke card yang sama, bukan card terpisah.
-            // Dipakai di tab Kalender karena grafiknya sudah jadi latar kalender.
-            if (showCategoryList && aggregations.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(16.dp))
-                HorizontalDivider(color = GhostWhite.copy(alpha = 0.1f))
-                Spacer(modifier = Modifier.height(12.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.lg)
+        ) {
+            StatItem(
+                title = "Kategori terbesar",
+                value = topCategoryName,
+                valueColor = Ink,
+                modifier = Modifier.weight(1f)
+            )
+            StatItem(
+                title = "Transaksi",
+                value = "${totalTransactions}x",
+                valueColor = Ink,
+                modifier = Modifier.weight(1f)
+            )
+        }
 
-                Text(
-                    text = "Rincian per Kategori",
-                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                    color = GhostWhite,
-                    modifier = Modifier.padding(bottom = 8.dp)
-                )
+        // Rincian kategori menyusul di bawah angka, dipisah garis rambut —
+        // bukan kartu kedua di dalam satu layar.
+        if (showCategoryList && aggregations.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(Spacing.md))
+            HairlineDivider()
+            Spacer(modifier = Modifier.height(Spacing.sm))
 
-                val listColors = listOf(
-                    Color(0xFFC2E0FF),
-                    Color(0xFF93C9FF),
-                    Color(0xFF5BA8F5),
-                    Color(0xFF2E86DE),
-                    Color(0xFF1E5FAD),
-                    Color(0xFF1A3A6B)
-                )
+            Eyebrow(text = "Rincian per kategori")
 
-                aggregations.forEachIndexed { index, agg ->
-                    val color = listColors[index % listColors.size]
-                    val percentage =
-                        if (totalExpense > 0) (agg.totalAmount.toDouble() / totalExpense) * 100 else 0.0
-
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
-                    ) {
-                        Box(modifier = Modifier.size(10.dp).background(color, CircleShape))
-                        Spacer(modifier = Modifier.width(8.dp))
-
-                        val (_, cleanCat) =
-                            com.example.ui.util.CategoryIconMapper.extractEmojiAndLabel(agg.category)
-                        Text(
-                            text = cleanCat,
-                            color = GhostWhite,
-                            modifier = Modifier.weight(1f),
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                        Text(
-                            text = String.format("%.1f%%", percentage),
-                            color = GhostWhite.copy(alpha = 0.7f),
-                            style = MaterialTheme.typography.bodySmall,
-                            modifier = Modifier.padding(end = 8.dp)
-                        )
-                        Text(
-                            text = FormatUtils.formatRupiahCompact(agg.totalAmount),
-                            color = GhostWhite,
-                            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold)
-                        )
-                    }
-                }
+            aggregations.forEachIndexed { index, agg ->
+                CategoryRow(aggregation = agg, totalExpense = totalExpense)
+                if (index < aggregations.lastIndex) HairlineDivider()
             }
         }
     }
 }
 
+/** Satu angka ringkasan: label mono di atas, nilai serif di bawah. */
 @Composable
 fun StatItem(title: String, value: String, valueColor: Color, modifier: Modifier = Modifier) {
     Column(modifier = modifier) {
-        Text(text = title, style = MaterialTheme.typography.labelMedium, color = GhostWhite.copy(alpha = 0.6f))
-        Text(text = value, style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold), color = valueColor)
+        Eyebrow(text = title)
+        Text(
+            text = value,
+            style = MaterialTheme.typography.titleLarge,
+            fontFamily = SerifFamily,
+            color = valueColor
+        )
     }
 }
 
-val EaseInOutQuad = CubicBezierEasing(0.45f, 0f, 0.55f, 1f)
-val EaseInOutSine = CubicBezierEasing(0.37f, 0f, 0.63f, 1f)
-
-
-/**
- * Kartu chart tren harian + daftar kategori.
- *
- * Kolom donut kategori sudah dihapus. Sebelumnya kartu ini membagi ruang dua kolom
- * berdampingan dengan `weight(1f)` masing-masing, sehingga di layar sempit keduanya
- * terperas jadi sekitar setengah lebar dan chart-nya sulit dibaca. Sekarang chart tren
- * memakai lebar penuh, dan daftar kategori tetap ada di bawahnya sebagai rincian
- * nominal per kategori.
- */
+/** Baris kategori: nama, porsi terhadap pengeluaran, lalu nominalnya. */
 @Composable
-fun CombinedChartsCard(
-    dailyTrends: List<DailyAggregation>,
-    aggregations: List<CategoryAggregation>,
-    totalExpense: Long
-) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = TranslucentGlass),
-        border = BorderStroke(
-            width = 1.dp,
-            brush = Brush.verticalGradient(
-                colors = listOf(GhostWhite.copy(alpha = 0.1f), GhostWhite.copy(alpha = 0.02f))
-            )
-        )
+private fun CategoryRow(aggregation: CategoryAggregation, totalExpense: Long) {
+    val (_, cleanCategory) = CategoryIconMapper.extractEmojiAndLabel(aggregation.category)
+    val percentage = if (totalExpense > 0) {
+        (aggregation.totalAmount.toDouble() / totalExpense) * 100
+    } else {
+        0.0
+    }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = Spacing.sm),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(
-                "Tren",
-                style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                color = GhostWhite,
-                modifier = Modifier.fillMaxWidth(),
-                textAlign = TextAlign.Start
-            )
-
-            if (dailyTrends.isEmpty()) {
-                Spacer(modifier = Modifier.height(32.dp))
-                Icon(
-                    Icons.Default.Warning,
-                    contentDescription = null,
-                    tint = GhostWhite.copy(alpha = 0.3f),
-                    modifier = Modifier.size(32.dp)
-                )
-                Text(
-                    "Belum ada",
-                    color = GhostWhite.copy(alpha = 0.5f),
-                    fontSize = 10.sp,
-                    modifier = Modifier.padding(top = 4.dp)
-                )
-                Spacer(modifier = Modifier.height(32.dp))
-            } else {
-                val progress = remember { Animatable(0f) }
-                LaunchedEffect(dailyTrends) {
-                    progress.snapTo(0f)
-                    progress.animateTo(
-                        targetValue = 1f,
-                        animationSpec = tween(durationMillis = 1200, easing = EaseInOutSine)
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Canvas(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(150.dp)
-                        .padding(horizontal = 4.dp)
-                ) {
-                    val maxAmount =
-                        (dailyTrends.maxOfOrNull { it.totalAmount }?.toFloat() ?: 0f).coerceAtLeast(1f)
-                    val width = size.width
-                    val height = size.height
-
-                    val linesCount = 4
-                    for (i in 0..linesCount) {
-                        val y = height - (height * (i.toFloat() / linesCount))
-                        drawLine(
-                            color = GhostWhite.copy(alpha = 0.1f),
-                            start = Offset(0f, y),
-                            end = Offset(width, y),
-                            strokeWidth = 1.dp.toPx()
-                        )
-                    }
-
-                    if (dailyTrends.size > 1) {
-                        val stepX = width / (dailyTrends.size - 1)
-                        val points = dailyTrends.mapIndexed { index, agg ->
-                            val x = index * stepX
-                            val scaledY = (agg.totalAmount.toFloat() / maxAmount) * height * progress.value
-                            Offset(x, height - scaledY)
-                        }
-
-                        val path = androidx.compose.ui.graphics.Path()
-                        path.moveTo(points.first().x, points.first().y)
-
-                        for (i in 0 until points.size - 1) {
-                            val p0 = points[i]
-                            val p1 = points[i + 1]
-                            val cx = (p0.x + p1.x) / 2
-                            path.cubicTo(cx, p0.y, cx, p1.y, p1.x, p1.y)
-                        }
-
-                        val fillPath = androidx.compose.ui.graphics.Path()
-                        fillPath.addPath(path)
-                        fillPath.lineTo(points.last().x, height)
-                        fillPath.lineTo(points.first().x, height)
-                        fillPath.close()
-
-                        drawPath(
-                            path = fillPath,
-                            brush = Brush.verticalGradient(
-                                colors = listOf(SteelBlue.copy(alpha = 0.3f), Color.Transparent),
-                                startY = 0f,
-                                endY = height
-                            )
-                        )
-
-                        drawPath(
-                            path = path,
-                            color = SteelBlue,
-                            style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round)
-                        )
-
-                        points.forEach { point ->
-                            drawCircle(color = MidnightAbyss, radius = 3.dp.toPx(), center = point)
-                            drawCircle(
-                                color = SteelBlue,
-                                radius = 3.dp.toPx(),
-                                center = point,
-                                style = Stroke(width = 1.5.dp.toPx())
-                            )
-                        }
-                    } else if (dailyTrends.size == 1) {
-                        val agg = dailyTrends.first()
-                        val scaledY = (agg.totalAmount.toFloat() / maxAmount) * height * progress.value
-                        drawCircle(
-                            color = SteelBlue,
-                            radius = 3.dp.toPx(),
-                            center = Offset(width / 2f, height - scaledY)
-                        )
-                    }
-                }
-
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    if (dailyTrends.size > 1) {
-                        Text(
-                            dailyTrends.first().dateString,
-                            fontSize = 8.sp,
-                            color = GhostWhite.copy(alpha = 0.5f)
-                        )
-                        Text(
-                            dailyTrends.last().dateString,
-                            fontSize = 8.sp,
-                            color = GhostWhite.copy(alpha = 0.5f)
-                        )
-                    } else if (dailyTrends.size == 1) {
-                        Text(
-                            dailyTrends.first().dateString,
-                            fontSize = 8.sp,
-                            color = GhostWhite.copy(alpha = 0.5f),
-                            modifier = Modifier.fillMaxWidth(),
-                            textAlign = TextAlign.Center
-                        )
-                    }
-                }
-            }
-
-            if (aggregations.isNotEmpty()) {
-                val listColors = listOf(
-                    Color(0xFFC2E0FF),
-                    Color(0xFF93C9FF),
-                    Color(0xFF5BA8F5),
-                    Color(0xFF2E86DE),
-                    Color(0xFF1E5FAD),
-                    Color(0xFF1A3A6B)
-                )
-
-                Spacer(modifier = Modifier.height(24.dp))
-                HorizontalDivider(color = GhostWhite.copy(alpha = 0.1f))
-                Spacer(modifier = Modifier.height(12.dp))
-
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    aggregations.forEachIndexed { index, agg ->
-                        val color = listColors[index % listColors.size]
-                        val percentage =
-                            if (totalExpense > 0) (agg.totalAmount.toDouble() / totalExpense) * 100 else 0.0
-
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 4.dp)
-                        ) {
-                            Box(modifier = Modifier.size(10.dp).background(color, CircleShape))
-                            Spacer(modifier = Modifier.width(8.dp))
-
-                            val (_, cleanCat) =
-                                com.example.ui.util.CategoryIconMapper.extractEmojiAndLabel(agg.category)
-                            Text(
-                                text = cleanCat,
-                                color = GhostWhite,
-                                modifier = Modifier.weight(1f),
-                                style = MaterialTheme.typography.bodySmall
-                            )
-                            Text(
-                                text = String.format("%.1f%%", percentage),
-                                color = GhostWhite.copy(alpha = 0.7f),
-                                style = MaterialTheme.typography.bodySmall,
-                                modifier = Modifier.padding(end = 8.dp)
-                            )
-                            Text(
-                                text = FormatUtils.formatRupiahCompact(agg.totalAmount),
-                                color = GhostWhite,
-                                style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold)
-                            )
-                        }
-                    }
-                }
-            }
-        }
+        Text(
+            text = cleanCategory,
+            style = MaterialTheme.typography.bodyMedium,
+            color = Ink,
+            modifier = Modifier.weight(1f)
+        )
+        Text(
+            text = String.format("%.1f%%", percentage),
+            style = MaterialTheme.typography.labelSmall,
+            color = InkMuted,
+            modifier = Modifier.padding(end = Spacing.sm)
+        )
+        Text(
+            text = FormatUtils.formatRupiahCompact(aggregation.totalAmount),
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = Ink
+        )
     }
 }
