@@ -175,7 +175,7 @@ fun DatabaseBackupSection(
                 // Toggle sinkronisasi: default MATI. Saat mati tidak ada data
                 // lokal yang dikirim ke cloud; menyalakan butuh konfirmasi.
                 EditorialToggleRow(
-                    title = "Sinkronisasi Firestore",
+                    title = "Sinkronisasi cloud",
                     checked = firestoreSyncEnabled,
                     onCheckedChange = { enabled ->
                         if (enabled) {
@@ -497,7 +497,7 @@ fun DatabaseBackupSection(
         EditorialDialog(onDismissRequest = { showFirestoreHelpInfo = false }) {
             EditorialDialogCard(title = "Panduan sinkronisasi realtime") {
                 Text(
-                    text = "Sinkronkan catatan transaksi secara otomatis ke cloud Firestore, lalu data tersinkron antar perangkat yang memakai akun Google sama.\n\n" +
+                    text = "Sinkronkan catatan transaksi secara otomatis ke cloud, lalu data tersinkron antar perangkat yang memakai akun Google sama.\n\n" +
                         "Saat sakelar mati, tidak ada data yang diunggah; semuanya tetap di HP ini.\n\n" +
                         "Hubungkan akun Google dulu untuk memakai fitur ini.",
                     style = MaterialTheme.typography.bodyMedium,
@@ -647,9 +647,8 @@ fun DatabaseBackupSection(
         EditorialDialog(onDismissRequest = { showSyncWarning = false }) {
             EditorialDialogCard(title = "Nyalakan sinkronisasi cloud?") {
                 Text(
-                    text = "Seluruh data di HP ini (transaksi, transaksi berulang, kategori, anggaran, dan pengaturan) akan DIUNGGAH PENUH ke cloud Firestore milik akun " +
-                        "${connectedGoogleAccount?.email ?: "Google"} lalu disinkronkan otomatis antar perangkat.\n\n" +
-                        "Catatan: isi cloud tidak dienkripsi khusus oleh aplikasi — data tersimpan dalam bentuk yang terbaca oleh layanan cloud. Jangan nyalakan kalau Anda tidak nyaman dengan hal itu.\n\n" +
+                    text = "Seluruh data aplikasi (transaksi, transaksi berulang, kategori, anggaran, dan pengaturan) akan DIUNGGAH PENUH ke cloud, lalu disinkronkan otomatis antar perangkat yang memakai akun Google yang sama.\n\n" +
+                        "Data yang masuk ke cloud tidak terenkripsi oleh aplikasi ini. Jangan nyalakan kalau Anda tidak nyaman dengan hal itu.\n\n" +
                         "Data di HP tetap utuh. Mematikan kembali sinkronisasi tidak menghapus data apa pun.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = InkMuted,
@@ -696,9 +695,9 @@ fun DatabaseBackupSection(
         EditorialDialog(onDismissRequest = { if (!isDeletingCloud) showDeleteCloudConfirm = false }) {
             EditorialDialogCard(title = "Hapus data cloud?") {
                 Text(
-                    text = "Seluruh data milik akun ${connectedGoogleAccount?.email ?: "Google"} yang tersimpan di cloud Firestore akan DIHAPUS PERMANEN.\n\n" +
+                    text = "Seluruh data aplikasi yang tersimpan di cloud akan DIHAPUS PERMANEN.\n\n" +
                         "Data di HP ini TIDAK dihapus dan tetap bisa dipakai. Sinkronisasi akan dimatikan otomatis setelah selesai. " +
-                        "Kalau dinyalakan lagi nanti, seluruh isi HP akan diunggah ulang dari awal.",
+                        "Kalau dinyalakan lagi nanti, seluruh data aplikasi akan diunggah ulang dari awal.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = InkMuted,
                     lineHeight = 20.sp
