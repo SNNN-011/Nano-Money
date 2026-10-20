@@ -1,5 +1,6 @@
 package com.example.ui.components
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -20,9 +21,13 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.NorthEast
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -59,6 +64,7 @@ import com.example.ui.theme.Hairline
 import com.example.ui.theme.HairlineStrong
 import com.example.ui.theme.Ink
 import com.example.ui.theme.InkMuted
+import com.example.ui.theme.SerifFamily
 import com.example.ui.theme.Spacing
 import com.example.ui.theme.StampTextStyle
 import com.example.ui.theme.TagTextStyle
@@ -370,6 +376,44 @@ fun EditorialDialog(
     }
 }
 
+/**
+ * Permukaan dialog editorial: krem, bingkai garis rambut, sudut bezel, judul
+ * serif. Dipakai dialog-dialog tab Simpan supaya bentuknya sama dengan dialog
+ * kelola kategori dan dialog konfirmasi lain.
+ */
+@Composable
+fun EditorialDialogCard(
+    title: String,
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(Spacing.lg),
+        shape = RoundedCornerShape(CornerRadius.bezel),
+        colors = CardDefaults.cardColors(containerColor = CreamRaised),
+        border = BorderStroke(1.dp, Hairline),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(Spacing.xl),
+            verticalArrangement = Arrangement.spacedBy(Spacing.md)
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleLarge,
+                fontFamily = SerifFamily,
+                fontWeight = FontWeight.Medium,
+                color = Ink
+            )
+            content()
+        }
+    }
+}
+
 // ── Isian ─────────────────────────────────────────────────────────────────────
 // Dipakai bersama tab Chat (lembar konfirmasi AI) dan dialog-dialog editorial,
 // supaya dua isian sejenis tidak pernah kelihatan beda bentuk.
@@ -503,3 +547,55 @@ fun editorialFieldColors() = OutlinedTextFieldDefaults.colors(
     disabledContainerColor = Cream,
     cursorColor = BurntOrange
 )
+
+/**
+ * Baris sakelar: judul dan keterangan di kiri, [Switch] di kanan.
+ *
+ * Tab Simpan punya tiga sakelar (PIN, sinkronisasi Firestore, cadangan
+ * otomatis). Ketiganya memakai baris ini supaya tidak ada satu pun yang
+ * tampil beda dari yang lain.
+ */
+@Composable
+fun EditorialToggleRow(
+    title: String,
+    subtitle: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+    testTag: String = ""
+) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = Ink
+            )
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.labelSmall,
+                color = InkMuted
+            )
+        }
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = Cream,
+                checkedTrackColor = Ink,
+                uncheckedThumbColor = CreamRaised,
+                uncheckedTrackColor = HairlineStrong,
+                uncheckedBorderColor = HairlineStrong
+            ),
+            modifier = if (testTag.isNotEmpty()) Modifier.testTag(testTag) else Modifier
+        )
+    }
+}

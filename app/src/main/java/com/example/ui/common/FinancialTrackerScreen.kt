@@ -464,8 +464,8 @@ fun FinancialTrackerScreen(
                     Box(modifier = Modifier.fillMaxSize().background(Cream))
                 }
                 TrackerTab.EKSPOR_IMPOR.name -> {
-                    Box(modifier = Modifier.fillMaxSize().background(Brush.radialGradient(colors = listOf(NeonViolet.copy(alpha = 0.09f), Color.Transparent), center = Offset(0f, 1500f), radius = 900f)))
-                    Box(modifier = Modifier.fillMaxSize().background(Brush.radialGradient(colors = listOf(SteelBlueGlow.copy(alpha = 0.12f), Color.Transparent), center = Offset(800f, 0f), radius = 800f)))
+                    // Tab Simpan ikut palet editorial: krem polos, tanpa gradien.
+                    Box(modifier = Modifier.fillMaxSize().background(Cream))
                 }
                 else -> {
                     Box(modifier = Modifier.fillMaxSize().background(Brush.radialGradient(colors = listOf(SteelBlueGlow.copy(alpha = 0.08f), Color.Transparent), radius = 600f)))
@@ -474,13 +474,15 @@ fun FinancialTrackerScreen(
             }
         }
 
-        // Tab Dashboard, Chat, Tambah, dan Kalender memakai palet editorial, jadi
-        // bar atas dan bar bawah ikut krem-tinta supaya tidak beradu dengan latar
-        // krem halamannya. Tab yang belum di-redesign tetap memakai warna lama.
+        // Tab Dashboard, Chat, Tambah, Kalender, dan Simpan memakai palet
+        // editorial, jadi bar atas dan bar bawah ikut krem-tinta supaya tidak
+        // beradu dengan latar krem halamannya. Tab yang belum di-redesign tetap
+        // memakai warna lama.
         val isEditorialTab = currentRoute == TrackerTab.BERANDA.name ||
             currentRoute == TrackerTab.CHAT.name ||
             currentRoute == TrackerTab.TRANSAKSI_BARU.name ||
-            currentRoute == TrackerTab.KALENDER.name
+            currentRoute == TrackerTab.KALENDER.name ||
+            currentRoute == TrackerTab.EKSPOR_IMPOR.name
         val barContainer = if (isEditorialTab) CreamRaised else MidnightAbyss.copy(alpha = 0.95f)
         val barDivider = if (isEditorialTab) Hairline else GhostWhite.copy(alpha = 0.05f)
         val barTitleColor = if (isEditorialTab) Ink else GhostWhite

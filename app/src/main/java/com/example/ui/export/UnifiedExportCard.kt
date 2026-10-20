@@ -1,32 +1,66 @@
 package com.example.ui.export
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Assessment
-import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material.icons.filled.PictureAsPdf
-import androidx.compose.material3.*
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.ui.components.EditorialButton
+import com.example.ui.components.EditorialButtonStyle
+import com.example.ui.components.EditorialDialog
+import com.example.ui.components.EditorialDialogCard
+import com.example.ui.components.EditorialPill
+import com.example.ui.components.Eyebrow
+import com.example.ui.components.HairlineDivider
 import com.example.ui.theme.*
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
+/** Satu bulan pada pemilih periode; bentuknya pil yang sama dengan filter lain. */
+@Composable
+fun MonthSelectChip(
+    month: YearMonth,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    // "MMM" (Okt 2026) supaya label muat di pil selebar separuh baris.
+    val formatter = remember { DateTimeFormatter.ofPattern("MMM yyyy", Locale("id", "ID")) }
+    val formattedName = remember(month) { month.format(formatter) }
+
+    EditorialPill(
+        text = formattedName,
+        selected = isSelected,
+        onClick = onClick,
+        modifier = modifier,
+        textStyle = MaterialTheme.typography.labelMedium,
+        contentPadding = Spacing.md,
+        testTag = "month_chip_${month.year}_${month.monthValue}"
+    )
+}
+
+/**
+ * Pemilih periode laporan + tombol ekspor/impor.
+ *
+ * Dulu satu kartu gelap berisi semua kontrol. Sekarang bagian datar: label
+ * mono, judul serif, pil bulan, dan tombol pil yang sama dengan tab lain.
+ */
 @Composable
 fun UnifiedExportCard(
     isWideScreen: Boolean,
@@ -41,279 +75,221 @@ fun UnifiedExportCard(
 ) {
     var showPdfHelpInfo by remember { mutableStateOf(false) }
 
-    val content: @Composable () -> Unit = {
-        Column(
-            modifier = Modifier.padding(Spacing.card),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(Spacing.md)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            // Header inside card
+            Eyebrow(text = "Ekspor & impor")
+
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(Spacing.xs)
+            ) {
+                IconButton(
+                    onClick = { showPdfHelpInfo = true },
+                    modifier = Modifier.size(28.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Info,
+                        contentDescription = "Info Ekspor PDF",
+                        tint = InkMuted,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+                IconButton(
+                    onClick = { onIsMonthsExpandedChanged(!isMonthsExpanded) },
+                    modifier = Modifier.size(28.dp).testTag("toggle_months_button")
+                ) {
+                    Icon(
+                        imageVector = if (isMonthsExpanded) {
+                            Icons.Default.KeyboardArrowUp
+                        } else {
+                            Icons.Default.KeyboardArrowDown
+                        },
+                        contentDescription = if (isMonthsExpanded) "Sembunyikan bulan" else "Tampilkan bulan",
+                        tint = InkMuted,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
+        }
+
+        Text(
+            text = "Pilih periode laporan",
+            style = MaterialTheme.typography.titleLarge,
+            fontFamily = SerifFamily,
+            color = Ink
+        )
+
+        if (showPdfHelpInfo) {
+            EditorialDialog(onDismissRequest = { showPdfHelpInfo = false }) {
+                EditorialDialogCard(title = "Informasi ekspor PDF") {
+                    Text(
+                        text = "Ekspor laporan keuangan Anda dalam format PDF yang rapi.\n\n" +
+                            "• Pilih satu atau beberapa bulan sekaligus.\n" +
+                            "• Setiap bulan tampil di halaman terpisah.\n" +
+                            "• Isinya ringkasan statistik, grafik arus kas, pie chart kategori pengeluaran, dan tabel transaksi.\n" +
+                            "• File langsung tersimpan di perangkat dan bisa dibagikan kapan saja.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = InkMuted,
+                        lineHeight = 20.sp
+                    )
+                    EditorialButton(
+                        text = "Mengerti",
+                        onClick = { showPdfHelpInfo = false },
+                        modifier = Modifier.fillMaxWidth(),
+                        trailingArrow = false,
+                        expanded = true,
+                        testTag = "pdf_info_dismiss"
+                    )
+                }
+            }
+        }
+
+        if (isMonthsExpanded) {
+            Text(
+                text = "Tentukan bulan transaksi yang ingin di-ekspor atau dicetak sebagai laporan. Bisa satu, beberapa, atau semua bulan.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = InkMuted
+            )
+
             Row(
                 modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
+            ) {
+                EditorialButton(
+                    text = "Pilih semua",
+                    onClick = { onSelectedMonthsChanged(availableMonths.toSet()) },
+                    modifier = Modifier.weight(1f),
+                    style = EditorialButtonStyle.Ghost,
+                    trailingArrow = false,
+                    testTag = "select_all_months"
+                )
+                EditorialButton(
+                    text = "Kosongkan",
+                    onClick = { onSelectedMonthsChanged(emptySet()) },
+                    modifier = Modifier.weight(1f),
+                    style = EditorialButtonStyle.Ghost,
+                    trailingArrow = false,
+                    testTag = "clear_all_months"
+                )
+            }
+
+            val columns = if (isWideScreen) 3 else 2
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(Spacing.sm)
+            ) {
+                availableMonths.chunked(columns).forEach { rowMonths ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
+                    ) {
+                        rowMonths.forEach { month ->
+                            MonthSelectChip(
+                                month = month,
+                                isSelected = selectedMonths.contains(month),
+                                onClick = {
+                                    val updated = if (selectedMonths.contains(month)) {
+                                        selectedMonths - month
+                                    } else {
+                                        selectedMonths + month
+                                    }
+                                    onSelectedMonthsChanged(updated)
+                                },
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                        repeat(columns - rowMonths.size) {
+                            Spacer(modifier = Modifier.weight(1f))
+                        }
+                    }
+                }
+            }
+        } else {
+            // Ringkasan periode = satu kolom isian ketuk, bukan blok teks polos.
+            val shape = RoundedCornerShape(CornerRadius.md)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(shape)
+                    .background(CreamRaised)
+                    .border(1.dp, HairlineStrong, shape)
+                    .clickable { onIsMonthsExpandedChanged(true) }
+                    .padding(horizontal = Spacing.md, vertical = Spacing.sm),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.clickable { onIsMonthsExpandedChanged(!isMonthsExpanded) }.weight(1f)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .width(3.dp)
-                            .height(20.dp)
-                            .background(
-                                brush = Brush.verticalGradient(
-                                    colors = listOf(SteelBlue, SteelBlue.copy(alpha = 0.4f))
-                                ),
-                                shape = RoundedCornerShape(2.dp)
-                            )
-                    )
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Text(
-                        text = "Pilih Periode Laporan Keuangan",
-                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                        color = GhostWhite
-                    )
+                val formatter = remember { DateTimeFormatter.ofPattern("MMM yyyy", Locale("id", "ID")) }
+                val displaySelectedStr = if (selectedMonths.isEmpty()) {
+                    "Tidak ada bulan terpilih"
+                } else {
+                    selectedMonths.sorted().joinToString(", ") { it.format(formatter) }
                 }
 
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    IconButton(
-                        onClick = { showPdfHelpInfo = true },
-                        modifier = Modifier.size(24.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Info,
-                            contentDescription = "Info Ekspor PDF",
-                            tint = GhostWhite.copy(alpha = 0.6f),
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-                    Icon(
-                        imageVector = if (isMonthsExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                        contentDescription = if (isMonthsExpanded) "Sembunyikan" else "Tampilkan Semua",
-                        tint = SteelBlue,
-                        modifier = Modifier.size(20.dp).clickable { onIsMonthsExpandedChanged(!isMonthsExpanded) }
-                    )
-                }
-            }
-
-            if (showPdfHelpInfo) {
-                Dialog(onDismissRequest = { showPdfHelpInfo = false }) {
-                    Card(
-                        modifier = Modifier.fillMaxWidth().padding(16.dp),
-                        shape = RoundedCornerShape(24.dp),
-                        colors = CardDefaults.cardColors(containerColor = MidnightAbyss),
-                        border = BorderStroke(
-                            width = 1.dp,
-                            brush = Brush.verticalGradient(
-                                colors = listOf(
-                                    GhostWhite.copy(alpha = 0.2f),
-                                    GhostWhite.copy(alpha = 0.02f)
-                                )
-                            )
-                        ),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
-                    ) {
-                        Box(modifier = Modifier.background(TranslucentGlass)) {
-                            Column(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(24.dp),
-                                verticalArrangement = Arrangement.spacedBy(16.dp)
-                            ) {
-                                Text(
-                                    text = "Informasi Ekspor PDF",
-                                    color = GhostWhite,
-                                    style = MaterialTheme.typography.titleLarge,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Text(
-                                    text = "Ekspor laporan keuangan Anda dalam format PDF yang rapi dan profesional.\n\n• Pilih satu atau beberapa bulan sekaligus untuk dijadikan laporan.\n• Setiap bulan ditampilkan di halaman terpisah agar mudah dibaca.\n• Laporan mencakup ringkasan statistik, grafik arus kas, pie chart kategori pengeluaran, dan tabel transaksi lengkap.\n• File PDF langsung tersimpan di penyimpanan perangkat Anda dan bisa dibagikan kapan saja.",
-                                    color = GhostWhite.copy(alpha = 0.8f),
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    lineHeight = 20.sp
-                                )
-                                Spacer(modifier = Modifier.height(8.dp))
-                                PremiumButton(
-                                    text = "Mengerti",
-                                    onClick = { showPdfHelpInfo = false },
-                                    isActive = true,
-                                    modifier = Modifier.fillMaxWidth(),
-                                    testTag = "pdf_info_dismiss"
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
-            if (isMonthsExpanded) {
-                Text(
-                    text = "Tentukan bulan transaksi yang ingin di-ekspor atau di-cetak sebagai laporan keuangan. Anda bisa memilih satu, beberapa, atau semua bulan sekaligus.",
-                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 12.sp, lineHeight = 18.sp),
-                    color = GhostWhite.copy(alpha = 0.55f)
-                )
-
-                // Month Selector Toggles
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    PremiumButton(
-                        text = "Pilih Semua",
-                        onClick = { onSelectedMonthsChanged(availableMonths.toSet()) },
-                        isActive = true,
-                        fillMaxWidth = false,
-                        testTag = "select_all_months",
-                        horizontalPadding = 12.dp,
-                        verticalPadding = 6.dp
-                    )
-
-                    PremiumButton(
-                        text = "Kosongkan",
-                        onClick = { onSelectedMonthsChanged(emptySet()) },
-                        isActive = false,
-                        fillMaxWidth = false,
-                        testTag = "clear_all_months",
-                        horizontalPadding = 12.dp,
-                        verticalPadding = 6.dp
-                    )
-                }
-
-                // Render Selectable Months
-                val chunkedMonths = availableMonths.chunked(if (isWideScreen) 3 else 2)
                 Column(
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
                 ) {
-                    chunkedMonths.forEach { rowMonths ->
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            rowMonths.forEach { month ->
-                                MonthSelectChip(
-                                    month = month,
-                                    isSelected = selectedMonths.contains(month),
-                                    onClick = {
-                                        val updated = if (selectedMonths.contains(month)) {
-                                            selectedMonths - month
-                                        } else {
-                                            selectedMonths + month
-                                        }
-                                        onSelectedMonthsChanged(updated)
-                                    },
-                                    modifier = Modifier.weight(1f)
-                                )
-                            }
-                            val emptySpaces = (if (isWideScreen) 3 else 2) - rowMonths.size
-                            if (emptySpaces > 0) {
-                                repeat(emptySpaces) {
-                                    Spacer(modifier = Modifier.weight(1f))
-                                }
-                            }
-                        }
-                    }
-                }
-            } else {
-                // Collapsed state month summary indicator
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { onIsMonthsExpandedChanged(true) }
-                        .background(GhostWhite.copy(alpha = 0.03f), shape = RoundedCornerShape(12.dp))
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    val formatter = remember { DateTimeFormatter.ofPattern("MMM yyyy", Locale("id", "ID")) }
-                    val displaySelectedStr = if (selectedMonths.isEmpty()) {
-                        "Tidak ada bulan terpilih"
-                    } else {
-                        selectedMonths.sorted().joinToString(", ") { it.format(formatter) }
-                    }
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "Periode terpilih (${selectedMonths.size} bulan):",
-                            style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold),
-                            color = SteelBlue
-                        )
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = displaySelectedStr,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = GhostWhite.copy(alpha = 0.7f)
-                        )
-                    }
-
                     Text(
-                        text = "Ubah",
-                        style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold),
-                        color = SteelBlue
+                        text = "Periode terpilih (${selectedMonths.size} bulan)",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = InkMuted
+                    )
+                    Text(
+                        text = displaySelectedStr,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Ink
                     )
                 }
-            }
 
-            HorizontalDivider(color = GhostWhite.copy(alpha = 0.08f))
-
-            // Buttons Layout (PDF Wide, CSV side-by-side)
-            PremiumButton(
-                text = "UNDUH LAPORAN PDF",
-                onClick = { onExportPdfFile(selectedMonths.toList()) },
-                isActive = selectedMonths.isNotEmpty(),
-                enabled = selectedMonths.isNotEmpty(),
-                icon = Icons.Default.PictureAsPdf,
-                testTag = "export_pdf_button",
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            Spacer(modifier = Modifier.height(2.dp))
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                PremiumButton(
-                    text = "Ekspor Excel",
-                    onClick = { onExportCsvFile(selectedMonths.toList()) },
-                    isActive = selectedMonths.isNotEmpty(),
-                    enabled = selectedMonths.isNotEmpty(),
-                    icon = Icons.Default.Assessment,
-                    testTag = "export_csv_button",
-                    modifier = Modifier.weight(1f),
-                    horizontalPadding = 12.dp,
-                    verticalPadding = 10.dp
-                )
-
-                PremiumButton(
-                    text = "Impor Excel",
-                    onClick = onImportCsvFile,
-                    isActive = true,
-                    icon = Icons.Default.Download,
-                    testTag = "import_csv_button",
-                    modifier = Modifier.weight(1f),
-                    horizontalPadding = 12.dp,
-                    verticalPadding = 10.dp
+                Icon(
+                    imageVector = Icons.Default.KeyboardArrowDown,
+                    contentDescription = null,
+                    tint = InkMuted,
+                    modifier = Modifier.size(18.dp)
                 )
             }
         }
-    }
 
-    // Kartu ini memakai bentuk, warna, dan padding yang sama dengan kartu lain di
-    // tab Simpan (Sinkronisasi, Cadangan Drive, Keamanan, Sampah).
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(CornerRadius.card),
-        colors = CardDefaults.cardColors(containerColor = TranslucentForm.copy(alpha = 0.65f)),
-        border = BorderStroke(
-            width = 1.dp,
-            brush = Brush.verticalGradient(
-                colors = listOf(GhostWhite.copy(alpha = 0.15f), GhostWhite.copy(alpha = 0.02f))
-            )
+        HairlineDivider()
+
+        EditorialButton(
+            text = "Unduh laporan PDF",
+            onClick = { onExportPdfFile(selectedMonths.toList()) },
+            modifier = Modifier.fillMaxWidth(),
+            enabled = selectedMonths.isNotEmpty(),
+            expanded = true,
+            testTag = "export_pdf_button"
         )
-    ) {
-        content()
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
+        ) {
+            EditorialButton(
+                text = "Ekspor Excel",
+                onClick = { onExportCsvFile(selectedMonths.toList()) },
+                modifier = Modifier.weight(1f),
+                style = EditorialButtonStyle.Ghost,
+                trailingArrow = false,
+                enabled = selectedMonths.isNotEmpty(),
+                testTag = "export_csv_button"
+            )
+            EditorialButton(
+                text = "Impor Excel",
+                onClick = onImportCsvFile,
+                modifier = Modifier.weight(1f),
+                style = EditorialButtonStyle.Ghost,
+                trailingArrow = false,
+                testTag = "import_csv_button"
+            )
+        }
     }
 }
 
@@ -334,81 +310,57 @@ fun ImportCsvConfirmDialog(
     onReplace: () -> Unit,
     onDismiss: () -> Unit
 ) {
-    Dialog(onDismissRequest = onDismiss) {
-        Card(
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
-            shape = RoundedCornerShape(24.dp),
-            colors = CardDefaults.cardColors(containerColor = MidnightAbyss),
-            border = BorderStroke(
-                width = 1.dp,
-                brush = Brush.verticalGradient(
-                    colors = listOf(
-                        GhostWhite.copy(alpha = 0.2f),
-                        GhostWhite.copy(alpha = 0.02f)
-                    )
-                )
-            ),
-            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
-        ) {
-            Box(modifier = Modifier.background(TranslucentGlass)) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(24.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Text(
-                        text = "Impor Data Excel/CSV",
-                        color = GhostWhite,
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = "$rowCount baris siap diimpor. Saat ini ada $activeCount transaksi aktif.",
-                        color = GhostWhite.copy(alpha = 0.8f),
-                        style = MaterialTheme.typography.bodyMedium,
-                        lineHeight = 20.sp
-                    )
-                    Text(
-                        text = "Gabung (aman): $rowCount baris ditambahkan ke data yang ada. Data lama tidak diubah.",
-                        color = GhostWhite.copy(alpha = 0.7f),
-                        style = MaterialTheme.typography.bodySmall,
-                        lineHeight = 18.sp
-                    )
-                    Text(
-                        text = "Ganti semua: $activeCount transaksi aktif dipindah ke Sampah (masih bisa dipulihkan), lalu $rowCount baris dari file dimasukkan.",
-                        color = GhostWhite.copy(alpha = 0.7f),
-                        style = MaterialTheme.typography.bodySmall,
-                        lineHeight = 18.sp
-                    )
+    EditorialDialog(onDismissRequest = onDismiss) {
+        EditorialDialogCard(title = "Impor data Excel/CSV") {
+            Text(
+                text = "$rowCount baris siap diimpor. Saat ini ada $activeCount transaksi aktif.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = Ink
+            )
+            Text(
+                text = "Gabung (aman): $rowCount baris ditambahkan ke data yang ada. Data lama tidak diubah.",
+                style = MaterialTheme.typography.bodySmall,
+                color = InkMuted,
+                lineHeight = 18.sp
+            )
+            Text(
+                text = "Ganti semua: $activeCount transaksi aktif dipindah ke Sampah (masih bisa dipulihkan), lalu $rowCount baris dari file dimasukkan.",
+                style = MaterialTheme.typography.bodySmall,
+                color = InkMuted,
+                lineHeight = 18.sp
+            )
 
-                    Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(Spacing.xs))
 
-                    PremiumButton(
-                        text = "Gabung (Aman)",
-                        onClick = onMerge,
-                        isActive = true,
-                        modifier = Modifier.fillMaxWidth(),
-                        testTag = "import_confirm_merge"
-                    )
-                    PremiumButton(
-                        text = "Ganti Semua",
-                        onClick = onReplace,
-                        // Aksi paling berisiko di dialog ini: ditandai merah
-                        // lewat isDestructive, bukan gradien manual lagi.
-                        isDestructive = true,
-                        modifier = Modifier.fillMaxWidth(),
-                        testTag = "import_confirm_replace"
-                    )
-                    PremiumButton(
-                        text = "Batal",
-                        onClick = onDismiss,
-                        isActive = false,
-                        modifier = Modifier.fillMaxWidth(),
-                        testTag = "import_confirm_cancel"
-                    )
-                }
-            }
+            EditorialButton(
+                text = "Gabung (aman)",
+                onClick = onMerge,
+                modifier = Modifier.fillMaxWidth(),
+                trailingArrow = false,
+                expanded = true,
+                testTag = "import_confirm_merge"
+            )
+            EditorialButton(
+                text = "Ganti semua",
+                onClick = onReplace,
+                modifier = Modifier.fillMaxWidth(),
+                style = EditorialButtonStyle.Ghost,
+                // Aksi paling berisiko di dialog ini: aksen jingga.
+                accent = BurntOrange,
+                trailingArrow = false,
+                expanded = true,
+                testTag = "import_confirm_replace"
+            )
+            EditorialButton(
+                text = "Batal",
+                onClick = onDismiss,
+                modifier = Modifier.fillMaxWidth(),
+                style = EditorialButtonStyle.Ghost,
+                trailingArrow = false,
+                accent = InkMuted,
+                expanded = true,
+                testTag = "import_confirm_cancel"
+            )
         }
     }
 }

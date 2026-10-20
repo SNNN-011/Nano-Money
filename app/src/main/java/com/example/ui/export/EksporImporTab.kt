@@ -1,118 +1,39 @@
 package com.example.ui.export
 
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import android.content.Context
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Assessment
-import androidx.compose.material.icons.filled.PictureAsPdf
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.RadioButtonUnchecked
-import androidx.compose.material.icons.filled.Download
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Info
-import com.example.util.BackupHelper
-import com.example.data.FinancialRecord
-import com.example.util.BackupScheduler
-import com.example.util.GoogleDriveHelper
-import com.google.android.gms.auth.api.signin.GoogleSignIn
-import com.google.android.gms.common.api.ApiException
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.material.icons.filled.Cloud
-import androidx.compose.material.icons.filled.CloudDone
-import androidx.compose.material.icons.filled.CloudDownload
-import androidx.compose.material.icons.filled.CloudUpload
-import androidx.compose.material.icons.filled.CloudOff
-import androidx.compose.material.icons.filled.Sync
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.LockOpen
-import androidx.compose.material.icons.filled.LockReset
-import androidx.compose.animation.AnimatedVisibility
-import java.io.File
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import androidx.compose.material3.*
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.draw.clip
-import androidx.compose.foundation.clickable
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.style.TextAlign
-import android.widget.Toast
+import com.example.data.FinancialRecord
+import com.example.ui.components.EditorialButton
+import com.example.ui.components.EditorialButtonStyle
+import com.example.ui.components.EditorialToggleRow
+import com.example.ui.components.Eyebrow
+import com.example.ui.components.HairlineDivider
 import com.example.ui.theme.*
+import com.example.util.GoogleDriveHelper
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.common.api.ApiException
+import kotlinx.coroutines.launch
 import java.time.YearMonth
-import java.time.format.DateTimeFormatter
-import java.util.Locale
 
-@Composable
-fun MonthSelectChip(
-    month: YearMonth,
-    isSelected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val formatter = remember { DateTimeFormatter.ofPattern("MMMM yyyy", Locale("id", "ID")) }
-    val formattedName = remember(month) { month.format(formatter) }
-
-    Card(
-        modifier = modifier
-            .clip(RoundedCornerShape(CornerRadius.md))
-            .clickable { onClick() }
-            .testTag("month_chip_${month.year}_${month.monthValue}"),
-        shape = RoundedCornerShape(CornerRadius.md),
-        colors = CardDefaults.cardColors(
-            containerColor = if (isSelected) SteelBlue.copy(alpha = 0.25f) else TranslucentGlass
-        ),
-        border = BorderStroke(
-            width = 1.dp,
-            brush = Brush.verticalGradient(
-                colors = if (isSelected) {
-                    listOf(SteelBlue.copy(alpha = 0.6f), SteelBlue.copy(alpha = 0.2f))
-                } else {
-                    listOf(GhostWhite.copy(alpha = 0.15f), GhostWhite.copy(alpha = 0.02f))
-                }
-            )
-        )
-    ) {
-        Row(
-            modifier = Modifier
-                .padding(horizontal = 12.dp, vertical = 10.dp)
-                .fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Text(
-                text = formattedName,
-                color = if (isSelected) GhostWhite else GhostWhite.copy(alpha = 0.7f),
-                fontSize = 12.sp,
-                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                modifier = Modifier.weight(1f)
-            )
-            Icon(
-                imageVector = if (isSelected) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
-                contentDescription = if (isSelected) "Dipilih" else "Tidak dipilih",
-                tint = if (isSelected) SteelBlue else GhostWhite.copy(alpha = 0.3f),
-                modifier = Modifier.size(16.dp)
-            )
-        }
-    }
-}
-
+/**
+ * Tab Simpan: ekspor/impor, sinkronisasi cloud, cadangan Drive, PIN, dan Sampah.
+ *
+ * Semua bagian memakai permukaan datar dengan pemisah garis rambut, sama seperti
+ * tab Tambah. Tidak ada kartu bersarang: satu bagian = satu label mono + judul
+ * serif + isinya.
+ */
 @Composable
 fun EksporImporTabContent(
     isWideScreen: Boolean,
@@ -147,6 +68,12 @@ fun EksporImporTabContent(
     var driveBackupList by remember { mutableStateOf<List<GoogleDriveHelper.DriveBackupFile>>(emptyList()) }
     var selectedDriveBackupToRestore by remember { mutableStateOf<GoogleDriveHelper.DriveBackupFile?>(null) }
     var driveErrorDetailMessage by remember { mutableStateOf<String?>(null) }
+
+    // State PIN
+    var showPinDialog by remember { mutableStateOf(false) }
+    // H4a: mematikan PIN wajib verifikasi PIN lama dulu
+    var showDisablePinDialog by remember { mutableStateOf(false) }
+    var pinEnabled by remember { mutableStateOf(com.example.util.PinUtils.isPinEnabled(context)) }
 
     // Google SignIn Launcher
     val googleSignInLauncher = rememberLauncherForActivityResult(
@@ -207,263 +134,168 @@ fun EksporImporTabContent(
         }
     }
 
-    // BODY LAYOUT
-    val contentBody = @Composable {
-        // Jarak antar bagian HANYA dari arrangement ini. Sebelumnya ada Spacer
-        // manual 10.dp di antara kartu, sehingga jaraknya jadi 24+10 = 34.dp dan
-        // tidak seragam dengan bagian lain.
+    MaterialTheme(typography = EditorialTypography) {
+        // Kerangka gulir sama dengan tab Tambah: kolom luar yang menggeser,
+        // kolom dalam 560 dp supaya baris teks tidak melebar di layar besar.
         Column(
-            modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(Spacing.xl)
+            modifier = modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState()),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Header Description
-            Column {
-                Text(
-                    text = "Laporan & Ekspor Data",
-                    style = MaterialTheme.typography.titleLarge.copy(
-                        fontWeight = FontWeight.ExtraBold,
-                        fontSize = 24.sp,
-                        letterSpacing = (-0.5).sp
-                    ),
-                    color = GhostWhite
-                )
-                Spacer(modifier = Modifier.height(6.dp))
-                Text(
-                    text = "Ekspor laporan keuangan resmi ke berkas PDF atau ekspor data mentah transaksi Anda ke lembar kerja Excel (.csv) sesuai bulan yang dipilih.",
-                    style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 20.sp),
-                    color = GhostWhite.copy(alpha = 0.5f)
-                )
-            }
-
-            // Ekspor & Impor berdiri sebagai kartu sendiri dan diletakkan paling
-            // atas: tab ini dibuka untuk mengunduh laporan. Sinkronisasi realtime
-            // dan cadangan Google Drive menyusul di bawahnya.
-            UnifiedExportCard(
-                isWideScreen = isWideScreen,
-                availableMonths = availableMonths,
-                selectedMonths = selectedMonths,
-                onSelectedMonthsChanged = { selectedMonths = it },
-                isMonthsExpanded = isMonthsExpanded,
-                onIsMonthsExpandedChanged = { isMonthsExpanded = it },
-                onExportPdfFile = onExportPdfFile,
-                onExportCsvFile = onExportCsvFile,
-                onImportCsvFile = onImportCsvFile
-            )
-
-            DatabaseBackupSection(
-                isAutoBackupEnabled = isAutoBackupEnabled,
-                onAutoBackupEnabledChanged = { enabled ->
-                    isAutoBackupEnabled = enabled
-                    securityPrefs.edit().putBoolean("auto_backup_enabled", enabled).commit()
-                },
-                autoBackupInterval = autoBackupInterval,
-                onAutoBackupIntervalChanged = { interval ->
-                    autoBackupInterval = interval
-                    securityPrefs.edit().putString("auto_backup_interval", interval).commit()
-                },
-                autoBackupHour = autoBackupHour,
-                onAutoBackupHourChanged = { hour ->
-                    autoBackupHour = hour
-                    securityPrefs.edit().putInt("auto_backup_hour", hour).commit()
-                },
-                autoBackupMinute = autoBackupMinute,
-                onAutoBackupMinuteChanged = { minute ->
-                    autoBackupMinute = minute
-                    securityPrefs.edit().putInt("auto_backup_minute", minute).commit()
-                },
-                autoBackupDayOfWeek = autoBackupDayOfWeek,
-                onAutoBackupDayOfWeekChanged = { dayOfWeek ->
-                    autoBackupDayOfWeek = dayOfWeek
-                    securityPrefs.edit().putInt("auto_backup_day_of_week", dayOfWeek).commit()
-                },
-                connectedGoogleAccount = connectedGoogleAccount,
-                onConnectedGoogleAccountChanged = { connectedGoogleAccount = it },
-                isDriveProcessing = isDriveProcessing,
-                onIsDriveProcessingChanged = { isDriveProcessing = it },
-                driveBackupList = driveBackupList,
-                onDriveBackupListChanged = { driveBackupList = it },
-                selectedDriveBackupToRestore = selectedDriveBackupToRestore,
-                onSelectedDriveBackupToRestoreChange = { selectedDriveBackupToRestore = it },
-                driveErrorDetailMessage = driveErrorDetailMessage,
-                onDriveErrorDetailMessageChange = { driveErrorDetailMessage = it },
-                onConnectGoogleDrive = {
-                    val client = GoogleDriveHelper.getGoogleSignInClient(context)
-                    googleSignInLauncher.launch(client.signInIntent)
-                }
-            )
-
-            // Keamanan (PIN) di atas Sampah: pengaturan ini lebih sering dibuka
-            // daripada memulihkan transaksi yang terlanjung dihapus.
-            // DIALOGS & OVERLAYS
-            var showPinDialog by remember { mutableStateOf(false) }
-            // H4a: mematikan PIN wajib verifikasi PIN lama dulu
-            var showDisablePinDialog by remember { mutableStateOf(false) }
-            var pinEnabled by remember { mutableStateOf(com.example.util.PinUtils.isPinEnabled(context)) }
-
-            Card(
-                modifier = Modifier.fillMaxWidth().testTag("security_card"),
-                shape = RoundedCornerShape(CornerRadius.card),
-                colors = CardDefaults.cardColors(containerColor = TranslucentForm.copy(alpha = 0.65f)),
-                border = BorderStroke(
-                    width = 1.dp,
-                    brush = Brush.verticalGradient(
-                        colors = listOf(GhostWhite.copy(alpha = 0.15f), GhostWhite.copy(alpha = 0.02f))
-                    )
-                )
+            Column(
+                modifier = Modifier
+                    .widthIn(max = 560.dp)
+                    .fillMaxWidth()
+                    .padding(horizontal = if (isWideScreen) Spacing.xl else Spacing.lg)
+                    .padding(top = Spacing.lg),
+                verticalArrangement = Arrangement.spacedBy(Spacing.lg)
             ) {
+                Eyebrow(text = "Simpan")
+
+                Text(
+                    text = "Laporan & ekspor data",
+                    style = MaterialTheme.typography.displaySmall,
+                    color = Ink
+                )
+                Text(
+                    text = "Ekspor laporan ke PDF atau Excel, cadangkan seluruh data ke Google Drive, dan atur keamanan aplikasi.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = InkMuted,
+                    lineHeight = 20.sp
+                )
+
+                HairlineDivider()
+
+                UnifiedExportCard(
+                    isWideScreen = isWideScreen,
+                    availableMonths = availableMonths,
+                    selectedMonths = selectedMonths,
+                    onSelectedMonthsChanged = { selectedMonths = it },
+                    isMonthsExpanded = isMonthsExpanded,
+                    onIsMonthsExpandedChanged = { isMonthsExpanded = it },
+                    onExportPdfFile = onExportPdfFile,
+                    onExportCsvFile = onExportCsvFile,
+                    onImportCsvFile = onImportCsvFile
+                )
+
+                HairlineDivider()
+
+                DatabaseBackupSection(
+                    isAutoBackupEnabled = isAutoBackupEnabled,
+                    onAutoBackupEnabledChanged = { enabled ->
+                        isAutoBackupEnabled = enabled
+                        securityPrefs.edit().putBoolean("auto_backup_enabled", enabled).commit()
+                    },
+                    autoBackupInterval = autoBackupInterval,
+                    onAutoBackupIntervalChanged = { interval ->
+                        autoBackupInterval = interval
+                        securityPrefs.edit().putString("auto_backup_interval", interval).commit()
+                    },
+                    autoBackupHour = autoBackupHour,
+                    onAutoBackupHourChanged = { hour ->
+                        autoBackupHour = hour
+                        securityPrefs.edit().putInt("auto_backup_hour", hour).commit()
+                    },
+                    autoBackupMinute = autoBackupMinute,
+                    onAutoBackupMinuteChanged = { minute ->
+                        autoBackupMinute = minute
+                        securityPrefs.edit().putInt("auto_backup_minute", minute).commit()
+                    },
+                    autoBackupDayOfWeek = autoBackupDayOfWeek,
+                    onAutoBackupDayOfWeekChanged = { dayOfWeek ->
+                        autoBackupDayOfWeek = dayOfWeek
+                        securityPrefs.edit().putInt("auto_backup_day_of_week", dayOfWeek).commit()
+                    },
+                    connectedGoogleAccount = connectedGoogleAccount,
+                    onConnectedGoogleAccountChanged = { connectedGoogleAccount = it },
+                    isDriveProcessing = isDriveProcessing,
+                    onIsDriveProcessingChanged = { isDriveProcessing = it },
+                    driveBackupList = driveBackupList,
+                    onDriveBackupListChanged = { driveBackupList = it },
+                    selectedDriveBackupToRestore = selectedDriveBackupToRestore,
+                    onSelectedDriveBackupToRestoreChange = { selectedDriveBackupToRestore = it },
+                    driveErrorDetailMessage = driveErrorDetailMessage,
+                    onDriveErrorDetailMessageChange = { driveErrorDetailMessage = it },
+                    onConnectGoogleDrive = {
+                        val client = GoogleDriveHelper.getGoogleSignInClient(context)
+                        googleSignInLauncher.launch(client.signInIntent)
+                    }
+                )
+
+                HairlineDivider()
+
+                // Keamanan (PIN) di atas Sampah: pengaturan ini lebih sering dibuka
+                // daripada memulihkan transaksi yang terlanjur dihapus.
                 Column(
-                    modifier = Modifier.padding(Spacing.card),
-                    verticalArrangement = Arrangement.spacedBy(Spacing.md)
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.sm)
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
-                            modifier = Modifier
-                                .width(3.dp)
-                                .height(20.dp)
-                                .background(
-                                    brush = Brush.verticalGradient(
-                                        colors = listOf(SteelBlue, SteelBlue.copy(alpha = 0.4f))
-                                    ),
-                                    shape = RoundedCornerShape(2.dp)
-                                )
-                        )
-                        Spacer(modifier = Modifier.width(10.dp))
-                        Text(
-                            text = "Keamanan",
-                            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                            color = GhostWhite
-                        )
-                    }
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(
-                            text = if (pinEnabled) "PIN Aktif" else "PIN Belum Diaktifkan",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = if (pinEnabled) NeonGreen else GhostWhite.copy(alpha = 0.6f)
-                        )
-                        Switch(
-                            checked = pinEnabled,
-                            onCheckedChange = { enabled ->
-                                if (enabled) {
-                                    showPinDialog = true
-                                } else {
-                                    // H4a: jangan matikan langsung — minta verifikasi PIN lama
-                                    showDisablePinDialog = true
-                                }
-                            },
-                            colors = SwitchDefaults.colors(
-                                checkedThumbColor = GhostWhite,
-                                checkedTrackColor = SteelBlue,
-                                uncheckedThumbColor = GhostWhite.copy(alpha = 0.4f),
-                                uncheckedTrackColor = GhostWhite.copy(alpha = 0.1f)
-                            ),
-                            modifier = Modifier.testTag("pin_switch")
-                        )
-                    }
-
+                    Eyebrow(text = "Keamanan")
                     Text(
-                        text = "Kunci aplikasi dengan PIN untuk melindungi data Anda.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = GhostWhite.copy(alpha = 0.7f)
+                        text = "PIN aplikasi",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontFamily = SerifFamily,
+                        color = Ink
                     )
-
-                    // Ubah PIN hanya muncul kalau PIN sudah aktif.
-                    AnimatedVisibility(visible = pinEnabled) {
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(CornerRadius.md))
-                                .background(
-                                    brush = Brush.verticalGradient(
-                                        colors = listOf(
-                                            GhostWhite.copy(alpha = 0.06f),
-                                            GhostWhite.copy(alpha = 0.02f)
-                                        )
-                                    )
-                                )
-                                .border(
-                                    width = 1.dp,
-                                    brush = Brush.verticalGradient(
-                                        colors = listOf(
-                                            GhostWhite.copy(alpha = 0.12f),
-                                            GhostWhite.copy(alpha = 0.03f)
-                                        )
-                                    ),
-                                    shape = RoundedCornerShape(CornerRadius.md)
-                                )
-                                .clickable { showPinDialog = true }
-                                .padding(horizontal = 16.dp, vertical = 12.dp)
-                        ) {
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Icon(
-                                    imageVector = Icons.Default.LockReset,
-                                    contentDescription = null,
-                                    tint = SteelBlue,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                Spacer(modifier = Modifier.width(10.dp))
-                                Text(
-                                    text = "Ubah PIN",
-                                    color = GhostWhite.copy(alpha = 0.8f),
-                                    style = MaterialTheme.typography.bodyMedium
-                                )
+                    EditorialToggleRow(
+                        title = if (pinEnabled) "PIN aktif" else "PIN belum diaktifkan",
+                        subtitle = "Kunci aplikasi dengan PIN untuk melindungi data Anda.",
+                        checked = pinEnabled,
+                        onCheckedChange = { enabled ->
+                            if (enabled) {
+                                showPinDialog = true
+                            } else {
+                                // H4a: jangan matikan langsung — minta verifikasi PIN lama
+                                showDisablePinDialog = true
                             }
-                        }
+                        },
+                        testTag = "pin_switch"
+                    )
+                    if (pinEnabled) {
+                        EditorialButton(
+                            text = "Ubah PIN",
+                            onClick = { showPinDialog = true },
+                            modifier = Modifier.fillMaxWidth(),
+                            style = EditorialButtonStyle.Ghost,
+                            trailingArrow = false
+                        )
                     }
                 }
-            }
 
-            if (showPinDialog) {
-                com.example.ui.common.PinSetupDialog(
-                    onDismiss = { showPinDialog = false },
-                    onPinSet = {
-                        showPinDialog = false
-                        pinEnabled = com.example.util.PinUtils.isPinEnabled(context)
-                    }
+                if (showPinDialog) {
+                    com.example.ui.common.PinSetupDialog(
+                        onDismiss = { showPinDialog = false },
+                        onPinSet = {
+                            showPinDialog = false
+                            pinEnabled = com.example.util.PinUtils.isPinEnabled(context)
+                        }
+                    )
+                }
+
+                // H4a: konfirmasi nonaktifkan PIN (verifikasi PIN lama di dalam dialog)
+                if (showDisablePinDialog) {
+                    com.example.ui.common.PinDisableDialog(
+                        onDismiss = { showDisablePinDialog = false },
+                        onPinDisabled = {
+                            showDisablePinDialog = false
+                            pinEnabled = false
+                        }
+                    )
+                }
+
+                HairlineDivider()
+
+                // Sampah: transaksi yang dihapus masih bisa dipulihkan.
+                TrashSection(
+                    deletedRecords = deletedRecords,
+                    onRestore = onRestoreRecord,
+                    onRestoreAll = onRestoreAllRecords,
+                    onEmptyTrash = onEmptyTrash
                 )
+
+                Spacer(modifier = Modifier.height(Spacing.xxxl))
             }
-
-            // H4a: konfirmasi nonaktifkan PIN (verifikasi PIN lama di dalam dialog)
-            if (showDisablePinDialog) {
-                com.example.ui.common.PinDisableDialog(
-                    onDismiss = { showDisablePinDialog = false },
-                    onPinDisabled = {
-                        showDisablePinDialog = false
-                        pinEnabled = false
-                    }
-                )
-            }
-
-            // Sampah: transaksi yang dihapus masih bisa dipulihkan.
-            TrashSection(
-                deletedRecords = deletedRecords,
-                onRestore = onRestoreRecord,
-                onRestoreAll = onRestoreAllRecords,
-                onEmptyTrash = onEmptyTrash
-            )
-
-            // DIALOGS & OVERLAYS
-
-            Spacer(modifier = Modifier.height(48.dp))
-        }
-    }
-
-    // MAIN SCROLL WRAPPER
-    Box(
-        modifier = modifier.fillMaxSize(),
-        contentAlignment = Alignment.TopCenter
-    ) {
-        Column(
-            modifier = Modifier
-                .widthIn(max = if (isWideScreen) 840.dp else Float.MAX_VALUE.dp)
-                .verticalScroll(rememberScrollState())
-                .padding(if (isWideScreen) 24.dp else 18.dp),
-            verticalArrangement = Arrangement.spacedBy(20.dp)
-        ) {
-            contentBody()
         }
     }
 }

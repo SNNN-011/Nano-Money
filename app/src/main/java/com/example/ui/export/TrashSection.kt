@@ -29,6 +29,9 @@ import com.example.data.FinancialRecord
 import com.example.ui.components.EditorialButton
 import com.example.ui.components.EditorialButtonStyle
 import com.example.ui.components.EditorialDialog
+import com.example.ui.components.Eyebrow
+import com.example.ui.components.HairlineDivider
+import com.example.ui.components.Tag
 import com.example.ui.config.FormatUtils
 import com.example.ui.theme.*
 import java.util.Locale
@@ -249,64 +252,32 @@ fun TrashSection(
     var showRestoreAllConfirm by remember { mutableStateOf(false) }
     
 
-    Card(
+    Column(
         modifier = modifier
             .fillMaxWidth()
             .testTag("trash_card"),
-        shape = RoundedCornerShape(CornerRadius.card),
-        colors = CardDefaults.cardColors(containerColor = TranslucentForm.copy(alpha = 0.65f)),
-        border = BorderStroke(
-            width = 1.dp,
-            brush = Brush.verticalGradient(
-                colors = listOf(GhostWhite.copy(alpha = 0.15f), GhostWhite.copy(alpha = 0.02f))
-            )
-        )
+        verticalArrangement = Arrangement.spacedBy(Spacing.md)
     ) {
         Column(
-            modifier = Modifier.padding(Spacing.card),
-            verticalArrangement = Arrangement.spacedBy(Spacing.md)
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(Spacing.xs)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Box(
-                    modifier = Modifier
-                        .width(3.dp)
-                        .height(20.dp)
-                        .background(
-                            brush = Brush.verticalGradient(
-                                colors = listOf(NeonRed, NeonRed.copy(alpha = 0.4f))
-                            ),
-                            shape = RoundedCornerShape(2.dp)
-                        )
-                )
-                Spacer(modifier = Modifier.width(10.dp))
-                Text(
-                    text = "Sampah",
-                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
-                    color = GhostWhite
-                )
+                Eyebrow(text = "Pemulihan")
                 if (deletedRecords.isNotEmpty()) {
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(NeonRed.copy(alpha = 0.2f))
-                            .padding(horizontal = 8.dp, vertical = 2.dp)
-                    ) {
-                        Text(
-                            text = "${deletedRecords.size}",
-                            style = MaterialTheme.typography.labelSmall.copy(
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 10.sp
-                            ),
-                            color = NeonRed.copy(alpha = 0.9f)
-                        )
-                    }
+                    Spacer(modifier = Modifier.width(Spacing.sm))
+                    Tag(text = "${deletedRecords.size}", color = BurntOrange, borderColor = BurntOrange.copy(alpha = 0.4f))
                 }
             }
-
+            Text(
+                text = "Sampah",
+                style = MaterialTheme.typography.titleLarge,
+                fontFamily = SerifFamily,
+                color = Ink
+            )
             Text(
                 text = if (deletedRecords.isEmpty()) {
                     "Transaksi yang dihapus akan tersimpan di sini dan bisa dipulihkan."
@@ -314,93 +285,57 @@ fun TrashSection(
                     "Transaksi yang sudah dihapus belum hilang permanen. Pilih untuk mengembalikannya."
                 },
                 style = MaterialTheme.typography.bodySmall,
-                color = GhostWhite.copy(alpha = 0.7f)
+                color = InkMuted
             )
+        }
 
             if (deletedRecords.isEmpty()) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 24.dp),
+                        .padding(vertical = Spacing.lg),
                     contentAlignment = Alignment.Center
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         Icon(
                             imageVector = Icons.Outlined.DeleteOutline,
                             contentDescription = null,
-                            tint = GhostWhite.copy(alpha = 0.18f),
-                            modifier = Modifier.size(36.dp)
+                            tint = HairlineStrong,
+                            modifier = Modifier.size(32.dp)
                         )
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(Spacing.sm))
                         Text(
                             text = "Sampah kosong",
                             style = MaterialTheme.typography.bodySmall,
-                            color = GhostWhite.copy(alpha = 0.3f)
+                            color = InkMuted
                         )
                     }
                 }
             } else {
-                // Dua tombol ini selalu bertumpuk. PremiumButton memakai maxLines = 1
-                // tanpa overflow, jadi teks panjang seperti "PULIHKAN SEMUA" terpotong
-                // di layar sempit. OutlinedButton membolehkan teks wrap ke dua baris.
+                // Dua tombol ini selalu bertumpuk selebar baris, sama seperti
+                // aksi lain di tab Simpan.
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    OutlinedButton(
+                    EditorialButton(
+                        text = "Pulihkan semua",
                         onClick = { showRestoreAllConfirm = true },
-                        modifier = Modifier
-                            .weight(1f)
-                            .heightIn(min = 44.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        border = BorderStroke(1.dp, SteelBlue.copy(alpha = 0.7f)),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = SteelBlue),
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Restore,
-                            contentDescription = null,
-                            modifier = Modifier.size(15.dp)
-                        )
-                        Spacer(modifier = Modifier.width(5.dp))
-                        Text(
-                            text = "Pulihkan Semua",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            lineHeight = 13.sp,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-
-                    OutlinedButton(
+                        modifier = Modifier.weight(1f),
+                        style = EditorialButtonStyle.Ghost,
+                        trailingArrow = false
+                    )
+                    EditorialButton(
+                        text = "Kosongkan",
                         onClick = { showEmptyConfirm = true },
-                        modifier = Modifier
-                            .weight(1f)
-                            .heightIn(min = 44.dp),
-                        shape = RoundedCornerShape(12.dp),
-                        border = BorderStroke(1.dp, NeonRed.copy(alpha = 0.5f)),
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = NeonRed.copy(alpha = 0.85f)),
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.DeleteForever,
-                            contentDescription = null,
-                            modifier = Modifier.size(15.dp)
-                        )
-                        Spacer(modifier = Modifier.width(5.dp))
-                        Text(
-                            text = "Kosongkan",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            lineHeight = 13.sp,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
+                        modifier = Modifier.weight(1f),
+                        style = EditorialButtonStyle.Ghost,
+                        accent = BurntOrange,
+                        trailingArrow = false
+                    )
                 }
 
-                HorizontalDivider(color = GhostWhite.copy(alpha = 0.08f))
+                HairlineDivider()
 
                 // Batasi tinggi supaya tidak memakan seluruh tab; daftar tetap bisa di-scroll.
                 LazyColumn(
@@ -416,7 +351,6 @@ fun TrashSection(
                     }
                 }
             }
-        }
     }
 
     if (showEmptyConfirm) {
@@ -452,17 +386,14 @@ private fun TrashItem(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 4.dp)
-            .background(GhostWhite.copy(alpha = 0.03f), shape = RoundedCornerShape(10.dp))
-            .border(1.dp, GhostWhite.copy(alpha = 0.06f), shape = RoundedCornerShape(10.dp))
-            .padding(horizontal = 12.dp, vertical = 10.dp),
+            .padding(vertical = Spacing.sm),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = formatted,
-                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Bold, fontSize = 13.sp),
-                color = GhostWhite.copy(alpha = 0.75f),
+                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold, fontSize = 13.sp),
+                color = Ink,
                 maxLines = 1
             )
             Spacer(modifier = Modifier.height(2.dp))
@@ -471,36 +402,36 @@ private fun TrashItem(
             ) {
                 Text(
                     text = if (isIncome) "+" else "-",
-                    style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold, fontSize = 12.sp),
-                    color = if (isIncome) NeonGreen.copy(alpha = 0.7f) else NeonRed.copy(alpha = 0.7f)
+                    style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold, fontSize = 12.sp),
+                    color = if (isIncome) ForestGreen else BurntOrange
                 )
                 Text(
                     text = FormatUtils.formatRupiah(record.amount),
-                    style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Bold, fontSize = 12.sp),
-                    color = if (isIncome) NeonGreen.copy(alpha = 0.7f) else NeonRed.copy(alpha = 0.7f)
+                    style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold, fontSize = 12.sp),
+                    color = if (isIncome) ForestGreen else BurntOrange
                 )
             }
         }
 
         TextButton(
             onClick = onRestore,
-            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+            contentPadding = PaddingValues(horizontal = Spacing.sm, vertical = Spacing.xs),
             modifier = Modifier.testTag("restore_record_button_${record.id}")
         ) {
             Icon(
                 imageVector = Icons.Default.Restore,
                 contentDescription = null,
-                tint = SteelBlue,
+                tint = InkMuted,
                 modifier = Modifier.size(15.dp)
             )
-            Spacer(modifier = Modifier.width(4.dp))
+            Spacer(modifier = Modifier.width(Spacing.xs))
             Text(
                 text = "Pulihkan",
                 style = MaterialTheme.typography.labelSmall.copy(
-                    fontWeight = FontWeight.Bold,
+                    fontWeight = FontWeight.SemiBold,
                     fontSize = 10.sp
                 ),
-                color = SteelBlue,
+                color = Ink,
                 maxLines = 1
             )
         }
