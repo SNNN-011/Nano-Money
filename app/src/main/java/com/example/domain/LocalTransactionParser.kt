@@ -61,6 +61,33 @@ class LocalTransactionParser(
         /** Kata satuan uang yang boleh muncul di jawaban nominal murni. */
         private val AMOUNT_WORDS_PATTERN =
             Regex("(?i)\\b(rp|idr|rupiah|rb|ribu|ribuan|k|jt|jta|juta|jutaan|m|miliar|milyar|perak)\\b")
+
+        /**
+         * Kata yang tidak menambah arti apa pun kalau berdiri sendiri di samping nominal.
+         *
+         * "uang 200 ribu" dan "ada 1 juta nih" cuma menyebut nominal: arah uangnya
+         * tidak ada di kalimat itu, jadi aplikasi harus bertanya -- bukan mencatat
+         * tebakan model sebagai pemasukan.
+         */
+        private val AMOUNT_FILLER_WORDS = setOf(
+            "uang", "ada", "nih", "sih", "dong", "aja", "saja", "ya", "yah", "iya",
+            "itu", "tadi", "yang", "kok", "kan", "doang", "bgt", "banget", "nominal",
+            "nominalnya", "sebesar", "adalah", "rp", "idr", "rupiah", "perak"
+        )
+
+        /**
+         * Kata yang tidak layak jadi nama item kalau berdiri sendiri.
+         *
+         * Model kadang mengisi `item` dengan kata kerja atau kata arah ("Beli",
+         * "Masuk"), dan itu tampil di kartu konfirmasi sebagai nama transaksi.
+         * Kalau seluruh isi item seperti ini, item dibuang dan deskripsi disusun
+         * dari kalimat user.
+         */
+        private val ITEM_FILLER_WORDS = CLARIFICATION_WORDS + setOf(
+            "beli", "bayar", "bayarin", "beliin", "isi", "topup", "sewa", "jajan",
+            "belanja", "terima", "dapat", "dapet", "jual", "kirim", "transfer",
+            "cicil", "angsuran", "ongkos", "parkir", "tarif", "bayarnya", "belinya"
+        )
     }
 
     suspend fun parseTransaction(
@@ -91,6 +118,26 @@ class LocalTransactionParser(
         quickAnswer(inputText, pendingContext, incomeCategories, expenseCategories)
             ?.let { return RequestResult.Success(it) }
 
+        // Kalimat yang isinya cuma nominal ("uang 200 ribu", "ada 1 juta nih")
+        // tidak menyebut arah uangnya sama sekali. Model di sini cuma menebak,
+        // dan tebakan yang tersimpan sebagai pemasukan lebih merugikan daripada
+        // satu pertanyaan singkat.
+        leftoverAfterAmount(inputText)?.let { sisa ->
+            if (sisa.isEmpty()) {
+                return RequestResult.Success(
+                    ExtractionResult(error = "klarifikasi", pertanyaan = QUESTION_TYPE)
+                )
+            }
+            directionWord(sisa)?.let { arah ->
+                return RequestResult.Success(
+                    clarificationResult(
+                        AmountReader.fromText(inputText), arah, inputText,
+                        incomeCategories, expenseCategories
+                    )
+                )
+            }
+        }
+
         // Daftar kategori user diteruskan ke model dulu: otak v5 memilih
         // kategori dari daftar yang DIBERIKAN. Tanpa ini kategori benar
         // anjlok ke 0,7-4% (lihat vm/CATATAN.md, mode eval `app`).
@@ -118,9 +165,19 @@ class LocalTransactionParser(
             // nominalnya). Isi panggilan yang ditahan tidak pernah dipakai untuk
             // menyimpan apa pun.
             return when {
-                readableAmount(query) != null -> RequestResult.Success(
-                    ExtractionResult(error = "klarifikasi", pertanyaan = QUESTION_TYPE)
-                )
+                readableAmount(query) != null -> {
+                    // "gajian 5jt": arahnya jelas dari kata kerjanya, jadi tidak
+                    // perlu ditanya lagi -- cukup susun dari kalimat user.
+                    val arah = TransactionCorrector.directionFromVerbs(query)
+                    if (arah != null) RequestResult.Success(
+                        clarificationResult(
+                            readableAmount(query), arah, query,
+                            incomeCategories, expenseCategories
+                        )
+                    ) else RequestResult.Success(
+                        ExtractionResult(error = "klarifikasi", pertanyaan = QUESTION_TYPE)
+                    )
+                }
                 hasSuppressedCall(envelope) -> RequestResult.Success(
                     ExtractionResult(error = "klarifikasi", pertanyaan = QUESTION_AMOUNT)
                 )
@@ -168,7 +225,7 @@ class LocalTransactionParser(
             incomeCategories = incomeCategories,
             expenseCategories = expenseCategories
         )
-        val item = args.optString("item", "").trim()
+        val item = cleanItem(args.optString("item", ""))
         val validType =
             if (corrected == TransactionCorrector.TYPE_INCOME) "PEMASUKAN" else "PENGELUARAN"
 
@@ -178,9 +235,18 @@ class LocalTransactionParser(
         // jawaban model dibiarkan (dan nanti jatuh ke "Lainnya" lewat resolver).
         val candidates =
             if (corrected == TransactionCorrector.TYPE_INCOME) incomeCategories else expenseCategories
+        // Kategori model hanya dipakai kalau tidak berasal dari daftar arah lawan:
+        // "Makanan" tidak boleh menempel di transaksi pemasukan.
+        val aiCategoryValid = if (corrected == aiType) {
+            aiCategory.ifBlank { null }
+        } else {
+            aiCategory.takeIf {
+                CategoryResolver.resolve(it, candidates) is CategoryResolution.Matched
+            }
+        }
         val finalCategory = CategoryHints.suggest(item, candidates)
             ?: CategoryHints.suggest(inputText, candidates)
-            ?: aiCategory.ifBlank { null }
+            ?: aiCategoryValid
 
         return RequestResult.Success(
             ExtractionResult(
@@ -284,6 +350,36 @@ class LocalTransactionParser(
             .replace(Regex("[^\\p{L}]"), " ")
             .trim()
         return sisa.isEmpty()
+    }
+
+    /**
+     * Sisa kata setelah nominal dibuang, atau null kalau kalimatnya tidak menyebut nominal.
+     *
+     * "uang 200 ribu" -> [], "200 ribu masuk" -> ["masuk"], "makan siang 25 ribu"
+     * -> ["makan", "siang"]. Kata pengisi ("uang", "nih") dibuang karena tidak
+     * memberi arah apa pun.
+     */
+    private fun leftoverAfterAmount(input: String): List<String>? {
+        if (AmountReader.fromText(input) == null) return null
+        return CategoryResolver.normalize(input)
+            .replace(Regex("[0-9.,]+"), " ")
+            .replace(AMOUNT_WORDS_PATTERN, " ")
+            .replace(Regex("[^\\p{L}]"), " ")
+            .split(' ')
+            .filter { it.isNotBlank() && it !in AMOUNT_FILLER_WORDS }
+    }
+
+    /**
+     * Nama item dari model, dibuang kalau isinya cuma kata kerja/kata arah.
+     *
+     * "Beli" atau "Masuk" bukan nama transaksi; dengan mengosongkannya, deskripsi
+     * jatuh ke [describeFrom] yang memakai kalimat asli user.
+     */
+    private fun cleanItem(raw: String): String {
+        val text = raw.trim()
+        if (text.isEmpty()) return ""
+        val kata = CategoryResolver.normalize(text).split(' ').filter { it.isNotBlank() }
+        return if (kata.none { it !in ITEM_FILLER_WORDS }) "" else text
     }
 
     /**

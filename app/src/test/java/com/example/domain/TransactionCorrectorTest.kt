@@ -77,11 +77,13 @@ class TransactionCorrectorTest {
     }
 
     @Test
-    fun `kata_kerja_pemasukan_tanpa_nama_kategori_tidak_mengubah_jenis`() {
-        // "terima uang 100 ribu" memang pemasukan, tapi tidak ada kategori milik
-        // user yang disebut. Menebak dari kata kerja saja pernah salah di kasus
-        // lain ("dapat tagihan listrik"), jadi di sini jawaban AI dibiarkan.
-        assertEquals("expense", jenisAkhir("terima uang 100 ribu", "expense", "Lainnya"))
+    fun `kata_kerja_pemasukan_tanpa_nama_kategori_tetap_pemasukan`() {
+        // "terima uang 100 ribu" jelas pemasukan. Dulu kalimat seperti ini
+        // dibiarkan mengikuti AI karena satu kata kerja dianggap bukti lemah;
+        // sekarang kata kerja dipercaya selama tidak dibantah nama kategori arah
+        // lawan -- penjaga kasus "dapat tagihan listrik" ada di
+        // `dapat_tagihan_listrik_tetap_pengeluaran`.
+        assertEquals("income", jenisAkhir("terima uang 100 ribu", "expense", "Lainnya"))
     }
 
     @Test
@@ -111,9 +113,12 @@ class TransactionCorrectorTest {
     }
 
     @Test
-    fun `daftar_kategori_kosong_tidak_mengubah_jenis`() {
+    fun `daftar_kategori_kosong_tetap_memakai_kata_kerja_user`() {
+        // Kategori user tidak menentukan apa pun di sini; arahnya dibaca dari
+        // kalimat user sendiri ("terima gaji"), jadi hasilnya tetap pemasukan
+        // walau kedua daftar kategori kosong.
         assertEquals(
-            "expense",
+            "income",
             jenisAkhir(
                 "terima gaji 5 juta",
                 "expense",

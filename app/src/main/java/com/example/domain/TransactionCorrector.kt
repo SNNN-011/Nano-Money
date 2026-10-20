@@ -9,10 +9,17 @@ package com.example.domain
  * dikarang model: daftar kategori milik user, dan kalimat asli yang diketik user.
  *
  * Aturan bukti, dari yang paling kuat:
- * 1. Kategori yang dipilih AI sendiri hanya ada di satu daftar -> jenisnya itu.
- * 2. Kalau kategori tidak menentukan (mis. "Lainnya" ada di dua daftar), kalimat
+ * 1. Kalimat user memakai kata kerja yang jelas satu arah dan tidak menyebut nama
+ *    kategori arah lawan -> jenisnya itu. Kalimat user lebih kuat daripada
+ *    kategori model: "sewa kos" tetap pengeluaran walau model memilih kategori
+ *    pemasukan.
+ * 2. Kategori yang dipilih AI sendiri hanya ada di satu daftar -> jenisnya itu.
+ * 3. Kalau kategori tidak menentukan (mis. "Lainnya" ada di dua daftar), kalimat
  *    user dipakai, tapi butuh DUA bukti searah sekaligus: kata kerja yang searah
  *    DAN nama kategori user yang disebut, tanpa kata kerja arah sebaliknya.
+ *
+ * Kata kerja yang arahnya memang dua arah ("transfer", "kirim") tidak pernah
+ * dipakai sebagai bukti: "transfer 500 ribu" bisa masuk bisa keluar.
  *
  * Ragunya sengaja dimenangkan oleh jawaban AI: salah menebak di sini berarti
  * memindahkan pemasukan jadi pengeluaran di data keuangan user.
@@ -32,8 +39,24 @@ object TransactionCorrector {
     /** Kata kerja yang menandakan uang keluar dari user. */
     private val EXPENSE_VERBS = listOf(
         "bayar", "bayarin", "beli", "beliin", "belanja", "sewa", "cicil",
-        "angsuran", "transfer", "kirim", "topup", "isi"
+        "angsuran", "transfer", "kirim", "topup", "isi", "ongkos", "parkir", "tarif"
     )
+
+    /**
+     * Kata kerja yang arahnya tidak bisa dipastikan dari kata itu saja.
+     *
+     * Tetap dihitung sebagai "ini kalimat transaksi", tapi tidak dipakai untuk
+     * memutuskan masuk/keluar.
+     */
+    private val AMBIGUOUS_VERBS = listOf("transfer", "kirim")
+
+    /**
+     * Frasa uang masuk yang tidak tertangkap satu kata.
+     *
+     * "uang kiriman ibu" adalah uang MASUK, sedangkan "kirim uang ke ibu" adalah
+     * uang keluar; kata "kirim" saja tidak cukup.
+     */
+    private val INCOME_PHRASES = listOf("uang kiriman", "kiriman dari", "dikirim")
 
     /**
      * Jenis akhir untuk satu jawaban AI.
@@ -51,7 +74,18 @@ object TransactionCorrector {
     ): String {
         val jenisAi = normalizeType(aiType)
 
-        // 1. Kategori pilihan AI sendiri. Kalau kategorinya cuma ada di daftar
+        val adaVerbIncome = hasIncomeSignal(userText)
+        val adaVerbExpense = hasExpenseSignal(userText)
+        val adaKatIncome = CategoryResolver.mentionsCategory(userText, incomeCategories)
+        val adaKatExpense = CategoryResolver.mentionsCategory(userText, expenseCategories)
+
+        // 1. Kalimat user sendiri yang menentukan, selama tidak dibantah nama
+        //    kategori arah lawan ("dapat tagihan listrik" memakai "dapat" padahal
+        //    pengeluaran). Kata kerja dua arah sudah disaring di helper.
+        if (adaVerbExpense && !adaVerbIncome && !adaKatIncome) return TYPE_EXPENSE
+        if (adaVerbIncome && !adaVerbExpense && !adaKatExpense) return TYPE_INCOME
+
+        // 2. Kategori pilihan AI sendiri. Kalau kategorinya cuma ada di daftar
         //    pemasukan, jenisnya pemasukan -- model sudah "tahu" isinya, yang
         //    salah hanya label jenisnya.
         val cocokIncome =
@@ -61,14 +95,10 @@ object TransactionCorrector {
         if (cocokIncome && !cocokExpense) return TYPE_INCOME
         if (cocokExpense && !cocokIncome) return TYPE_EXPENSE
 
-        // 2. Kategori belum menentukan. Baca kalimat user: perlu kata kerja searah
-        //    DAN nama kategori yang searah. Satu bukti saja terlalu gampang salah
-        //    -- "dapat tagihan listrik" memakai kata "dapat" padahal pengeluaran.
-        val adaVerbIncome = CategoryResolver.containsAnyWord(userText, INCOME_VERBS)
-        val adaVerbExpense = CategoryResolver.containsAnyWord(userText, EXPENSE_VERBS)
-        val adaKatIncome = CategoryResolver.mentionsCategory(userText, incomeCategories)
-        val adaKatExpense = CategoryResolver.mentionsCategory(userText, expenseCategories)
-
+        // 3. Kategori belum menentukan. Perlu DUA bukti searah sekaligus: kata
+        //    kerja yang searah DAN nama kategori user yang disebut. Satu bukti
+        //    saja terlalu gampang salah -- "dapat tagihan listrik" memakai kata
+        //    "dapat" padahal pengeluaran.
         if (jenisAi != TYPE_INCOME && adaVerbIncome && adaKatIncome && !adaVerbExpense) {
             return TYPE_INCOME
         }
@@ -76,8 +106,29 @@ object TransactionCorrector {
             return TYPE_EXPENSE
         }
 
-        // 3. Tidak ada bukti yang searah: jawaban AI dibiarkan.
+        // 4. Tidak ada bukti yang searah: jawaban AI dibiarkan.
         return jenisAi
+    }
+
+    /** Ada kata kerja/frasa pemasukan di [text], dan tidak ada kata kerja dua arah. */
+    private fun hasIncomeSignal(text: String?): Boolean {
+        if (CategoryResolver.containsAnyWord(text, AMBIGUOUS_VERBS)) return false
+        return CategoryResolver.containsAnyWord(text, INCOME_VERBS) ||
+            containsAnyPhrase(text, INCOME_PHRASES)
+    }
+
+    /** Ada kata kerja pengeluaran di [text], dan tidak ada kata kerja dua arah. */
+    private fun hasExpenseSignal(text: String?): Boolean {
+        if (CategoryResolver.containsAnyWord(text, AMBIGUOUS_VERBS)) return false
+        return CategoryResolver.containsAnyWord(text, EXPENSE_VERBS)
+    }
+
+    /** [text] memuat salah satu [phrases] sebagai frasa utuh. */
+    private fun containsAnyPhrase(text: String?, phrases: List<String>): Boolean {
+        val haystack = CategoryResolver.normalize(text)
+        if (haystack.isEmpty()) return false
+        val padded = " ${haystack} "
+        return phrases.any { padded.contains(" $it ") }
     }
 
     /**
@@ -89,20 +140,20 @@ object TransactionCorrector {
      * tidak ikut terhitung di sini; jalur nominal yang menanganinya.
      */
     fun looksLikeTransaction(text: String?): Boolean =
-        CategoryResolver.containsAnyWord(text, INCOME_VERBS) ||
-            CategoryResolver.containsAnyWord(text, EXPENSE_VERBS)
+        hasIncomeSignal(text) || hasExpenseSignal(text) ||
+            CategoryResolver.containsAnyWord(text, AMBIGUOUS_VERBS)
 
     /**
      * Arah uang dari kata kerja di [text], atau null kalau buktinya bercampur/tidak ada.
      *
      * Hanya kata kerja yang dipakai: ini untuk menjawab pertanyaan aplikasi sendiri
      * ("Itu uang masuk atau uang keluar?") ketika user cuma mengetik nominalnya.
-     * Kalau kedua arah muncul ("terima lalu bayar"), hasilnya null supaya aplikasi
-     * tetap bertanya, bukan menebak.
+     * Kalau kedua arah muncul ("terima lalu bayar") atau kata kerjanya dua arah
+     * ("transfer"), hasilnya null supaya aplikasi tetap bertanya, bukan menebak.
      */
     fun directionFromVerbs(text: String?): String? {
-        val masuk = CategoryResolver.containsAnyWord(text, INCOME_VERBS)
-        val keluar = CategoryResolver.containsAnyWord(text, EXPENSE_VERBS)
+        val masuk = hasIncomeSignal(text)
+        val keluar = hasExpenseSignal(text)
         return when {
             masuk && !keluar -> TYPE_INCOME
             keluar && !masuk -> TYPE_EXPENSE

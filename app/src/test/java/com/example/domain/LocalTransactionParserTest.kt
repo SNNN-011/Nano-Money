@@ -119,7 +119,7 @@ class LocalTransactionParserTest {
     @Test
     fun `minta_jenis_transaksi_diteruskan_sebagai_pertanyaan`() {
         val engine = FakeEngine(envelope("""{"name":"tanya","arguments":{"field":"type"}}"""))
-        val result = success(parse(engine, "uang 200 ribu masuk"))
+        val result = success(parse(engine, "bayar iBox"))
 
         assertEquals("klarifikasi", result.error)
         assertNotNull(result.pertanyaan)
@@ -297,6 +297,77 @@ class LocalTransactionParserTest {
         val result = success(parse(engine, "nasi goreng 15 ribu"))
 
         assertEquals(15_000L, result.amount)
+    }
+
+    @Test
+    fun `kata_kerja_user_menang_dari_kategori_model`() {
+        // "sewa kos" jelas pengeluaran; model salah memilih kategori pemasukan
+        // (Freelance), dan dulu kategori itu yang menentukan arahnya.
+        val engine = FakeEngine(envelope(catat("catat_masuk", "2000000", "Freelance", "Kos")))
+        val result = success(parse(engine, "sewa kos 2 juta"))
+
+        assertEquals("PENGELUARAN", result.type)
+        assertEquals("Tagihan", result.category)
+    }
+
+    @Test
+    fun `uang_kiriman_dihitung_pemasukan`() {
+        val engine = FakeEngine(envelope(catat("catat_pengeluaran", "500000", "Makanan", "Kiriman")))
+        val result = success(parse(engine, "uang kiriman ibu 500 ribu"))
+
+        assertEquals("PEMASUKAN", result.type)
+    }
+
+    @Test
+    fun `item_berupa_kata_kerja_diganti_nama_barang`() {
+        // Model mengisi item "Beli"; yang tampil di kartu harus "Sepatu".
+        val engine = FakeEngine(envelope(catat("catat_pengeluaran", "800000", "Belanja", "Beli")))
+        val result = success(parse(engine, "kemarin beli sepatu 800 ribu"))
+
+        assertTrue("item: ${result.description}", result.description!!.contains("sepatu", true))
+    }
+
+    @Test
+    fun `nominal_tanpa_arah_ditanya_jenis_tanpa_memanggil_model`() {
+        // "ada 1 juta nih" tidak menyebut arah uang; tebakan model tidak dipakai.
+        val result = success(parse(FailingEngine(), "ada 1 juta nih"))
+
+        assertEquals("klarifikasi", result.error)
+        assertTrue(
+            "pertanyaan harus menyinggung arah uang: ${result.pertanyaan}",
+            result.pertanyaan!!.contains("masuk")
+        )
+    }
+
+    @Test
+    fun `nominal_dengan_kata_arah_langsung_dicatat`() {
+        val result = success(parse(FailingEngine(), "200 ribu masuk"))
+
+        assertEquals("PEMASUKAN", result.type)
+        assertEquals(200_000L, result.amount)
+    }
+
+    @Test
+    fun `gajian_tanpa_panggilan_alat_tetap_pemasukan`() {
+        // Dulu ditanya "masuk atau keluar?" padahal kata "gajian" sudah menjawab.
+        val engine = FakeEngine("""{"type":"text","function_calls":[]}""")
+        val result = success(parse(engine, "gajian 5jt"))
+
+        assertEquals("PEMASUKAN", result.type)
+        assertEquals(5_000_000L, result.amount)
+        assertEquals("Gaji", result.category)
+    }
+
+    @Test
+    fun `ongkos_tanpa_nominal_ditanya_nominal`() {
+        val engine = FakeEngine("""{"type":"text","function_calls":[]}""")
+        val result = success(parse(engine, "ongkos ojek"))
+
+        assertEquals("klarifikasi", result.error)
+        assertTrue(
+            "pertanyaan harus menyinggung nominal: ${result.pertanyaan}",
+            result.pertanyaan!!.contains("ominal")
+        )
     }
 
     @Test
