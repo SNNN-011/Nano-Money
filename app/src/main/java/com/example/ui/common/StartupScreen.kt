@@ -1,12 +1,18 @@
 package com.example.ui.common
 
-import androidx.compose.animation.*
-import androidx.compose.animation.core.*
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -14,21 +20,26 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.example.R
-import com.example.ui.theme.*
+import com.example.ui.components.EditorialProgress
+import com.example.ui.theme.Cream
+import com.example.ui.theme.EyebrowTextStyle
+import com.example.ui.theme.HairlineStrong
+import com.example.ui.theme.Ink
+import com.example.ui.theme.InkMuted
+import com.example.ui.theme.SerifFamily
+import com.example.ui.theme.CornerRadius
+import com.example.ui.theme.Spacing
 
+/**
+ * Layar muat aplikasi: krem, logo berbingkai, judul serif, dan satu garis
+ * progres tipis. Menggantikan latar gelap + spinner cincin versi lama supaya
+ * sama dengan palet editorial tab lain.
+ */
 @Composable
 fun StartupScreen(
     visible: Boolean,
@@ -55,170 +66,65 @@ fun StartupScreen(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(MidnightAbyss)
+                .background(Cream)
                 .testTag("startup_screen"),
             contentAlignment = Alignment.Center
         ) {
-            // Ambient atmospheric radial glow spots matching the main dashboard background perfectly
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.radialGradient(
-                            colors = listOf(SteelBlueGlow.copy(alpha = 0.12f), Color.Transparent),
-                            center = Offset(500f, 300f),
-                            radius = 1000f
-                        )
-                    )
-            )
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.radialGradient(
-                            colors = listOf(SteelBlueGlow.copy(alpha = 0.08f), Color.Transparent),
-                            center = Offset(100f, 1600f),
-                            radius = 1200f
-                        )
-                    )
-            )
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        Brush.radialGradient(
-                            colors = listOf(NeonViolet.copy(alpha = 0.08f), Color.Transparent),
-                            center = Offset(1500f, 1000f),
-                            radius = 900f
-                        )
-                    )
-            )
-
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(24.dp),
+                    .padding(horizontal = Spacing.xxl),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
+                verticalArrangement = Arrangement.spacedBy(Spacing.lg)
             ) {
-                // Logo
-                val logoPainter = painterResource(id = R.drawable.logo)
+                val logoShape = RoundedCornerShape(CornerRadius.xl)
                 Image(
-                    painter = logoPainter,
+                    painter = painterResource(id = R.drawable.logo),
                     contentDescription = "Logo Aplikasi",
                     modifier = Modifier
-                        .size(110.dp)
-                        .clip(RoundedCornerShape(24.dp))
+                        .size(84.dp)
+                        .clip(logoShape)
+                        .border(1.dp, HairlineStrong, logoShape)
                         .testTag("startup_logo")
                 )
 
-                Spacer(modifier = Modifier.height(28.dp))
-
-                // Title
                 Text(
                     text = "Nano Money",
-                    style = MaterialTheme.typography.headlineLarge.copy(
-                        fontWeight = FontWeight.ExtraBold,
-                        fontSize = 30.sp,
-                        letterSpacing = 1.5.sp
-                    ),
-                    color = GhostWhite,
-                    modifier = Modifier
-                        .padding(bottom = 8.dp)
-                        .testTag("startup_title")
-                )
-
-                // Slogan
-                Text(
-                    text = "mencatat keuangan semudah chat teman".uppercase(),
-                    style = MaterialTheme.typography.bodySmall.copy(
-                        fontWeight = FontWeight.Bold,
-                        letterSpacing = 1.2.sp,
-                        fontSize = 11.sp,
-                        lineHeight = 18.sp
-                    ),
-                    color = GhostWhite,
+                    style = MaterialTheme.typography.displaySmall,
+                    fontFamily = SerifFamily,
+                    color = Ink,
                     textAlign = TextAlign.Center,
-                    modifier = Modifier
-                        .fillMaxWidth(0.85f)
-                        .padding(bottom = 36.dp)
-                        .testTag("startup_tagline")
+                    modifier = Modifier.testTag("startup_title")
                 )
 
-                // Modern premium custom rotating loader
-                val infiniteTransition = rememberInfiniteTransition(label = "startup_loader_anim")
-                val rotation by infiniteTransition.animateFloat(
+                Text(
+                    text = "MENCATAT KEUANGAN SEMUDAH CHAT TEMAN",
+                    style = EyebrowTextStyle,
+                    color = InkMuted,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.testTag("startup_tagline")
+                )
+
+                // Bar progres tipis; animasi mengisi dari kiri lalu diulang.
+                val transition = rememberInfiniteTransition(label = "startup_line")
+                val progress by transition.animateFloat(
                     initialValue = 0f,
-                    targetValue = 360f,
+                    targetValue = 1f,
                     animationSpec = infiniteRepeatable(
-                        animation = tween(1200, easing = LinearEasing),
+                        animation = tween(1400, easing = LinearEasing),
                         repeatMode = RepeatMode.Restart
                     ),
-                    label = "rotation"
+                    label = "startup_progress"
                 )
-                val scale by infiniteTransition.animateFloat(
-                    initialValue = 0.82f,
-                    targetValue = 1.22f,
-                    animationSpec = infiniteRepeatable(
-                        animation = tween(1000, easing = FastOutSlowInEasing),
-                        repeatMode = RepeatMode.Reverse
-                    ),
-                    label = "scale"
-                )
-                val pulseAlpha by infiniteTransition.animateFloat(
-                    initialValue = 0.4f,
-                    targetValue = 1.0f,
-                    animationSpec = infiniteRepeatable(
-                        animation = tween(1000, easing = FastOutSlowInEasing),
-                        repeatMode = RepeatMode.Reverse
-                    ),
-                    label = "pulseAlpha"
-                )
-
-                Box(
+                EditorialProgress(
+                    progress = progress,
+                    color = Ink,
                     modifier = Modifier
-                        .size(50.dp)
-                        .testTag("startup_loader"),
-                    contentAlignment = Alignment.Center
-                ) {
-                    // Pulsing background core
-                    Box(
-                        modifier = Modifier
-                            .size(18.dp)
-                            .graphicsLayer(scaleX = scale, scaleY = scale, alpha = pulseAlpha)
-                            .background(SteelBlue.copy(alpha = 0.35f), shape = CircleShape)
-                    )
-                    Box(
-                        modifier = Modifier
-                            .size(9.dp)
-                            .background(GhostWhite, shape = CircleShape)
-                    )
-
-                    // Spinning outer split-arc ring
-                    Canvas(
-                        modifier = Modifier
-                            .size(48.dp)
-                            .graphicsLayer(rotationZ = rotation)
-                    ) {
-                        val strokeWidth = 3.dp.toPx()
-                        // Main arc using steel blue highlights
-                        drawArc(
-                            color = GhostWhite,
-                            startAngle = 0f,
-                            sweepAngle = 110f,
-                            useCenter = false,
-                            style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
-                        )
-                        // Supporting transparent arc
-                        drawArc(
-                            color = SteelBlue,
-                            startAngle = 180f,
-                            sweepAngle = 110f,
-                            useCenter = false,
-                            style = Stroke(width = strokeWidth, cap = StrokeCap.Round)
-                        )
-                    }
-                }
+                        .width(140.dp)
+                        .padding(top = Spacing.sm),
+                    height = 3.dp,
+                    testTag = "startup_loader"
+                )
             }
         }
     }
