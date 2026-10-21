@@ -192,6 +192,21 @@ class TransactionCorrectorTest {
     }
 
     @Test
+    fun `kata_kerja_khusus_pengeluaran_dikenali`() {
+        // "nraktir" (Jawa), "nyumbang"/"sedekah"/"infak" tidak ada di daftar lama,
+        // jadi transaksinya sempat ditanyakan arah atau dicatat sebagai pemasukan.
+        assertEquals("expense", jenisAkhir("nraktir teman 50 ribu", "income", "Lainnya"))
+        assertEquals("expense", jenisAkhir("nyumbang pembangunan masjid 250 ribu", "income", "Lainnya"))
+        assertEquals("expense", jenisAkhir("sedekah 100 ribu", "income", "Lainnya"))
+        assertEquals("expense", jenisAkhir("infak jumat 50 ribu", "income", "Lainnya"))
+    }
+
+    @Test
+    fun `warisan_selalu_pemasukan`() {
+        assertEquals("income", jenisAkhir("warisan dari kakek 25 juta", "expense", "Lainnya"))
+    }
+
+    @Test
     fun `pemetaan_jenis_bawaan_ai_dinormalkan_dengan_aturan_yang_sama`() {
         // Dipakai jalur simpan DAN kartu konfirmasi. Satu tempat saja, supaya kartu
         // tidak pernah menampilkan jenis yang berbeda dari yang akhirnya disimpan.

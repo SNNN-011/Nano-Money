@@ -43,6 +43,13 @@ internal object LocalToolsJson {
      * di-inisialisasi ulang terus-menerus. Duplikat dibuang mengabaikan huruf
      * besar-kecil (yang pertama menang) supaya daftar "Gaji" dan "gaji" tidak
      * jadi dua pilihan berbeda.
+     *
+     * Ejaan user dipertahankan. Data latih memang huruf kecil, tetapi percobaan
+     * di HP dengan daftar huruf kecil justru menurunkan kategori bawaan
+     * (34 kasus: 19 -> 16; 30 kasus: 16 -> 13), sedangkan keuntungan kategori
+     * kustom datang dari pencocokan nama kategori di parser, bukan dari huruf.
+     * ponytail: satu variabel, diukur di HP; kalau nanti ada eval 599 mode app
+     * untuk kedua ejaan, ganti keputusan ini dengan angka itu.
      */
     private fun List<String>.cleaned(): List<String> {
         val seen = LinkedHashMap<String, String>()

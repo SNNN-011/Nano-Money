@@ -30,6 +30,8 @@ object CategoryResolver {
     private const val TOKEN_OVERLAP = 55
     private const val MIN_SCORE = 30
 
+    private val NON_ALNUM = Regex("[^a-z0-9]+")
+
     /**
      * Nama kategori penampung untuk jawaban AI yang tidak cocok dengan kategori user.
      *
@@ -167,6 +169,30 @@ object CategoryResolver {
             val norm = normalize(kategori)
             norm.isNotEmpty() && containsWholeWord(haystack, norm)
         }
+    }
+
+    /**
+     * Nama kategori dari [categories] yang benar-benar disebut di [text].
+     *
+     * Beda dengan [mentionsCategory] yang cuma menjawab ya/tidak: di sini nama
+     * kategorinya dikembalikan supaya bisa dipakai sebagai pilihan akhir.
+     * Dipakai untuk kategori buatan user yang sering tidak dikenali model
+     * ("servis rem motor" -> "Servis Motor", "makanan kucing" -> "Kucing").
+     *
+     * Semua kata nama kategori harus muncul sebagai kata utuh. Urutan kata
+     * bebas, jadi "Servis Motor" tetap cocok dengan "servis rem motor".
+     * Kategori yang lebih panjang menang supaya "Kopi Susu" tidak kalah oleh
+     * "Kopi" kalau keduanya ada.
+     */
+    fun categoryMentionedIn(text: String?, categories: List<String>): String? {
+        if (text.isNullOrBlank()) return null
+        val tokens = normalize(text).split(NON_ALNUM).filter { it.isNotBlank() }.toSet()
+        if (tokens.isEmpty()) return null
+        return categories
+            .map { it to normalize(it).split(NON_ALNUM).filter { part -> part.length >= 2 } }
+            .filter { (_, parts) -> parts.isNotEmpty() && parts.all { it in tokens } }
+            .maxByOrNull { (_, parts) -> parts.sumOf { it.length } }
+            ?.first
     }
 
     /** Jarak edit Levenshtein antara [a] dan [b] (jumlah huruf yang perlu diubah). */

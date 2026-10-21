@@ -7,10 +7,15 @@ package com.example.domain
  * yang jelas bukan makanan, mis. "beli bensin". Diuji pada 200 baris simulasi
  * aplikasi (`vm/measure_hint.py`): kategori benar naik 29,5% -> 37,8%.
  *
- * Daftar kata di bawah adalah kata yang paling sering muncul sebagai `item` untuk
- * tiap kategori di `draf_v5/finetune.jsonl` (`vm/build_category_hints.py`), sudah
- * disaring dari kata ambigu. Kata yang muncul di lebih dari satu kategori tidak
- * dipakai sama sekali.
+ * Sebagian besar daftar kata di bawah adalah kata yang paling sering muncul
+ * sebagai `item` untuk tiap kategori di `draf_v5/finetune.jsonl`
+ * (`vm/build_category_hints.py`), sudah disaring dari kata ambigu. Kata yang
+ * muncul di lebih dari satu kategori tidak dipakai.
+ *
+ * Beberapa kelompok (kesehatan, donasi, servis motor, jualan online) sengaja
+ * memakai nama kategori di luar bawaan. Itu tetap aman: [suggest] hanya
+ * mengembalikan nama yang benar-benar ada di daftar user, jadi kelompok itu
+ * dilewati kalau user tidak punya kategorinya.
  *
  * Penunjuk ini hanya **menyarankan**; yang menentukan tetap kategori milik user.
  * Kalau kategorinya tidak ada di daftar user ([CategoryResolution.Matched] gagal),
@@ -25,7 +30,7 @@ object CategoryHints {
         "padang", "solaria", "dimsum", "hokben", "pecel", "lele", "kopken", "geprek",
         "bensu", "telur", "warteg", "gacoan", "tempe", "seblak", "dunkin", "kenangan",
         "roti", "kerupuk", "yoshinoya", "mineral", "kfc", "jco", "starbucks", "snack",
-        "martabak", "taichan", "tahu", "mcd", "warung"
+        "martabak", "taichan", "tahu", "mcd", "warung", "nraktir", "traktir"
     )
 
     private val TRANSPORTASI = listOf(
@@ -37,7 +42,7 @@ object CategoryHints {
     private val TAGIHAN = listOf(
         "iuran", "listrik", "kos", "gas", "wifi", "kuota", "galon", "indihome",
         "pln", "telkomsel", "lpg", "bpjs", "pulsa", "internet", "smartfren",
-        "sampah", "keamanan", "pdam", "token"
+        "sampah", "keamanan", "pdam", "token", "denda"
     )
 
     private val HIBURAN = listOf(
@@ -52,8 +57,28 @@ object CategoryHints {
         "alfamidi", "baterai", "perabot", "shopee", "alfamart", "matahari",
         "bhinneka", "sprei", "erafone", "sampo", "indomaret", "electronic",
         "transmart", "lotte", "bukalapak", "tas", "sepatu", "superindo", "deterjen",
-        "ramayana", "blibli", "celana", "ibox", "minyak"
+        "ramayana", "blibli", "celana", "ibox", "minyak", "kado"
     )
+
+    private val KESEHATAN = listOf(
+        "obat", "apotek", "dokter", "klinik", "vaksin", "sakit", "rumah sakit"
+    )
+
+    /**
+     * Kata untuk kategori buatan user yang umum dipakai.
+     *
+     * Nama tujuan di sini ("donasi", "servis motor") BUKAN kategori bawaan.
+     * Kalau user tidak punya kategori dengan nama itu, saran otomatis dilewati
+     * oleh [suggest], sama seperti kata kunci lain.
+     */
+    private val DONASI = listOf(
+        "donasi", "sumbang", "nyumbang", "sedekah", "infak", "zakat", "amal",
+        "masjid", "panti"
+    )
+
+    private val SERVIS_MOTOR = listOf("oli")
+
+    private val JUALAN_ONLINE = listOf("lapak")
 
     private val GAJI = listOf(
         "gaji", "gajian", "bonus", "tunjangan", "honor", "upah", "lembur",
@@ -84,6 +109,10 @@ object CategoryHints {
         tambah("gaji", GAJI)
         tambah("investasi", INVESTASI)
         tambah("freelance", FREELANCE)
+        tambah("kesehatan", KESEHATAN)
+        tambah("donasi", DONASI)
+        tambah("servis motor", SERVIS_MOTOR)
+        tambah("jualan online", JUALAN_ONLINE)
     }.sortedByDescending { it.first.length }
 
     /**

@@ -33,14 +33,15 @@ object TransactionCorrector {
     private val INCOME_VERBS = listOf(
         "terima", "menerima", "diterima", "dapat", "dapet", "dapetin", "gajian",
         "dibayar", "dikasih", "diberi", "menang", "cair", "jual", "jualan",
-        "refund", "cashback"
+        "refund", "cashback", "warisan"
     )
 
     /** Kata kerja yang menandakan uang keluar dari user. */
     private val EXPENSE_VERBS = listOf(
         "bayar", "bayarin", "beli", "beliin", "belanja", "sewa", "cicil",
         "angsuran", "transfer", "kirim", "topup", "isi", "ongkos", "parkir", "tarif",
-        "jajan", "servis", "cuci", "traktir"
+        "jajan", "servis", "cuci", "traktir", "nraktir",
+        "nyumbang", "sumbang", "sedekah", "infak"
     )
 
     /**

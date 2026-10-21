@@ -68,6 +68,16 @@ class LocalTransactionParserTest {
             .parseTransaction(text, pending, incomeCategories, expenseCategories)
     }
 
+    private fun parseDenganKategori(
+        engine: LocalEngine,
+        text: String,
+        income: List<String>,
+        expense: List<String>
+    ): RequestResult<ExtractionResult> = runBlocking {
+        LocalTransactionParser(engine, clock = { 1_700_000_000_000L })
+            .parseTransaction(text, null, income, expense)
+    }
+
     private fun success(result: RequestResult<ExtractionResult>): ExtractionResult {
         assertTrue("harus sukses, dapat: $result", result is RequestResult.Success)
         return (result as RequestResult.Success).data
@@ -491,5 +501,70 @@ class LocalTransactionParserTest {
         val result = success(parse(engine, "3 juta", pending = "bayar iBox"))
 
         assertEquals(3_000_000L, result.amount)
+    }
+
+    @Test
+    fun `kategori_buatan_user_tidak_ditimpa_kata_kunci_bawaan`() {
+        // "kopi" punya kata kunci bawaan ke Makanan, padahal user punya kategori
+        // Kopi dan model sudah memilihnya. Kata kunci lama tidak boleh menang.
+        val engine = FakeEngine(envelope(catat("catat_pengeluaran", "22000", "kopi", "kopi susu")))
+        val result = success(
+            parseDenganKategori(
+                engine, "beli kopi susu 22rb",
+                income = listOf("Gaji", "Lainnya"),
+                expense = listOf("Makanan", "Kopi", "Lainnya")
+            )
+        )
+
+        assertEquals("Kopi", result.category)
+    }
+
+    @Test
+    fun `nama_kategori_yang_disebut_user_menang_atas_pilihan_model`() {
+        // Model salah memilih Kopi; kalimat user menyebut "servis motor" dan user
+        // punya kategori itu, jadi kategori itulah yang dipakai.
+        val engine = FakeEngine(envelope(catat("catat_pengeluaran", "150000", "kopi", "servis motor")))
+        val result = success(
+            parseDenganKategori(
+                engine, "servis rem motor 150rb",
+                income = listOf("Gaji", "Lainnya"),
+                expense = listOf("Makanan", "Kopi", "Servis Motor", "Lainnya")
+            )
+        )
+
+        assertEquals("Servis Motor", result.category)
+    }
+
+    @Test
+    fun `kalimat_penuh_dengan_kata_masuk_tetap_dikirim_ke_model`() {
+        // Dulu setiap kalimat bernominal yang memuat "masuk" dijawab tanpa model,
+        // jadi kategori buatan user tidak pernah dipilih.
+        val engine = FakeEngine(envelope(catat("catat_masuk", "2400000", "jualan online", "jualan online")))
+        val result = success(
+            parseDenganKategori(
+                engine, "jualan online minggu ini masuk 2,4 juta",
+                income = listOf("Gaji", "Jualan Online", "Lainnya"),
+                expense = listOf("Makanan", "Lainnya")
+            )
+        )
+
+        assertNotNull("model harus tetap dipanggil", engine.lastText)
+        assertEquals("Jualan Online", result.category)
+        assertEquals("PEMASUKAN", result.type)
+    }
+
+    @Test
+    fun `kategori_bonus_user_menang_atas_kata_kunci_gaji`() {
+        val engine = FakeEngine(envelope(catat("catat_masuk", "1500000", "bonus", "bonus proyek")))
+        val result = success(
+            parseDenganKategori(
+                engine, "dapat bonus proyek 1,5 juta",
+                income = listOf("Gaji", "Bonus", "Lainnya"),
+                expense = listOf("Makanan", "Lainnya")
+            )
+        )
+
+        assertEquals("Bonus", result.category)
+        assertEquals("PEMASUKAN", result.type)
     }
 }

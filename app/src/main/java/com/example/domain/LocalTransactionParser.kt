@@ -44,6 +44,21 @@ class LocalTransactionParser(
         const val TOOL_MASUK = "catat_masuk"
         const val TOOL_TANYA = "tanya"
 
+        /**
+         * Kategori bawaan yang dikenal model dari data latih.
+         *
+         * Nama di luar daftar ini dianggap kategori buatan user. Kategori
+         * buatan user yang dipilih model tidak boleh ditimpa kata kunci lama,
+         * karena kata kunci itu hanya tahu kategori bawaan.
+         */
+        private val DEFAULT_CATEGORY_NAMES = setOf(
+            "makanan", "transportasi", "tagihan", "hiburan", "belanja",
+            "gaji", "investasi", "freelance", "kesehatan", "lainnya"
+        )
+
+        private fun isDefaultCategory(name: String): Boolean =
+            CategoryResolver.normalize(name) in DEFAULT_CATEGORY_NAMES
+
         const val QUESTION_AMOUNT = "Berapa nominalnya?"
         const val QUESTION_TYPE = "Itu uang masuk atau uang keluar?"
         const val QUESTION_OTHER = "Bisa tolong lengkapi keterangan transaksinya?"
@@ -128,13 +143,20 @@ class LocalTransactionParser(
                     ExtractionResult(error = "klarifikasi", pertanyaan = QUESTION_TYPE)
                 )
             }
-            directionWord(sisa)?.let { arah ->
-                return RequestResult.Success(
-                    clarificationResult(
-                        AmountReader.fromText(inputText), arah, inputText,
-                        incomeCategories, expenseCategories
+            // Jalan pintas ini hanya untuk jawaban yang isinya memang cuma
+            // nominal + arah ("3 juta masuk"). Kalimat biasa yang kebetulan
+            // memuat kata "masuk"/"keluar" ("jualan online minggu ini masuk
+            // 2,4 juta") tetap harus lewat model supaya kategori buatan user
+            // ikut dipilih; dulu kalimat seperti itu kehilangan kategorinya.
+            if (sisa.all { it in CLARIFICATION_WORDS }) {
+                directionWord(sisa)?.let { arah ->
+                    return RequestResult.Success(
+                        clarificationResult(
+                            AmountReader.fromText(inputText), arah, inputText,
+                            incomeCategories, expenseCategories
+                        )
                     )
-                )
+                }
             }
         }
 
@@ -244,8 +266,30 @@ class LocalTransactionParser(
                 CategoryResolver.resolve(it, candidates) is CategoryResolution.Matched
             }
         }
-        val finalCategory = CategoryHints.suggest(item, candidates)
+
+        // Urutan bukti kategori:
+        // 1. nama kategori buatan user yang benar-benar disebut di kalimat,
+        // 2. kata kunci bawaan ("oli" -> Servis Motor, "denda" -> Tagihan),
+        // 3. pilihan model kalau kategorinya buatan user,
+        // 4. jawaban model apa adanya.
+        //
+        // Pilihan model sengaja di bawah kata kunci: model kadang memilih
+        // kategori kustom yang tidak ada hubungannya ("ganti oli" -> "Kopi").
+        // Sebaliknya kata kunci tidak boleh menimpa kategori kustom yang
+        // namanya disebut user ("kopi" -> Kopi, bukan Makanan) -- itu sudah
+        // ditangani langkah 1.
+        val customCandidates = candidates.filterNot { isDefaultCategory(it) }
+        val kategoriDisebut =
+            CategoryResolver.categoryMentionedIn(inputText, customCandidates)
+                ?: CategoryResolver.categoryMentionedIn(item, customCandidates)
+        val aiCustom = aiCategoryValid
+            ?.let { CategoryResolver.resolve(it, candidates) as? CategoryResolution.Matched }
+            ?.category
+            ?.takeIf { !isDefaultCategory(it) }
+        val finalCategory = kategoriDisebut
+            ?: CategoryHints.suggest(item, candidates)
             ?: CategoryHints.suggest(inputText, candidates)
+            ?: aiCustom
             ?: aiCategoryValid
 
         return RequestResult.Success(
@@ -314,12 +358,14 @@ class LocalTransactionParser(
 
         val income = type == TransactionCorrector.TYPE_INCOME
         val candidates = if (income) incomeCategories else expenseCategories
+        val customCandidates = candidates.filterNot { isDefaultCategory(it) }
 
         return ExtractionResult(
             description = describeFrom(source),
             amount = nominal,
             type = if (income) "PEMASUKAN" else "PENGELUARAN",
-            category = CategoryHints.suggest(source, candidates),
+            category = CategoryResolver.categoryMentionedIn(source, customCandidates)
+                ?: CategoryHints.suggest(source, candidates),
             date = clock(),
             notes = null
         )

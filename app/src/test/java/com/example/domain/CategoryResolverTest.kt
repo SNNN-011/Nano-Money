@@ -195,4 +195,33 @@ class CategoryResolverTest {
         assertEquals("Lainnya", CategoryResolver.finalCategory(null, listOf("Makanan")))
         assertEquals("Lainnya", CategoryResolver.finalCategory("   ", listOf("Makanan")))
     }
+
+    @Test
+    fun `nama_kategori_yang_disebut_user_ditemukan_walau_kata_terpisah`() {
+        val kategori = listOf("Kopi", "Servis Motor", "Kucing")
+        assertEquals(
+            "Servis Motor",
+            CategoryResolver.categoryMentionedIn("servis rem motor 150rb", kategori)
+        )
+        assertEquals(
+            "Kucing",
+            CategoryResolver.categoryMentionedIn("makanan kucing 50rb", kategori)
+        )
+    }
+
+    @Test
+    fun `kategori_dengan_nama_lebih_panjang_menang`() {
+        val kategori = listOf("Kopi", "Kopi Susu")
+        assertEquals(
+            "Kopi Susu",
+            CategoryResolver.categoryMentionedIn("beli kopi susu 22rb", kategori)
+        )
+    }
+
+    @Test
+    fun `kata_yang_mirip_tapi_bukan_nama_kategori_tidak_dianggap_sebutan`() {
+        val kategori = listOf("Kopi", "Servis Motor")
+        assertEquals(null, CategoryResolver.categoryMentionedIn("ngopi 20rb", kategori))
+        assertEquals(null, CategoryResolver.categoryMentionedIn("beli motor 20 juta", kategori))
+    }
 }
