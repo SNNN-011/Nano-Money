@@ -7,4 +7,6 @@
     <color name="teal_700">#FF018786</color>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+    <!-- Latar halaman (Cream), dipakai jendela aplikasi dan ikon peluncur. -->
+    <color name="cream">#FFF3EEE4</color>
 </resources>

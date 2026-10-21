@@ -1,5 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
 
-    <style name="Theme.MyApplication" parent="android:Theme.DeviceDefault.NoActionBar" />
+    <!-- Latar jendela sebelum Compose menggambar, samakan dengan latar halaman (Cream)
+         supaya tidak ada kilatan gelap bawaan tema perangkat. -->
+    <style name="Theme.MyApplication" parent="android:Theme.DeviceDefault.NoActionBar">
+        <item name="android:windowBackground">@color/cream</item>
+    </style>
 </resources>
