@@ -33,7 +33,10 @@ object TransactionCorrector {
     private val INCOME_VERBS = listOf(
         "terima", "menerima", "diterima", "dapat", "dapet", "dapetin", "gajian",
         "dibayar", "dikasih", "diberi", "menang", "cair", "jual", "jualan",
-        "refund", "cashback", "warisan"
+        "refund", "cashback", "warisan",
+        // Bukan kata kerja, tapi penanda pemasukan yang sama kuatnya: "gaji
+        // bulan ini 7 juta" tidak punya kata kerja apa pun.
+        "gaji", "honor", "dividen", "dijual", "terjual"
     )
 
     /** Kata kerja yang menandakan uang keluar dari user. */

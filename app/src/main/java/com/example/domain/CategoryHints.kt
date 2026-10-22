@@ -43,7 +43,7 @@ object CategoryHints {
     private val TAGIHAN = listOf(
         "iuran", "listrik", "kos", "gas", "wifi", "kuota", "galon", "indihome",
         "pln", "telkomsel", "lpg", "bpjs", "pulsa", "internet", "smartfren",
-        "sampah", "keamanan", "pdam", "token", "denda", "kontrakan"
+        "sampah", "keamanan", "pdam", "token", "denda", "kontrakan", "asuransi"
     )
 
     private val HIBURAN = listOf(
@@ -79,7 +79,7 @@ object CategoryHints {
 
     private val SERVIS_MOTOR = listOf("oli")
 
-    private val JUALAN_ONLINE = listOf("lapak")
+    private val JUALAN_ONLINE = listOf("lapak", "penjualan", "marketplace")
 
     private val GAJI = listOf(
         "gaji", "gajian", "bonus", "tunjangan", "honor", "upah", "lembur",
@@ -95,7 +95,9 @@ object CategoryHints {
      *
      * "hadiah undian" bukan Investasi hanya karena model menebak begitu.
      */
-    private val LAINNYA = listOf("undian")
+    private val LAINNYA = listOf("undian", "kiriman", "cashback")
+
+    private val KUCING = listOf("whiskas", "pasir kucing", "makanan kucing")
 
     private val FREELANCE = listOf(
         "freelance", "proyek", "project", "klien", "pelanggan", "omzet"
@@ -131,6 +133,7 @@ object CategoryHints {
         tambah("donasi", DONASI)
         tambah("servis motor", SERVIS_MOTOR)
         tambah("jualan online", JUALAN_ONLINE)
+        tambah("kucing", KUCING)
         tambah("lainnya", LAINNYA)
     }.sortedByDescending { it.first.length }
 

@@ -653,4 +653,52 @@ class LocalTransactionParserTest {
 
         assertEquals("Tagihan", result.category)
     }
+
+    @Test
+    fun `gaji_bukan_kata_kerja_tetap_pemasukan`() {
+        // Uji 50 kalimat: model menjawab pengeluaran + kategori Kucing.
+        val engine = FakeEngine(envelope(catat("catat_pengeluaran", "7200000", "kucing", "Gaji bulan oktober")))
+        val result = success(parse(engine, "gaji bulan oktober 7,2 juta"))
+
+        assertEquals("PEMASUKAN", result.type)
+        assertEquals("Gaji", result.category)
+    }
+
+    @Test
+    fun `dividen_saham_pemasukan_investasi`() {
+        // Uji 50 kalimat: model menjawab pengeluaran, kategori Kopi.
+        val engine = FakeEngine(envelope(catat("catat_pengeluaran", "320000", "kopi", "Saham")))
+        val result = success(
+            parseDenganKategori(
+                engine, "dividen saham bca 320rb",
+                income = listOf("Gaji", "Investasi", "Lainnya"),
+                expense = listOf("Makanan", "Kopi", "Lainnya")
+            )
+        )
+
+        assertEquals("PEMASUKAN", result.type)
+        assertEquals("Investasi", result.category)
+    }
+
+    @Test
+    fun `penjualan_masuk_kategori_jualan_online`() {
+        val engine = FakeEngine(envelope(catat("catat_masuk", "1200000", "Gaji", "Marketplace")))
+        val result = success(
+            parseDenganKategori(
+                engine, "penjualan marketplace masuk 1,2 juta",
+                income = listOf("Gaji", "Jualan Online", "Lainnya"),
+                expense = listOf("Makanan", "Lainnya")
+            )
+        )
+
+        assertEquals("Jualan Online", result.category)
+    }
+
+    @Test
+    fun `uang_kiriman_tidak_jadi_investasi`() {
+        val engine = FakeEngine(envelope(catat("catat_masuk", "2000000", "investasi", "Kiriman")))
+        val result = success(parse(engine, "uang kiriman dari ayah 2 juta"))
+
+        assertEquals("Lainnya", result.category)
+    }
 }
