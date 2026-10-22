@@ -36,13 +36,14 @@ object CategoryHints {
     private val TRANSPORTASI = listOf(
         "spbu", "bus", "tol", "parkir", "grab", "pertamina", "bensin", "maxim",
         "paxel", "pertamini", "jne", "indriver", "anterin", "bengkel", "gojek",
-        "shell", "tarif", "ojek", "sicepat", "angkot", "kereta", "tambal", "ban"
+        "shell", "tarif", "ojek", "sicepat", "angkot", "kereta", "tambal", "ban",
+        "servis motor", "servis mobil", "cuci motor", "cuci mobil"
     )
 
     private val TAGIHAN = listOf(
         "iuran", "listrik", "kos", "gas", "wifi", "kuota", "galon", "indihome",
         "pln", "telkomsel", "lpg", "bpjs", "pulsa", "internet", "smartfren",
-        "sampah", "keamanan", "pdam", "token", "denda"
+        "sampah", "keamanan", "pdam", "token", "denda", "kontrakan"
     )
 
     private val HIBURAN = listOf(
@@ -85,11 +86,28 @@ object CategoryHints {
         "komisi", "thr", "insentif"
     )
 
-    private val INVESTASI = listOf("dividen", "reksadana", "saham", "obligasi", "deposito")
+    private val INVESTASI = listOf(
+        "dividen", "reksadana", "saham", "obligasi", "deposito", "tabungan"
+    )
+
+    /**
+     * Kategori penampung untuk pemasukan yang tidak punya pemilik jelas.
+     *
+     * "hadiah undian" bukan Investasi hanya karena model menebak begitu.
+     */
+    private val LAINNYA = listOf("undian")
 
     private val FREELANCE = listOf(
         "freelance", "proyek", "project", "klien", "pelanggan", "omzet"
     )
+
+    /**
+     * Sasaran cadangan kalau kategori utama tidak dimiliki user.
+     *
+     * Obat dan apotek tetap belanja kalau user tidak punya kategori Kesehatan;
+     * tanpa cadangan ini model bebas memilih kategori yang tidak berhubungan.
+     */
+    private val FALLBACKS = mapOf("kesehatan" to "belanja")
 
     /**
      * Pasangan kata -> nama kategori bawaan.
@@ -113,6 +131,7 @@ object CategoryHints {
         tambah("donasi", DONASI)
         tambah("servis motor", SERVIS_MOTOR)
         tambah("jualan online", JUALAN_ONLINE)
+        tambah("lainnya", LAINNYA)
     }.sortedByDescending { it.first.length }
 
     /**
@@ -127,11 +146,21 @@ object CategoryHints {
         val haystack = CategoryResolver.normalize(text)
         if (haystack.isEmpty()) return null
 
-        KEYWORDS.forEach { (kata, kategori) ->
-            val pola = Regex("(^|[^a-z0-9])${Regex.escape(kata)}([^a-z0-9]|$)")
-            if (!pola.containsMatchIn(haystack)) return@forEach
+        fun disebut(kata: String): Boolean =
+            Regex("(^|[^a-z0-9])${Regex.escape(kata)}([^a-z0-9]|$)").containsMatchIn(haystack)
 
+        // Utama: kata kunci menuju kategorinya sendiri.
+        KEYWORDS.forEach { (kata, kategori) ->
+            if (!disebut(kata)) return@forEach
             val hasil = CategoryResolver.resolve(kategori, candidates)
+            if (hasil is CategoryResolution.Matched) return hasil.category
+        }
+
+        // Cadangan: hanya untuk kata kunci yang kategorinya tidak dimiliki user.
+        KEYWORDS.forEach { (kata, kategori) ->
+            val cadangan = FALLBACKS[kategori] ?: return@forEach
+            if (!disebut(kata)) return@forEach
+            val hasil = CategoryResolver.resolve(cadangan, candidates)
             if (hasil is CategoryResolution.Matched) return hasil.category
         }
         return null

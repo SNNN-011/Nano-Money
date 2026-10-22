@@ -567,4 +567,90 @@ class LocalTransactionParserTest {
         assertEquals("Bonus", result.category)
         assertEquals("PEMASUKAN", result.type)
     }
+
+    @Test
+    fun `obat_tanpa_kategori_kesehatan_jatuh_ke_belanja`() {
+        // Uji HP: user tidak punya kategori Kesehatan, model memilih Kopi.
+        // Kata kesehatan tetap harus menang, dengan sasaran cadangan Belanja.
+        val engine = FakeEngine(envelope(catat("catat_pengeluaran", "35000", "kopi", "obat batuk")))
+        val result = success(
+            parseDenganKategori(
+                engine, "beli obat batuk di apotek 35rb",
+                income = listOf("Gaji", "Lainnya"),
+                expense = listOf(
+                    "Makanan", "Transportasi", "Tagihan", "Belanja",
+                    "Kopi", "Lainnya"
+                )
+            )
+        )
+
+        assertEquals("Belanja", result.category)
+    }
+
+    @Test
+    fun `hadiah_undian_tidak_jatuh_ke_investasi`() {
+        // Uji HP: model menebak Investasi untuk hadiah undian.
+        val engine = FakeEngine(envelope(catat("catat_masuk", "2000000", "investasi", "hadiah undian")))
+        val result = success(
+            parseDenganKategori(
+                engine, "dapat hadiah undian 2 juta",
+                income = listOf("Gaji", "Bonus", "Investasi", "Lainnya"),
+                expense = listOf("Makanan", "Lainnya")
+            )
+        )
+
+        assertEquals("Lainnya", result.category)
+        assertEquals("PEMASUKAN", result.type)
+    }
+
+    @Test
+    fun `bunga_tabungan_dapat_kategori_investasi`() {
+        // Uji HP: kategori kosong karena tidak ada kata kunci untuk "tabungan".
+        val engine = FakeEngine(envelope(catat("catat_pengeluaran", "45000", "makanan", "bunga tabungan")))
+        val result = success(
+            parseDenganKategori(
+                engine, "bunga tabungan 45 ribu",
+                income = listOf("Gaji", "Investasi", "Freelance", "Lainnya"),
+                expense = listOf("Makanan", "Transportasi", "Tagihan", "Lainnya")
+            )
+        )
+
+        assertEquals("PEMASUKAN", result.type)
+        assertEquals("Investasi", result.category)
+    }
+
+    @Test
+    fun `kategori_tidak_pernah_kosong`() {
+        // Uji HP: model tidak mengisi kategori sama sekali. Kartu konfirmasi tidak
+        // boleh menampilkan kategori kosong; "Lainnya" yang benar untuk barang
+        // pribadi yang dijual.
+        val engine = FakeEngine(envelope(catat("catat_masuk", "1200000", "", "hp bekas")))
+        val result = success(
+            parseDenganKategori(
+                engine, "jual hp bekas 1,2 juta",
+                income = listOf("Gaji", "Investasi", "Freelance", "Lainnya"),
+                expense = listOf("Makanan", "Transportasi", "Tagihan", "Lainnya")
+            )
+        )
+
+        assertEquals("Lainnya", result.category)
+    }
+
+    @Test
+    fun `servis_motor_jatuh_ke_transportasi`() {
+        // Uji HP: tanpa kategori "Servis Motor", model menebak Makanan.
+        val engine = FakeEngine(envelope(catat("catat_pengeluaran", "150000", "makanan", "Motor")))
+        val result = success(parse(engine, "servis motor 150 ribu"))
+
+        assertEquals("Transportasi", result.category)
+    }
+
+    @Test
+    fun `kontrakan_jatuh_ke_tagihan`() {
+        // Uji HP: "bayar kontrakan" tidak punya kata kunci, model menebak Makanan.
+        val engine = FakeEngine(envelope(catat("catat_pengeluaran", "1800000", "makanan", "Kontrakan")))
+        val result = success(parse(engine, "bayar kontrakan 1,8 juta"))
+
+        assertEquals("Tagihan", result.category)
+    }
 }

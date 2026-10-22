@@ -300,7 +300,12 @@ class LocalTransactionParser(
                 description = item.ifBlank { null }?.capitalizeFirst() ?: describeFrom(query),
                 amount = amount,
                 type = validType,
-                category = finalCategory,
+                // Kategori kosong tidak boleh lolos ke kartu konfirmasi: jatuh ke
+                // penampung milik user ("Lainnya"). Jawaban model yang tidak cocok
+                // tetap dibiarkan, sama seperti sebelumnya -- penyaring di jalur
+                // simpan yang memindahkannya ke penampung.
+                category = finalCategory
+                    ?: CategoryResolver.finalCategory(null, candidates),
                 date = clock(),
                 notes = null
             )
