@@ -166,7 +166,7 @@ fun EksporImporTabContent(
                     color = Ink
                 )
 
-                HairlineDivider()
+                HairlineDivider(color = HairlineStrong)
 
                 UnifiedExportCard(
                     isWideScreen = isWideScreen,
@@ -178,7 +178,7 @@ fun EksporImporTabContent(
                     onImportCsvFile = onImportCsvFile
                 )
 
-                HairlineDivider()
+                HairlineDivider(color = HairlineStrong)
 
                 DatabaseBackupSection(
                     isAutoBackupEnabled = isAutoBackupEnabled,
@@ -222,7 +222,7 @@ fun EksporImporTabContent(
                     }
                 )
 
-                HairlineDivider()
+                HairlineDivider(color = HairlineStrong)
 
                 // Keamanan (PIN) di atas Sampah: pengaturan ini lebih sering dibuka
                 // daripada memulihkan transaksi yang terlanjur dihapus.
@@ -321,7 +321,7 @@ fun EksporImporTabContent(
                     }
                 }
 
-                HairlineDivider()
+                HairlineDivider(color = HairlineStrong)
 
                 // Sampah: transaksi yang dihapus masih bisa dipulihkan.
                 TrashSection(

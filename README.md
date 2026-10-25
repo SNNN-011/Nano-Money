@@ -22,7 +22,7 @@ Nano Money mengusung tema visual **Midnight Abyss** (Dark Theme) yang elegan, di
 ## ✨ Fitur Produksi Utama
 
 ### 💬 1. Dua Otak AI: Lokal (Offline) & Gemini, plus OCR Nota
-* **Pilih Otak di Atas Kolom Chat**: **AI Lokal** menjalankan model langsung di HP — tanpa internet dan tanpa mengirim teks ke mana pun. **AI Gemini** memakai jaringan dan bisa membaca foto struk. Bawaannya Gemini agar perilaku lama tidak berubah; mode lokal dipilih sendiri oleh user.
+* **Pilih Otak di Kanan Judul Chat**: **AI Lokal** menjalankan model langsung di HP — tanpa internet dan tanpa mengirim teks ke mana pun. **AI Cloud** memakai jaringan dan bisa membaca foto struk. Bawaannya AI Cloud agar perilaku lama tidak berubah; mode lokal dipilih sendiri oleh user.
 * **Lapisan Aturan Deterministik**: Arah uang, nominal, item, dan kategori diperiksa ulang oleh aturan aplikasi (kata kerja masuk/keluar, kata kunci kategori, nama kategori milik user) sehingga hasilnya konsisten dan bisa diuji di JVM tanpa mesin AI.
 * **Kemampuan Multimodal OCR**: Unggah atau potret struk fisik Anda. AI melakukan pemindaian semantik (*Optical Character Recognition*) untuk mendeteksi item belanja dan nominal akhir secara instan.
 * **Keamanan URL Endpoint & Multi-Model**: Mendukung peralihan model AI secara aman (seperti `gemma-4-31b-it` dan `gemini-3.5-flash-lite`) tanpa membocorkan infrastruktur serverless utama Anda.
@@ -68,7 +68,7 @@ dengan bentuk saat model dilatih.
   tool pencatatan transaksi dan mengisi argumennya.
 * **Kategori milik user ikut dikirim**: daftar kategori aktif dari database diteruskan
   ke model lewat skema tool, bukan ditebak dari ingatan model.
-* **Belum bisa membaca foto struk**: untuk itu ganti ke AI Gemini. Otak lokal hanya
+* **Belum bisa membaca foto struk**: untuk itu ganti ke AI Cloud. Otak lokal hanya
   menerima teks.
 * **Hasil uji di HP**: 50 kalimat baru → 50/50 tercatat, arah uang 50/50, nominal 50/50,
   kategori 47/50. Unit test JVM: 116 lulus.
@@ -125,7 +125,7 @@ Mekanisme pertahanan:
 2. Aplikasi client menghitung SHA-256 dan menyertakan header keamanan khusus `X-Worker-Secret` yang diekstrak menggunakan fungsionalitas kunci Android Keystore internal aman.
 3. Workers di Cloudflare memvalidasi kecocokan tanda tangan data sebelum meneruskan instruksi menuju server Google.
 
-Jalur **AI Lokal** tidak melewati proxy ini karena teks diproses sepenuhnya di perangkat. Proxy tetap dipakai saat mode **AI Gemini** aktif, termasuk pembacaan foto struk.
+Jalur **AI Lokal** tidak melewati proxy ini karena teks diproses sepenuhnya di perangkat. Proxy tetap dipakai saat mode **AI Cloud** aktif, termasuk pembacaan foto struk.
 
 ---
 

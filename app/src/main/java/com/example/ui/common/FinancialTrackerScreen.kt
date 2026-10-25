@@ -212,6 +212,11 @@ fun FinancialTrackerScreen(
         if (currentRoute != TrackerTab.BERANDA.name) {
             viewModel.resetFilters()
         }
+        // Tab Tambah selalu mulai kosong. Tanpa ini, data transaksi yang tadi
+        // diedit tetap tertinggal di form saat user pindah tab lalu kembali.
+        if (currentRoute != TrackerTab.TRANSAKSI_BARU.name) {
+            viewModel.resetForm()
+        }
     }
 
     var monthsToExport by rememberSaveable(stateSaver = YearsMonthsSaver) {

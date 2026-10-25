@@ -102,7 +102,7 @@ private fun ChatScreenContent(
     // Satu sumber kebenaran: bendera dari ViewModel, bukan hasil hitung ulang isi
     // daftar pesan (dulu keduanya bisa berbeda).
     val isAiProcessing by viewModel.isAiProcessing.collectAsState()
-    // Otak yang sedang dipakai: AI Lokal (tanpa internet) atau AI Gemini (online).
+    // Otak yang sedang dipakai: AI Lokal (tanpa internet) atau AI Cloud (online).
     val aiMode by viewModel.aiMode.collectAsState()
     val focusManager = LocalFocusManager.current
     var inputText by rememberSaveable { mutableStateOf("") }
@@ -297,11 +297,11 @@ private fun ChatScreenContent(
                     )
 
                     Text(
-                        text = "Nano AI punya dua otak yang bisa dipilih di atas kolom chat:\n" +
+                        text = "Nano AI punya dua otak yang bisa dipilih di kanan judul chat:\n" +
                             "â€¢ AI Lokal â€” jalan tanpa internet dan tanpa kirim data ke mana pun, " +
                             "tapi belum bisa membaca foto struk.\n" +
-                            "â€¢ AI Gemini â€” butuh internet, bisa membaca foto struk.\n\n" +
-                            "Di AI Gemini, aplikasi memakai satu model utama. Kalau model itu sedang " +
+                            "â€¢ AI Cloud â€” butuh internet, bisa membaca foto struk.\n\n" +
+                            "Di AI Cloud, aplikasi memakai satu model utama. Kalau model itu sedang " +
                             "tidak tersedia, aplikasi otomatis mencoba dua model cadangan secara " +
                             "berurutan, jadi tidak perlu memilih model secara manual.",
                         color = InkMuted,
@@ -447,11 +447,54 @@ private fun ChatScreenContent(
                 }
                 Spacer(modifier = Modifier.width(Spacing.md))
                 Column {
-                    Text(
-                        text = "Nano AI",
-                        color = Ink,
-                        style = MaterialTheme.typography.titleMedium
-                    )
+                    // Judul, tombol info, dan pemilih otak berbagi satu baris:
+                    // pil otak duduk tepat di kanan tombol (i), sejajar judul.
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.xs)
+                    ) {
+                        Text(
+                            text = "Nano AI",
+                            color = Ink,
+                            style = MaterialTheme.typography.titleMedium
+                        )
+
+                        Spacer(modifier = Modifier.weight(1f))
+
+                        // Pilihan model dihapus: chat memakai satu model dengan cadangan
+                        // otomatis (lihat AiModelConfig.modelsToTry). Tombol info tetap ada
+                        // supaya user tahu model apa yang sedang dipakai.
+                        //
+                        // Ukuran bawaan IconButton TIDAK diperkecil: dulu dipaksa 24.dp
+                        // sehingga area sentuh ikut mengecil di bawah standar 48dp.
+                        IconButton(onClick = { showModelInfo = true }) {
+                            Icon(
+                                imageVector = Icons.Default.Info,
+                                contentDescription = "Info Model",
+                                tint = InkMuted,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+
+                        // Dua otak, satu kolom chat. AI Lokal jalan tanpa internet tapi
+                        // belum bisa baca foto struk; AI Cloud sebaliknya. Jarak tepi pil
+                        // dikecilkan supaya keduanya tetap muat di baris judul.
+                        EditorialPill(
+                            text = "AI Lokal",
+                            selected = aiMode == AiMode.LOCAL,
+                            onClick = { viewModel.setAiMode(AiMode.LOCAL) },
+                            contentPadding = Spacing.sm,
+                            testTag = "chat_mode_local_chip"
+                        )
+                        EditorialPill(
+                            text = "AI Cloud",
+                            selected = aiMode == AiMode.GEMINI,
+                            onClick = { viewModel.setAiMode(AiMode.GEMINI) },
+                            contentPadding = Spacing.sm,
+                            testTag = "chat_mode_gemini_chip"
+                        )
+                    }
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(Spacing.xs)
@@ -464,49 +507,9 @@ private fun ChatScreenContent(
                         Eyebrow(text = "Aktif & Siap Membantu", color = ForestGreen)
                     }
                 }
-
-                Spacer(modifier = Modifier.weight(1f))
-
-                // Pilihan model dihapus: chat memakai satu model dengan cadangan
-                // otomatis (lihat AiModelConfig.modelsToTry). Tombol info tetap ada
-                // supaya user tahu model apa yang sedang dipakai.
-                //
-                // Ukuran bawaan IconButton TIDAK diperkecil: dulu dipaksa 24.dp
-                // sehingga area sentuh ikut mengecil di bawah standar 48dp.
-                IconButton(onClick = { showModelInfo = true }) {
-                    Icon(
-                        imageVector = Icons.Default.Info,
-                        contentDescription = "Info Model",
-                        tint = InkMuted,
-                        modifier = Modifier.size(20.dp)
-                    )
-                }
             }
 
             HairlineDivider()
-
-            // Dua otak, satu kolom chat. AI Lokal jalan tanpa internet tapi belum
-            // bisa baca foto struk; AI Gemini sebaliknya.
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = Spacing.lg, vertical = Spacing.sm),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
-            ) {
-                EditorialPill(
-                    text = "AI Lokal",
-                    selected = aiMode == AiMode.LOCAL,
-                    onClick = { viewModel.setAiMode(AiMode.LOCAL) },
-                    testTag = "chat_mode_local_chip"
-                )
-                EditorialPill(
-                    text = "AI Gemini",
-                    selected = aiMode == AiMode.GEMINI,
-                    onClick = { viewModel.setAiMode(AiMode.GEMINI) },
-                    testTag = "chat_mode_gemini_chip"
-                )
-            }
 
 
 

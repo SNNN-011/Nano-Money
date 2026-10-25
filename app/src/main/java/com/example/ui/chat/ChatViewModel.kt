@@ -237,7 +237,7 @@ class ChatViewModel(
         // Foto struk dibaca model gambar (Gemini). Otak lokalnya teks saja, jadi
         // jalur ini ditolak di pangkal, bukan gagal di tengah jalan.
         if (_aiMode.value == AiMode.LOCAL) {
-            addAiMessage("Mode AI Lokal belum bisa membaca foto struk. Ganti ke AI Gemini atau ketik transaksinya ya 🙂")
+            addAiMessage("Mode AI Lokal belum bisa membaca foto struk. Ganti ke AI Cloud atau ketik transaksinya ya 🙂")
             return
         }
 

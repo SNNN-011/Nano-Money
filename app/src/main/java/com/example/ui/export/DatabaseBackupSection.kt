@@ -3,6 +3,7 @@ package com.example.ui.export
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -10,6 +11,7 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -89,6 +91,8 @@ fun DatabaseBackupSection(
     var tempBackupDayOfWeek by remember(autoBackupDayOfWeek) { mutableStateOf(autoBackupDayOfWeek) }
     var showFirestoreHelpInfo by remember { mutableStateOf(false) }
     var showBackupInfo by remember { mutableStateOf(false) }
+    // Bagian cadangan Drive bawaannya terlipat; daftar cadangan bisa panjang.
+    var driveSectionExpanded by rememberSaveable { mutableStateOf(false) }
 
     fun getDayNameIndonesian(dayOfWeek: Int): String {
         return when (dayOfWeek) {
@@ -265,7 +269,7 @@ fun DatabaseBackupSection(
             }
         }
 
-        HairlineDivider()
+        HairlineDivider(color = HairlineStrong)
 
         // ── Cadangan Google Drive ────────────────────────────────────────────
         Column(
@@ -290,13 +294,35 @@ fun DatabaseBackupSection(
                     )
                 }
             }
-            Text(
-                text = "Cadangan Google Drive",
-                style = MaterialTheme.typography.titleLarge,
-                fontFamily = SerifFamily,
-                color = Ink,
-                modifier = Modifier.testTag("drive_menu_header")
-            )
+            // Bagian ini bisa dilipat: tombol unggah dan daftar cadangan cukup
+            // panjang, jadi bawaannya tertutup dan dibuka saat user perlu.
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(
+                        onClickLabel = if (driveSectionExpanded) "Tutup cadangan Drive" else "Buka cadangan Drive"
+                    ) { driveSectionExpanded = !driveSectionExpanded }
+                    .padding(vertical = Spacing.xs)
+                    .testTag("drive_section_toggle"),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = "Cadangan Google Drive",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontFamily = SerifFamily,
+                    color = Ink,
+                    modifier = Modifier
+                        .weight(1f)
+                        .testTag("drive_menu_header")
+                )
+                Icon(
+                    imageVector = if (driveSectionExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                    contentDescription = if (driveSectionExpanded) "Sembunyikan cadangan Drive" else "Tampilkan cadangan Drive",
+                    tint = InkMuted,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
             Text(
                 text = if (driveBackupList.isEmpty()) {
                     "Belum ada cadangan di cloud"
@@ -350,143 +376,145 @@ fun DatabaseBackupSection(
                 }
             }
 
-            // Tidak ada lagi cadangan lokal: ZIP dibuat sementara di cache,
-            // diunggah ke Drive, lalu dihapus dari perangkat.
-            if (connectedGoogleAccount != null) {
-                EditorialButton(
-                    text = if (isDriveProcessing) "Mengunggah..." else "Cadangkan ke Google Drive",
-                    onClick = {
-                        coroutineScope.launch {
-                            onIsDriveProcessingChanged(true)
-                            when (val backup = BackupHelper.performBackup(context)) {
-                                is BackupHelper.BackupResult.Success -> {
-                                    try {
-                                        when (val upload = GoogleDriveHelper.uploadBackupToDrive(context, backup.file)) {
-                                            is GoogleDriveHelper.DriveResult.Success -> {
-                                                Toast.makeText(
-                                                    context,
-                                                    "Cadangan berhasil diunggah ke Google Drive",
-                                                    Toast.LENGTH_LONG
-                                                ).show()
-                                                // Pesan gagal sebelumnya sudah tidak berlaku.
-                                                onDriveErrorDetailMessageChange(null)
-                                                when (val listRes = GoogleDriveHelper.listBackupsFromDrive(context)) {
-                                                    is GoogleDriveHelper.DriveResult.Success ->
-                                                        onDriveBackupListChanged(listRes.data)
-                                                    is GoogleDriveHelper.DriveResult.Error -> Unit
+            if (driveSectionExpanded) {
+                // Tidak ada lagi cadangan lokal: ZIP dibuat sementara di cache,
+                // diunggah ke Drive, lalu dihapus dari perangkat.
+                if (connectedGoogleAccount != null) {
+                    EditorialButton(
+                        text = if (isDriveProcessing) "Mengunggah..." else "Cadangkan ke Google Drive",
+                        onClick = {
+                            coroutineScope.launch {
+                                onIsDriveProcessingChanged(true)
+                                when (val backup = BackupHelper.performBackup(context)) {
+                                    is BackupHelper.BackupResult.Success -> {
+                                        try {
+                                            when (val upload = GoogleDriveHelper.uploadBackupToDrive(context, backup.file)) {
+                                                is GoogleDriveHelper.DriveResult.Success -> {
+                                                    Toast.makeText(
+                                                        context,
+                                                        "Cadangan berhasil diunggah ke Google Drive",
+                                                        Toast.LENGTH_LONG
+                                                    ).show()
+                                                    // Pesan gagal sebelumnya sudah tidak berlaku.
+                                                    onDriveErrorDetailMessageChange(null)
+                                                    when (val listRes = GoogleDriveHelper.listBackupsFromDrive(context)) {
+                                                        is GoogleDriveHelper.DriveResult.Success ->
+                                                            onDriveBackupListChanged(listRes.data)
+                                                        is GoogleDriveHelper.DriveResult.Error -> Unit
+                                                    }
+                                                }
+                                                is GoogleDriveHelper.DriveResult.Error -> {
+                                                    onDriveErrorDetailMessageChange(upload.message)
                                                 }
                                             }
-                                            is GoogleDriveHelper.DriveResult.Error -> {
-                                                onDriveErrorDetailMessageChange(upload.message)
-                                            }
+                                        } finally {
+                                            if (backup.file.exists()) backup.file.delete()
                                         }
-                                    } finally {
-                                        if (backup.file.exists()) backup.file.delete()
+                                    }
+                                    is BackupHelper.BackupResult.Error -> {
+                                        Toast.makeText(
+                                            context,
+                                            "Gagal membuat cadangan: ${backup.message}",
+                                            Toast.LENGTH_LONG
+                                        ).show()
                                     }
                                 }
-                                is BackupHelper.BackupResult.Error -> {
-                                    Toast.makeText(
-                                        context,
-                                        "Gagal membuat cadangan: ${backup.message}",
-                                        Toast.LENGTH_LONG
-                                    ).show()
-                                }
+                                onIsDriveProcessingChanged(false)
                             }
-                            onIsDriveProcessingChanged(false)
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = !isDriveProcessing,
-                    trailingArrow = false,
-                    expanded = true,
-                    testTag = "backup_to_drive_now_button"
-                )
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = !isDriveProcessing,
+                        trailingArrow = false,
+                        expanded = true,
+                        testTag = "backup_to_drive_now_button"
+                    )
 
-                // Pencadangan otomatis hanya berguna kalau Drive terhubung.
-                // Pengaturan jam/hari tidak ditampilkan di sini; jadwal yang
-                // tersimpan dari versi sebelumnya tetap dipakai.
-                EditorialToggleRow(
-                    title = "Pencadangan otomatis",
-                    checked = isAutoBackupEnabled,
-                    onCheckedChange = { enabled ->
-                        onAutoBackupEnabledChanged(enabled)
-                        BackupScheduler.schedulePeriodicBackup(
-                            context = context,
-                            enabled = enabled,
-                            interval = autoBackupInterval,
-                            hour = autoBackupHour,
-                            minute = autoBackupMinute,
-                            dayOfWeek = autoBackupDayOfWeek,
-                            forceUpdate = true
-                        )
-                    },
-                    testTag = "auto_backup_drive_switch"
-                )
-            }
+                    // Pencadangan otomatis hanya berguna kalau Drive terhubung.
+                    // Pengaturan jam/hari tidak ditampilkan di sini; jadwal yang
+                    // tersimpan dari versi sebelumnya tetap dipakai.
+                    EditorialToggleRow(
+                        title = "Pencadangan otomatis",
+                        checked = isAutoBackupEnabled,
+                        onCheckedChange = { enabled ->
+                            onAutoBackupEnabledChanged(enabled)
+                            BackupScheduler.schedulePeriodicBackup(
+                                context = context,
+                                enabled = enabled,
+                                interval = autoBackupInterval,
+                                hour = autoBackupHour,
+                                minute = autoBackupMinute,
+                                dayOfWeek = autoBackupDayOfWeek,
+                                forceUpdate = true
+                            )
+                        },
+                        testTag = "auto_backup_drive_switch"
+                    )
+                }
 
-            if (driveBackupList.isEmpty()) {
-                Text(
-                    text = if (connectedGoogleAccount == null) {
-                        "Hubungkan akun Google dulu untuk mengaktifkan cadangan cloud."
-                    } else {
-                        "Belum ada cadangan. Tekan tombol di atas untuk mencadangkan ke Google Drive."
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = InkMuted
-                )
-            } else {
-                driveBackupList.forEachIndexed { index, driveFile ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = Spacing.xs),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = driveFile.name,
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = Ink,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                            Text(
-                                text = FormatUtils.formatDriveTimestamp(driveFile.createdTime) +
-                                    " · " + FormatUtils.formatFileSize(driveFile.sizeBytes),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = InkMuted,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-                        IconButton(
-                            onClick = { onSelectedDriveBackupToRestoreChange(driveFile) },
-                            enabled = !isDriveProcessing,
+                if (driveBackupList.isEmpty()) {
+                    Text(
+                        text = if (connectedGoogleAccount == null) {
+                            "Hubungkan akun Google dulu untuk mengaktifkan cadangan cloud."
+                        } else {
+                            "Belum ada cadangan. Tekan tombol di atas untuk mencadangkan ke Google Drive."
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = InkMuted
+                    )
+                } else {
+                    driveBackupList.forEachIndexed { index, driveFile ->
+                        Row(
                             modifier = Modifier
-                                .size(44.dp)
-                                .testTag("restore_drive_backup_${driveFile.id}")
+                                .fillMaxWidth()
+                                .padding(vertical = Spacing.xs),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.Restore,
-                                contentDescription = "Pulihkan dari Drive",
-                                tint = Ink,
-                                modifier = Modifier.size(18.dp)
-                            )
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = driveFile.name,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = Ink,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                Text(
+                                    text = FormatUtils.formatDriveTimestamp(driveFile.createdTime) +
+                                        " · " + FormatUtils.formatFileSize(driveFile.sizeBytes),
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = InkMuted,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                            IconButton(
+                                onClick = { onSelectedDriveBackupToRestoreChange(driveFile) },
+                                enabled = !isDriveProcessing,
+                                modifier = Modifier
+                                    .size(44.dp)
+                                    .testTag("restore_drive_backup_${driveFile.id}")
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Restore,
+                                    contentDescription = "Pulihkan dari Drive",
+                                    tint = Ink,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                            IconButton(
+                                onClick = { driveBackupFileToDelete = driveFile },
+                                enabled = !isDriveProcessing,
+                                modifier = Modifier.size(44.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Outlined.DeleteOutline,
+                                    contentDescription = "Hapus cadangan Drive",
+                                    tint = BurntOrange,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
                         }
-                        IconButton(
-                            onClick = { driveBackupFileToDelete = driveFile },
-                            enabled = !isDriveProcessing,
-                            modifier = Modifier.size(44.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Outlined.DeleteOutline,
-                                contentDescription = "Hapus cadangan Drive",
-                                tint = BurntOrange,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
+                        if (index < driveBackupList.lastIndex) HairlineDivider()
                     }
-                    if (index < driveBackupList.lastIndex) HairlineDivider()
                 }
             }
         }
