@@ -23,11 +23,13 @@ import kotlinx.coroutines.withContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -428,7 +430,19 @@ fun FinancialTrackerScreen(
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
-            .background(Cream)
+            // Latar krem diberi gradien halus + vignette supaya permukaan kaca
+            // punya sesuatu untuk dipantulkan. Di krem rata, kaca putih nyaris
+            // tidak terlihat bedanya.
+            .background(Brush.verticalGradient(listOf(CreamRaised, Cream)))
+            .drawBehind {
+                drawRect(
+                    Brush.radialGradient(
+                        colors = listOf(Color.Transparent, Ink.copy(alpha = 0.06f)),
+                        center = Offset(size.width / 2f, size.height * 0.55f),
+                        radius = size.height * 0.80f
+                    )
+                )
+            }
     ) {
         val isWideScreen = maxWidth > 720.dp
 

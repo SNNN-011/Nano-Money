@@ -1,6 +1,5 @@
 package com.example.ui.components
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -21,13 +20,9 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.NorthEast
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -39,10 +34,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.testTag
@@ -57,7 +54,6 @@ import com.example.ui.theme.CardCore
 import com.example.ui.theme.CardVeil
 import com.example.ui.theme.CornerRadius
 import com.example.ui.theme.Cream
-import com.example.ui.theme.CreamRaised
 import com.example.ui.theme.EditorialTypography
 import com.example.ui.theme.EyebrowTextStyle
 import com.example.ui.theme.Hairline
@@ -150,8 +146,12 @@ fun EditorialButton(
      */
     expanded: Boolean = false
 ) {
-    val container = if (style == EditorialButtonStyle.Filled) accent else Color.Transparent
-    val contentColor = if (style == EditorialButtonStyle.Filled) Cream else accent
+    val filled = style == EditorialButtonStyle.Filled
+    val shape = RoundedCornerShape(CornerRadius.pill)
+    // Varian Ghost memakai kaca bening-tinted, bukan latar transparan: di atas
+    // krem polos tombol berbingkai saja terlihat seperti kotak kosong.
+    val container = if (filled) accent else GlassTintedFill
+    val contentColor = if (filled) Cream else accent
 
     Row(
         modifier = modifier
@@ -161,15 +161,29 @@ fun EditorialButton(
             // dialog), tombol jadi terlalu pendek karena chip 26 dp itulah yang
             // biasanya menahan tingginya.
             .heightIn(min = 44.dp)
-            .clip(RoundedCornerShape(CornerRadius.pill))
-            .background(container)
-            .then(
-                if (style == EditorialButtonStyle.Ghost) {
-                    Modifier.border(1.dp, HairlineStrong, RoundedCornerShape(CornerRadius.pill))
-                } else {
-                    Modifier
-                }
+            .shadow(
+                elevation = if (filled) 6.dp else 3.dp,
+                shape = shape,
+                ambientColor = Ink.copy(alpha = 0.14f),
+                spotColor = Ink.copy(alpha = 0.20f)
             )
+            .clip(shape)
+            .background(container)
+            .drawBehind {
+                // Kilau atas kaca. Di tombol tinta kilaunya dikecilkan supaya
+                // tulisan krem tetap punya kontras.
+                drawRect(
+                    brush = Brush.verticalGradient(
+                        colors = listOf(
+                            if (filled) Color.White.copy(alpha = 0.20f) else GlassRimHighlight.copy(alpha = 0.60f),
+                            Color.Transparent
+                        ),
+                        startY = 0f,
+                        endY = size.height * 0.55f
+                    )
+                )
+            }
+            .then(if (filled) Modifier.border(1.dp, GlassRim, shape) else Modifier.border(1.dp, GlassEdge, shape))
             .clickable(enabled = enabled) { onClick() }
             .padding(
                 start = 16.dp,
@@ -232,14 +246,30 @@ fun EditorialPill(
     contentPadding: Dp = 14.dp,
     testTag: String = ""
 ) {
+    val shape = RoundedCornerShape(CornerRadius.pill)
     Box(
         modifier = modifier
-            .clip(RoundedCornerShape(CornerRadius.pill))
-            .background(if (selected) Ink else Color.Transparent)
-            .then(
-                if (selected) Modifier
-                else Modifier.border(1.dp, Hairline, RoundedCornerShape(CornerRadius.pill))
+            .shadow(
+                elevation = if (selected) 4.dp else 0.dp,
+                shape = shape,
+                ambientColor = Ink.copy(alpha = 0.12f),
+                spotColor = Ink.copy(alpha = 0.16f)
             )
+            .clip(shape)
+            .background(if (selected) Ink else GlassClearFill)
+            .drawBehind {
+                drawRect(
+                    brush = Brush.verticalGradient(
+                        colors = listOf(
+                            if (selected) Color.White.copy(alpha = 0.16f) else GlassRimHighlight.copy(alpha = 0.45f),
+                            Color.Transparent
+                        ),
+                        startY = 0f,
+                        endY = size.height * 0.70f
+                    )
+                )
+            }
+            .border(1.dp, if (selected) GlassRim else GlassEdge, shape)
             .clickable { onClick() }
             .padding(horizontal = contentPadding, vertical = 8.dp)
             .then(if (testTag.isNotEmpty()) Modifier.testTag(testTag) else Modifier),
@@ -387,14 +417,15 @@ fun EditorialDialogCard(
     modifier: Modifier = Modifier,
     content: @Composable ColumnScope.() -> Unit
 ) {
-    Card(
+    // Permukaan kaca pekat (preset overlay Glassy UI): teks tetap 4.5:1 di
+    // atas latar apa pun, tapi tepinya memantulkan cahaya seperti kaca.
+    GlassSurface(
         modifier = modifier
             .fillMaxWidth()
             .padding(Spacing.lg),
-        shape = RoundedCornerShape(CornerRadius.bezel),
-        colors = CardDefaults.cardColors(containerColor = CreamRaised),
-        border = BorderStroke(1.dp, Hairline),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+        preset = GlassPreset.Overlay,
+        shape = RoundedCornerShape(CornerRadius.xl),
+        raised = true
     ) {
         Column(
             modifier = Modifier
@@ -465,9 +496,19 @@ fun EditorialTextField(
             // isian ketuk di form yang sama selalu tampil sama.
             .height(FieldHeight)
             .clip(shape)
-            // Latar isian memakai --bg-2 (CreamRaised), bukan latar halaman,
-            // supaya kotaknya tetap terbaca saat form tidak dibungkus kartu.
-            .background(CreamRaised)
+            // Latar isian memakai kaca kontrol Glassy UI (putih .72), bukan
+            // latar halaman, supaya kotaknya tetap terbaca saat form tidak
+            // dibungkus kartu.
+            .background(GlassControlFill)
+            .drawBehind {
+                drawRect(
+                    brush = Brush.verticalGradient(
+                        colors = listOf(GlassRimHighlight.copy(alpha = 0.60f), Color.Transparent),
+                        startY = 0f,
+                        endY = size.height * 0.65f
+                    )
+                )
+            }
             .border(1.dp, if (focused) BurntOrange else HairlineStrong, shape)
             .onFocusChanged { focused = it.isFocused }
             .padding(horizontal = Spacing.md, vertical = Spacing.sm)
@@ -506,7 +547,16 @@ fun TapField(
             // Isian ketuk dulu 56 dp, jadi tampil lebih jangkung daripada
             // isian teks di form yang sama; sekarang dua-duanya 44 dp.
             .clip(RoundedCornerShape(CornerRadius.md))
-            .background(CreamRaised)
+            .background(GlassControlFill)
+            .drawBehind {
+                drawRect(
+                    brush = Brush.verticalGradient(
+                        colors = listOf(GlassRimHighlight.copy(alpha = 0.60f), Color.Transparent),
+                        startY = 0f,
+                        endY = size.height * 0.75f
+                    )
+                )
+            }
             .border(1.dp, HairlineStrong, RoundedCornerShape(CornerRadius.md))
             .clickable(onClickLabel = text, onClick = onClick)
             .padding(horizontal = Spacing.md, vertical = Spacing.sm)
@@ -589,17 +639,10 @@ fun EditorialToggleRow(
                 )
             }
         }
-        Switch(
+        GlassSwitch(
             checked = checked,
             onCheckedChange = onCheckedChange,
-            colors = SwitchDefaults.colors(
-                checkedThumbColor = Cream,
-                checkedTrackColor = Ink,
-                uncheckedThumbColor = CreamRaised,
-                uncheckedTrackColor = HairlineStrong,
-                uncheckedBorderColor = HairlineStrong
-            ),
-            modifier = if (testTag.isNotEmpty()) Modifier.testTag(testTag) else Modifier
+            testTag = testTag
         )
     }
 }

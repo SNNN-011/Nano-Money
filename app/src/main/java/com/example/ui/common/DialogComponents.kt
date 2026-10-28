@@ -41,6 +41,9 @@ import com.example.ui.components.EditorialDialogCard
 import com.example.ui.components.EditorialPill
 import com.example.ui.components.EditorialTextField
 import com.example.ui.components.Eyebrow
+import com.example.ui.components.GlassEdge
+import com.example.ui.components.GlassOverlayFill
+import com.example.ui.components.GlassSwitch
 import com.example.ui.components.HairlineDivider
 import com.example.ui.components.LabeledField
 import com.example.ui.components.TapField
@@ -1302,7 +1305,7 @@ fun RecurringTransactionManagementDialog(
                             DropdownMenu(
                                 expanded = expandedCategoryMenu,
                                 onDismissRequest = { expandedCategoryMenu = false },
-                                modifier = Modifier.background(CreamRaised).border(1.dp, Hairline)
+                                modifier = Modifier.background(GlassOverlayFill).border(1.dp, GlassEdge)
                             ) {
                                 categories.forEach { category ->
                                     DropdownMenuItem(
@@ -1327,7 +1330,7 @@ fun RecurringTransactionManagementDialog(
                             DropdownMenu(
                                 expanded = expandedDayMenu,
                                 onDismissRequest = { expandedDayMenu = false },
-                                modifier = Modifier.background(CreamRaised).border(1.dp, Hairline)
+                                modifier = Modifier.background(GlassOverlayFill).border(1.dp, GlassEdge)
                             ) {
                                 (1..31).forEach { day ->
                                     DropdownMenuItem(
@@ -1433,16 +1436,10 @@ fun RecurringTransactionManagementDialog(
                                             verticalAlignment = Alignment.CenterVertically,
                                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                                         ) {
-                                            Switch(
+                                            GlassSwitch(
                                                 checked = item.isActive,
                                                 onCheckedChange = { onToggleRecurringActive(item) },
-                                                colors = SwitchDefaults.colors(
-                                                    checkedThumbColor = Cream,
-                                                    checkedTrackColor = Ink,
-                                                    uncheckedThumbColor = InkMuted,
-                                                    uncheckedTrackColor = Cream
-                                                ),
-                                                modifier = Modifier.testTag("recurring_toggle_active_${item.id}")
+                                                testTag = "recurring_toggle_active_${item.id}"
                                             )
                                             IconButton(
                                                 onClick = { onDeleteRecurring(item) },
