@@ -7,6 +7,12 @@ package com.example.domain
  * yang jelas bukan makanan, mis. "beli bensin". Diuji pada 200 baris simulasi
  * aplikasi (`vm/measure_hint.py`): kategori benar naik 29,5% -> 37,8%.
  *
+ * Kata yang ditambahkan sesudah audit 189 salah kategori (`draf_kontras_v1/AUDIT_189.md`)
+ * diberi tanda di daftarnya. Diukur pada 554 baris beroutput `gold_v6/eval_599.jsonl`
+ * lewat `vm/measure_app_layer.py`: kategori 67,9% -> 87,4%, jenis 97,7% -> 99,6%.
+ * "topup" dibuang dari Hiburan karena "topup pulsa" itu Tagihan, sedangkan
+ * "topup game" sudah tertangkap kata "game".
+ *
  * Sebagian besar daftar kata di bawah adalah kata yang paling sering muncul
  * sebagai `item` untuk tiap kategori di `draf_v5/finetune.jsonl`
  * (`vm/build_category_hints.py`), sudah disaring dari kata ambigu. Kata yang
@@ -30,7 +36,8 @@ object CategoryHints {
         "padang", "solaria", "dimsum", "hokben", "pecel", "lele", "kopken", "geprek",
         "bensu", "telur", "warteg", "gacoan", "tempe", "seblak", "dunkin", "kenangan",
         "roti", "kerupuk", "yoshinoya", "mineral", "kfc", "jco", "starbucks", "snack",
-        "martabak", "taichan", "tahu", "mcd", "warung", "nraktir", "traktir"
+        "martabak", "taichan", "tahu", "mcd", "warung", "nraktir", "traktir",
+        "sarapan", "makan"
     )
 
     private val TRANSPORTASI = listOf(
@@ -43,11 +50,12 @@ object CategoryHints {
     private val TAGIHAN = listOf(
         "iuran", "listrik", "kos", "gas", "wifi", "kuota", "galon", "indihome",
         "pln", "telkomsel", "lpg", "bpjs", "pulsa", "internet", "smartfren",
-        "sampah", "keamanan", "pdam", "token", "denda", "kontrakan", "asuransi"
+        "sampah", "keamanan", "pdam", "token", "denda", "kontrakan", "asuransi",
+        "cicilan", "angsuran", "tagihan"
     )
 
     private val HIBURAN = listOf(
-        "bioskop", "loket", "nonton", "viu", "steam", "disney", "game", "topup",
+        "bioskop", "loket", "nonton", "viu", "steam", "disney", "game",
         "konser", "genflix", "traveloka", "spotify", "cgv", "xxi", "langganan",
         "film", "nintendo", "eshop", "iflix", "netflix", "youtube", "wetv", "vidio",
         "store"

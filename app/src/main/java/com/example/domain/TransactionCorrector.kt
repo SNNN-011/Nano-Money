@@ -35,13 +35,22 @@ object TransactionCorrector {
         "dibayar", "dikasih", "diberi", "menang", "cair", "jual", "jualan",
         "refund", "cashback", "warisan",
         // Bukan kata kerja, tapi penanda pemasukan yang sama kuatnya: "gaji
-        // bulan ini 7 juta" tidak punya kata kerja apa pun.
-        "gaji", "honor", "dividen", "dijual", "terjual"
+        // bulan ini 7 juta" tidak punya kata kerja apa pun. Daftar ini diuji
+        // pada 554 baris `gold_v6/eval_599.jsonl`: jenis 97,7% -> 99,6% dan
+        // kategori 67,9% -> 87,4% setelah dipasang bersama CategoryHints
+        // (`vm/measure_app_layer.py`). Tanpa "thr"/"bonus"/"insentif" di sini,
+        // "THR Rp 20 juta" tercatat pengeluaran lalu kategorinya ikut salah.
+        "gaji", "honor", "dividen", "dijual", "terjual",
+        "thr", "bonus", "insentif", "tunjangan", "komisi", "upah", "lembur",
+        "pesangon", "beasiswa", "hadiah",
+        // "uang masuk 2 juta dari sewa" adalah pemasukan, sedangkan "sewa" di
+        // daftar kata keluar sempat membalik arahnya.
+        "masuk"
     )
 
     /** Kata kerja yang menandakan uang keluar dari user. */
     private val EXPENSE_VERBS = listOf(
-        "bayar", "bayarin", "beli", "beliin", "belanja", "sewa", "cicil",
+        "bayar", "bayarin", "beli", "beliin", "belanja", "sewa", "cicil", "cicilan",
         "angsuran", "transfer", "kirim", "topup", "isi", "ongkos", "parkir", "tarif",
         "jajan", "servis", "cuci", "traktir", "nraktir",
         "nyumbang", "sumbang", "sedekah", "infak"
@@ -63,7 +72,10 @@ object TransactionCorrector {
      */
     private val INCOME_PHRASES = listOf(
         "uang kiriman", "kiriman dari", "dikirim",
-        "bunga tabungan", "bunga deposito"
+        "bunga tabungan", "bunga deposito",
+        // "uang jajan" adalah uang yang DITERIMA, sedangkan "jajan" sendiri
+        // adalah kata keluar. Tanpa frasa ini arahnya ikut terbalik.
+        "uang jajan", "uang saku"
     )
 
     /**
@@ -75,7 +87,10 @@ object TransactionCorrector {
      */
     private val EARLY_INCOME_PHRASES = listOf(
         "dikasih uang", "dikasih duit", "diberi uang", "diberi duit",
-        "dapat uang", "dapet uang", "dapat duit", "dapet duit", "uang dari"
+        "dapat uang", "dapet uang", "dapat duit", "dapet duit", "uang dari",
+        // "uang jajan 200rb" tetap pemasukan walau model memilih kategori
+        // pengeluaran: frasa masuknya muncul lebih dulu daripada kata "jajan".
+        "uang jajan", "uang saku"
     )
 
     /**

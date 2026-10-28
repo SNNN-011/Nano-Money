@@ -207,6 +207,50 @@ class TransactionCorrectorTest {
     }
 
     @Test
+    fun `penanda_pemasukan_tanpa_kata_kerja_dikenali`() {
+        // Audit 189 salah kategori menemukan "THR Rp 20 juta" dan "insentif 8 juta"
+        // tercatat pengeluaran karena daftar lama hanya punya "gaji"/"honor".
+        // Diukur di 554 baris eval: jenis 97,7% -> 99,6%.
+        assertEquals("income", jenisAkhir("THR Rp 20 juta", "expense", "Lainnya"))
+        assertEquals("income", jenisAkhir("insentif 8 juta", "expense", "Lainnya"))
+        assertEquals("income", jenisAkhir("tunjangan bulan ini 2 juta", "expense", "Lainnya"))
+        assertEquals("income", TransactionCorrector.directionFromVerbs("uang masuk 2 juta"))
+    }
+
+    @Test
+    fun `uang_masuk_dari_sewa_tetap_pemasukan`() {
+        // "sewa" ada di daftar kata keluar, jadi kalimat ini dulu dibalik jadi
+        // pengeluaran. "masuk" menahannya, dan kategori AI sendiri menguatkan.
+        assertEquals(
+            "income",
+            jenisAkhir(
+                "uang masuk 2 juta dari sewa",
+                "income",
+                "Investasi",
+                income = kategoriIncome + "Investasi"
+            )
+        )
+    }
+
+    @Test
+    fun `uang_jajan_dihitung_pemasukan`() {
+        // "jajan" adalah kata keluar, padahal "uang jajan" adalah uang yang
+        // diterima. Satu-satunya baris seperti ini di eval ikut terbalik.
+        assertEquals("income", jenisAkhir("uang uang jajan 5 jutaan", "income", "Lainnya"))
+        // Kategori pilihan model pun tidak boleh membalik arahnya.
+        assertEquals("income", jenisAkhir("uang jajan 200rb", "expense", "Makanan"))
+        assertEquals("income", TransactionCorrector.directionFromVerbs("uang saku 200rb"))
+    }
+
+    @Test
+    fun `cicilan_dan_angsuran_dihitung_pengeluaran`() {
+        // "cicil" sudah ada, tapi pencocokan memakai kata utuh sehingga
+        // "cicilan" (bentuk yang dipakai orang) tidak pernah cocok.
+        assertEquals("expense", TransactionCorrector.directionFromVerbs("cicilan motor 800rb"))
+        assertEquals("expense", TransactionCorrector.directionFromVerbs("bayar angsuran 500rb"))
+    }
+
+    @Test
     fun `pemetaan_jenis_bawaan_ai_dinormalkan_dengan_aturan_yang_sama`() {
         // Dipakai jalur simpan DAN kartu konfirmasi. Satu tempat saja, supaya kartu
         // tidak pernah menampilkan jenis yang berbeda dari yang akhirnya disimpan.
