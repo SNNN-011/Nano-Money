@@ -11,11 +11,11 @@ Aplikasi ini mendisrupsi cara pencatatan keuangan manual konvensional dengan men
 
 ---
 
-## 🌌 Tema Visual: Midnight Abyss
-Nano Money mengusung tema visual **Midnight Abyss** (Dark Theme) yang elegan, dirancang khusus untuk kenyamanan mata pengguna:
-* **Slate Canvas Background**: Latar belakang pekat mengurangi emisi cahaya biru dan konsumsi energi baterai ponsel.
-* **Ambient Radial Glows**: Penerapan degradasi warna pendar cahaya (*ambient glow*) menggunakan warna **Steel Blue** (Utama) dan **Neon Violet** (Aksen) untuk menonjolkan visualisasi metrik data finansial penting.
-* **Dynamic Animations**: Sentuhan mikro-interaksi responsif dan visual riak halus (*Material Ripples*) saat komponen berinteraksi.
+## 🎨 Tema Visual: Editorial Cream
+Nano Money kini memakai tema visual **Editorial Cream** yang terang, hangat, dan terinspirasi tata letak editorial:
+* **Cream Canvas**: Latar krem terang dengan tinta gelap, tipografi serif, garis rambut, serta struktur bezel yang menjaga hierarki informasi tetap tenang dan mudah dibaca.
+* **Editorial Components**: Tombol, pil pilihan, dialog, kolom isian, dan navigasi mengikuti bentuk, jarak, serta warna dari sistem visual editorial.
+* **Warm Accent**: Aksen **Burnt Orange** dipakai untuk aksi dan perhatian, sementara tinta gelap menjaga kontras dan keterbacaan.
 
 ---
 
