@@ -34,9 +34,6 @@ import androidx.compose.ui.unit.sp
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import com.example.ui.common.FinancialTrackerScreen
-import com.example.ui.components.EditorialButton
-import com.example.ui.components.EditorialDialog
-import com.example.ui.components.EditorialDialogCard
 import com.example.ui.theme.*
 
 // H4b: jeda minimum di background sebelum PIN dikunci lagi. Alur singkat seperti
@@ -243,27 +240,20 @@ private fun SecurityWarningDialog(
   onContinue: () -> Unit
 ) {
   val isRooted = status == com.example.util.SecurityUtil.SecurityStatus.ROOTED
-  // Peringatan ini muncul sebelum layar utama, tapi tetap ikut permukaan kaca
-  // yang sama supaya tidak ada dialog gelap bawaan Material di aplikasi.
-  EditorialDialog(onDismissRequest = onContinue) {
-    EditorialDialogCard(
-      title = if (isRooted) "Perangkat Root Terdeteksi" else "Lingkungan Emulator Terdeteksi"
-    ) {
+  AlertDialog(
+    onDismissRequest = onContinue,
+    title = { Text(if (isRooted) "Perangkat Root Terdeteksi" else "Lingkungan Emulator Terdeteksi") },
+    text = {
       Text(
-        text = if (isRooted) {
+        if (isRooted) {
           "Aplikasi tetap bisa dipakai, tetapi perangkat root menurunkan jaminan keamanan data keuangan Anda. Hindari fitur sensitif di perangkat ini."
         } else {
           "Aplikasi tetap bisa dipakai di emulator, tetapi data di sini tidak terlindungi seperti di perangkat asli."
-        },
-        style = MaterialTheme.typography.bodyMedium,
-        color = InkMuted
+        }
       )
-      EditorialButton(
-        text = "Lanjutkan",
-        onClick = onContinue,
-        trailingArrow = false,
-        expanded = true
-      )
+    },
+    confirmButton = {
+      TextButton(onClick = onContinue) { Text("Lanjutkan") }
     }
-  }
+  )
 }

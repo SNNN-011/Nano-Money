@@ -1,4 +1,4 @@
-package com.example.ui.chat
+﻿package com.example.ui.chat
 
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
@@ -70,8 +70,6 @@ import com.example.ui.components.EditorialDialog
 import com.example.ui.components.EditorialPill
 import com.example.ui.components.EditorialTextField
 import com.example.ui.components.Eyebrow
-import com.example.ui.components.GlassEdge
-import com.example.ui.components.GlassOverlayFill
 import com.example.ui.components.HairlineDivider
 import com.example.ui.components.LabeledField
 import com.example.ui.components.TapField
@@ -877,7 +875,7 @@ private fun PendingTransactionSheet(
                     DropdownMenu(
                         expanded = categoryDropdownExpanded,
                         onDismissRequest = { categoryDropdownExpanded = false },
-                        modifier = Modifier.background(GlassOverlayFill).border(1.dp, GlassEdge)
+                        modifier = Modifier.background(CreamRaised).border(1.dp, Hairline)
                     ) {
                         cats.forEach { categoryLabel ->
                             val (_, label) = CategoryIconMapper.extractEmojiAndLabel(categoryLabel)
@@ -1071,7 +1069,7 @@ private fun PendingReceiptSheet(
                                 DropdownMenu(
                                     expanded = itemCategoryDropdownExpanded,
                                     onDismissRequest = { itemCategoryDropdownExpanded = false },
-                                    modifier = Modifier.background(GlassOverlayFill).border(1.dp, GlassEdge)
+                                    modifier = Modifier.background(CreamRaised).border(1.dp, Hairline)
                                 ) {
                                     itemCats.forEach { categoryLabel ->
                                         val (_, label) = CategoryIconMapper.extractEmojiAndLabel(categoryLabel)

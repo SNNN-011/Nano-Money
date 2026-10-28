@@ -4,6 +4,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -12,6 +13,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Backspace
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -30,8 +33,6 @@ import com.example.ui.components.EditorialButton
 import com.example.ui.components.EditorialButtonStyle
 import com.example.ui.components.EditorialDialog
 import com.example.ui.components.Eyebrow
-import com.example.ui.components.GlassPreset
-import com.example.ui.components.GlassSurface
 import com.example.ui.theme.*
 import com.example.util.PinUtils
 import kotlinx.coroutines.launch
@@ -378,15 +379,15 @@ private fun PinDialogFrame(
     content: @Composable () -> Unit
 ) {
     EditorialDialog(onDismissRequest = onDismiss) {
-        // Dialog PIN ikut permukaan kaca yang sama dengan dialog lain.
-        GlassSurface(
+        Card(
             modifier = Modifier
                 .widthIn(max = 400.dp)
                 .fillMaxWidth()
                 .padding(Spacing.md),
-            preset = GlassPreset.Overlay,
-            shape = RoundedCornerShape(CornerRadius.xl),
-            raised = true
+            shape = RoundedCornerShape(CornerRadius.bezel),
+            colors = CardDefaults.cardColors(containerColor = CreamRaised),
+            border = BorderStroke(1.dp, Hairline),
+            elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
         ) {
             Box(
                 modifier = Modifier
