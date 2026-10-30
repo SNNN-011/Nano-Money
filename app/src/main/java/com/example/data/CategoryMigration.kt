@@ -19,8 +19,93 @@ object CategoryMigration {
     const val TYPE_INCOME = "income"
     const val TYPE_EXPENSE = "expense"
 
-    val DEFAULT_INCOME = listOf("Gaji", "Investasi", "Freelance", "Lainnya")
-    val DEFAULT_EXPENSE = listOf("Makanan", "Transportasi", "Tagihan", "Hiburan", "Belanja", "Lainnya")
+    val DEFAULT_INCOME = listOf(
+        "Gaji", "Uang Saku", "Freelance", "Bisnis",
+        "Investasi", "Bonus", "Hadiah", "Lainnya"
+    )
+    val DEFAULT_EXPENSE = listOf(
+        "Makanan & Minuman", "Transportasi", "Belanja", "Kebutuhan Rumah",
+        "Tagihan & Utilitas", "Pendidikan", "Kesehatan", "Hiburan",
+        "Langganan", "Internet & Pulsa", "Perawatan Diri", "Donasi", "Lainnya"
+    )
+
+    /**
+     * Nama bawaan lama -> nama bawaan baru.
+     *
+     * Hanya dipakai untuk baris yang masih persis hasil seeding: id legacy
+     * deterministik dan namanya belum pernah diubah user. Rename mempertahankan
+     * id, jadi transaksi dan budget yang menunjuk id itu tetap nyambung.
+     */
+    private val RENAMED_DEFAULTS = mapOf(
+        "Makanan" to "Makanan & Minuman",
+        "Tagihan" to "Tagihan & Utilitas"
+    )
+
+    /** Rencana upgrade daftar bawaan: rename baris lama + tambah baris yang belum ada. */
+    data class DefaultUpgradePlan(
+        val renames: List<Category>,
+        val inserts: List<Category>
+    )
+
+    /**
+     * Menyusun perubahan daftar bawaan untuk database yang sudah berisi kategori.
+     *
+     * Aturannya sengaja konservatif:
+     * - rename hanya untuk baris hasil seeding (id legacy) yang namanya masih lama;
+     *   kategori buatan user atau yang sudah diganti namanya tidak disentuh;
+     * - kategori yang sudah dihapus user tidak dihidupkan lagi, termasuk penerusnya;
+     * - nama yang sudah ada (walau sudah dihapus) tidak diduplikasi.
+     *
+     * Murni dan idempoten: menjalankan rencana ini dua kali tidak menghasilkan
+     * perubahan kedua.
+     */
+    fun planDefaultUpgrade(existing: List<Category>, now: Long): DefaultUpgradePlan {
+        val names = existing.map { it.type to normalize(it.name) }.toMutableSet()
+        val ids = existing.map { it.id }.toMutableSet()
+        val renames = mutableListOf<Category>()
+        val blocked = mutableSetOf<Pair<String, String>>()
+
+        existing.forEach { row ->
+            if (row.type != TYPE_EXPENSE) return@forEach
+            val baru = RENAMED_DEFAULTS.entries
+                .firstOrNull { it.key.equals(row.name.trim(), ignoreCase = true) }
+                ?.value ?: return@forEach
+            if (row.id != legacyId(row.type, row.name)) return@forEach
+
+            val kunciBaru = row.type to normalize(baru)
+            if (row.isDeleted) {
+                blocked += kunciBaru
+                return@forEach
+            }
+            if (kunciBaru in names) return@forEach
+
+            renames += row.copy(name = baru, updatedAt = now, syncStatus = SyncStatus.PENDING)
+            names += kunciBaru
+        }
+
+        val inserts = mutableListOf<Category>()
+        listOf(TYPE_INCOME to DEFAULT_INCOME, TYPE_EXPENSE to DEFAULT_EXPENSE).forEach { (type, daftar) ->
+            daftar.forEach { name ->
+                val kunci = type to normalize(name)
+                if (kunci in blocked || kunci in names) return@forEach
+                val id = legacyId(type, name)
+                if (id in ids) return@forEach
+
+                inserts += Category(
+                    id = id,
+                    name = name,
+                    type = type,
+                    isDeleted = false,
+                    updatedAt = now,
+                    syncKey = id,
+                    syncStatus = SyncStatus.PENDING
+                )
+                names += kunci
+                ids += id
+            }
+        }
+        return DefaultUpgradePlan(renames, inserts)
+    }
 
     /** Memecah daftar kategori yang tersimpan sebagai CSV. */
     fun parseCategoryList(csv: String?): List<String> =
@@ -101,7 +186,13 @@ object CategoryMigration {
         budgetByName.forEach { (rawName, rawLimit) ->
             val name = rawName.trim()
             if (name.isEmpty() || rawLimit <= 0L) return@forEach
+            // Prefs lama masih memakai nama bawaan lama ("Makanan", "Tagihan").
+            // Setelah daftar bawaan berganti nama, budget itu harus tetap
+            // menemukan kategorinya, bukan dibuang sebagai yatim.
             val category = byName[name.lowercase(Locale.ROOT)]
+                ?: RENAMED_DEFAULTS.entries
+                    .firstOrNull { it.key.equals(name, ignoreCase = true) }
+                    ?.let { byName[it.value.trim().lowercase(Locale.ROOT)] }
             if (category == null) {
                 orphans += name
                 return@forEach

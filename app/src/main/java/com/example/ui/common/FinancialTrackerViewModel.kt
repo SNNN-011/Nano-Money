@@ -399,7 +399,7 @@ class FinancialTrackerViewModel(
                 }
             } else {
                 if (!expenseCategories.value.contains(formCategory.value)) {
-                    formCategory.value = expenseCategories.value.firstOrNull() ?: "Makanan"
+                    formCategory.value = expenseCategories.value.firstOrNull() ?: "Makanan & Minuman"
                 }
             }
         }.launchIn(viewModelScope)
@@ -440,7 +440,7 @@ class FinancialTrackerViewModel(
                     cal.set(java.util.Calendar.DAY_OF_MONTH, 10)
                     sampleData.add(FinancialRecord(0, "Gaji Bulanan", 5000000L, "income", "Gaji", cal.timeInMillis, "Gaji pokok"))
                     cal.set(java.util.Calendar.DAY_OF_MONTH, 8)
-                    sampleData.add(FinancialRecord(0, "Makan Siang", 25000L, "expense", "Makanan", cal.timeInMillis, "Bakso"))
+                    sampleData.add(FinancialRecord(0, "Makan Siang", 25000L, "expense", "Makanan & Minuman", cal.timeInMillis, "Bakso"))
                     cal.set(java.util.Calendar.DAY_OF_MONTH, 5)
                     sampleData.add(FinancialRecord(0, "Beli Buku", 150000L, "expense", "Belanja", cal.timeInMillis, "Buku Android"))
                     cal.set(java.util.Calendar.DAY_OF_MONTH, 3)
@@ -454,9 +454,9 @@ class FinancialTrackerViewModel(
                     lastMonthCal.set(java.util.Calendar.DAY_OF_MONTH, 15)
                     sampleData.add(FinancialRecord(0, "Belanja Sepatu Baru", 450000L, "expense", "Belanja", lastMonthCal.timeInMillis, "Sepatu lari"))
                     lastMonthCal.set(java.util.Calendar.DAY_OF_MONTH, 18)
-                    sampleData.add(FinancialRecord(0, "Makan Malam Bersama", 180000L, "expense", "Makanan", lastMonthCal.timeInMillis, "Restoran"))
+                    sampleData.add(FinancialRecord(0, "Makan Malam Bersama", 180000L, "expense", "Makanan & Minuman", lastMonthCal.timeInMillis, "Restoran"))
                     lastMonthCal.set(java.util.Calendar.DAY_OF_MONTH, 22)
-                    sampleData.add(FinancialRecord(0, "Langganan Netflix", 54000L, "expense", "Hiburan", lastMonthCal.timeInMillis, "Paket Standard"))
+                    sampleData.add(FinancialRecord(0, "Langganan Netflix", 54000L, "expense", "Langganan", lastMonthCal.timeInMillis, "Paket Standard"))
 
                     // --- 2 MONTHS AGO ---
                     val twoMonthsAgoCal = java.util.Calendar.getInstance()
@@ -464,11 +464,11 @@ class FinancialTrackerViewModel(
                     twoMonthsAgoCal.set(java.util.Calendar.DAY_OF_MONTH, 10)
                     sampleData.add(FinancialRecord(0, "Gaji Bulanan", 5000000L, "income", "Gaji", twoMonthsAgoCal.timeInMillis, "Gaji pokok"))
                     twoMonthsAgoCal.set(java.util.Calendar.DAY_OF_MONTH, 5)
-                    sampleData.add(FinancialRecord(0, "Servis Motor", 350000L, "expense", "Tagihan", twoMonthsAgoCal.timeInMillis, "Ganti oli & ban"))
+                    sampleData.add(FinancialRecord(0, "Servis Motor", 350000L, "expense", "Transportasi", twoMonthsAgoCal.timeInMillis, "Ganti oli & ban"))
                     twoMonthsAgoCal.set(java.util.Calendar.DAY_OF_MONTH, 12)
-                    sampleData.add(FinancialRecord(0, "Makan Bakso Lapangan", 30000L, "expense", "Makanan", twoMonthsAgoCal.timeInMillis, ""))
+                    sampleData.add(FinancialRecord(0, "Makan Bakso Lapangan", 30000L, "expense", "Makanan & Minuman", twoMonthsAgoCal.timeInMillis, ""))
                     twoMonthsAgoCal.set(java.util.Calendar.DAY_OF_MONTH, 20)
-                    sampleData.add(FinancialRecord(0, "Tagihan Internet Wifi", 150000L, "expense", "Tagihan", twoMonthsAgoCal.timeInMillis, "Bulanan"))
+                    sampleData.add(FinancialRecord(0, "Tagihan Internet Wifi", 150000L, "expense", "Internet & Pulsa", twoMonthsAgoCal.timeInMillis, "Bulanan"))
                     twoMonthsAgoCal.set(java.util.Calendar.DAY_OF_MONTH, 25)
                     sampleData.add(FinancialRecord(0, "Tiket Bioskop", 65000L, "expense", "Hiburan", twoMonthsAgoCal.timeInMillis, "Nonton film"))
 

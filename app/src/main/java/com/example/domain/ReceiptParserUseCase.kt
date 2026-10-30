@@ -78,7 +78,7 @@ class ReceiptParserUseCase {
                   "title": "Nama Toko/Merchant/Aplikasi",
                   "date": "2023-11-25",
                   "items": [
-                    { "name": "Indomie Goreng", "amount": 15000.0, "category": "Makanan", "emoji": "🍔", "type": "expense" },
+                    { "name": "Indomie Goreng", "amount": 15000.0, "category": "Makanan & Minuman", "emoji": "🍔", "type": "expense" },
                     { "name": "Topup Saldo", "amount": 50000.0, "category": "Topup", "emoji": "💳", "type": "expense" },
                     { "name": "Refund Barang", "amount": 3330.0, "category": "Refund", "emoji": "🔄", "type": "income" }
                   ]

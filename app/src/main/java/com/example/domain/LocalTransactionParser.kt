@@ -1,5 +1,6 @@
 package com.example.domain
 
+import com.example.data.CategoryMigration
 import com.example.data.local.LocalEngine
 import com.example.data.remote.ExtractionResult
 import kotlinx.coroutines.CancellationException
@@ -50,11 +51,15 @@ class LocalTransactionParser(
          * Nama di luar daftar ini dianggap kategori buatan user. Kategori
          * buatan user yang dipilih model tidak boleh ditimpa kata kunci lama,
          * karena kata kunci itu hanya tahu kategori bawaan.
+         *
+         * "Makanan" dan "Tagihan" tetap ada karena masih dipakai user yang
+         * belum menjalankan migrasi daftar bawaan v9.
          */
-        private val DEFAULT_CATEGORY_NAMES = setOf(
-            "makanan", "transportasi", "tagihan", "hiburan", "belanja",
-            "gaji", "investasi", "freelance", "kesehatan", "lainnya"
-        )
+        private val DEFAULT_CATEGORY_NAMES: Set<String> =
+            (CategoryMigration.DEFAULT_INCOME + CategoryMigration.DEFAULT_EXPENSE +
+                listOf("Makanan", "Tagihan"))
+                .map { CategoryResolver.normalize(it) }
+                .toSet()
 
         private fun isDefaultCategory(name: String): Boolean =
             CategoryResolver.normalize(name) in DEFAULT_CATEGORY_NAMES

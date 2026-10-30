@@ -18,7 +18,7 @@ import com.example.util.DatabaseKeyManager
         CategoryBudget::class,
         AppSetting::class
     ],
-    version = 8,
+    version = 9,
     exportSchema = true
 )
 @TypeConverters(AppDatabase.Converters::class)
@@ -182,6 +182,58 @@ abstract class AppDatabase : RoomDatabase() {
                     "CREATE INDEX IF NOT EXISTS `index_financial_records_syncStatus` " +
                         "ON `financial_records` (`syncStatus`)"
                 )
+            }
+        }
+
+        /**
+         * v8 -> v9: daftar kategori bawaan baru (21 kategori).
+         *
+         * Bukan migrasi skema, tapi data: baris bawaan lama yang masih utuh
+         * diganti namanya (ID tetap, jadi transaksi/budget ikut), lalu kategori
+         * bawaan yang belum ada ditambahkan. Baris yang sudah dihapus user tidak
+         * dihidupkan lagi dan nama yang sudah ada tidak diduplikasi; aturannya
+         * ada di [CategoryMigration.planDefaultUpgrade] supaya bisa diuji tanpa Room.
+         */
+        val MIGRATION_8_9 = object : androidx.room.migration.Migration(8, 9) {
+            override fun migrate(database: androidx.sqlite.db.SupportSQLiteDatabase) {
+                if (!tableExists(database, "categories")) return
+                val now = System.currentTimeMillis()
+
+                val existing = mutableListOf<Category>()
+                database.query(
+                    "SELECT `id`, `name`, `type`, `isDeleted`, `updatedAt`, `syncKey`, `syncStatus` FROM `categories`"
+                ).use { c ->
+                    while (c.moveToNext()) {
+                        existing += Category(
+                            id = c.getString(0),
+                            name = c.getString(1),
+                            type = c.getString(2),
+                            isDeleted = c.getInt(3) != 0,
+                            updatedAt = c.getLong(4),
+                            syncKey = c.getString(5),
+                            syncStatus = if (c.getInt(6) == 1) SyncStatus.PENDING else SyncStatus.SYNCED
+                        )
+                    }
+                }
+
+                val plan = CategoryMigration.planDefaultUpgrade(existing, now)
+                plan.renames.forEach { category ->
+                    database.execSQL(
+                        "UPDATE `categories` SET `name` = ?, `updatedAt` = ?, `syncStatus` = 1 WHERE `id` = ?",
+                        arrayOf<Any>(category.name, category.updatedAt, category.id)
+                    )
+                }
+                plan.inserts.forEach { category ->
+                    database.execSQL(
+                        "INSERT OR IGNORE INTO `categories` " +
+                            "(`id`, `name`, `type`, `isDeleted`, `updatedAt`, `syncKey`, `syncStatus`) " +
+                            "VALUES (?, ?, ?, 0, ?, ?, 1)",
+                        arrayOf<Any>(
+                            category.id, category.name, category.type,
+                            category.updatedAt, category.syncKey
+                        )
+                    )
+                }
             }
         }
 
@@ -657,7 +709,8 @@ abstract class AppDatabase : RoomDatabase() {
                     MIGRATION_4_5,
                     MIGRATION_5_6,
                     MIGRATION_6_7,
-                    MIGRATION_7_8
+                    MIGRATION_7_8,
+                    MIGRATION_8_9
                 )
                 // Sengaja TIDAK memakai fallbackToDestructiveMigration(): kalau ada
                 // versi DB tanpa migrasi, aplikasi harus error dengan jelas, bukan

@@ -19,7 +19,97 @@ class CategoryMigrationTest {
 
         assertEquals(CategoryMigration.DEFAULT_INCOME.size + CategoryMigration.DEFAULT_EXPENSE.size, categories.size)
         assertTrue(categories.any { it.name == "Gaji" && it.type == CategoryMigration.TYPE_INCOME })
-        assertTrue(categories.any { it.name == "Makanan" && it.type == CategoryMigration.TYPE_EXPENSE })
+        assertTrue(categories.any { it.name == "Makanan & Minuman" && it.type == CategoryMigration.TYPE_EXPENSE })
+        assertEquals(8, CategoryMigration.DEFAULT_INCOME.size)
+        assertEquals(13, CategoryMigration.DEFAULT_EXPENSE.size)
+    }
+
+    @Test
+    fun upgrade_mengganti_nama_bawaan_lama_tanpa_mengubah_id() {
+        val lama = listOf(
+            Category("cat:expense:makanan", "Makanan", CategoryMigration.TYPE_EXPENSE, updatedAt = 1L)
+        )
+        val plan = CategoryMigration.planDefaultUpgrade(lama, now)
+
+        val rename = plan.renames.single()
+        assertEquals("cat:expense:makanan", rename.id)
+        assertEquals("Makanan & Minuman", rename.name)
+        assertEquals(now, rename.updatedAt)
+        // Penerus "Tagihan" belum ada di data, jadi harus ikut ditambahkan.
+        assertTrue(plan.inserts.any { it.name == "Tagihan & Utilitas" })
+        // Nama yang sudah diwakili rename tidak boleh ditambahkan lagi.
+        assertTrue(plan.inserts.none { it.name == "Makanan & Minuman" })
+        assertEquals(20, plan.inserts.size)
+    }
+
+    @Test
+    fun upgrade_tidak_menyentuh_kategori_yang_sudah_diganti_nama_user() {
+        // id masih id legacy, tapi namanya sudah diubah user: jangan ditimpa.
+        val lama = listOf(
+            Category("cat:expense:makanan", "Food", CategoryMigration.TYPE_EXPENSE, updatedAt = 1L)
+        )
+        val plan = CategoryMigration.planDefaultUpgrade(lama, now)
+
+        assertTrue(plan.renames.isEmpty())
+        assertTrue(plan.inserts.any { it.name == "Makanan & Minuman" })
+    }
+
+    @Test
+    fun upgrade_tidak_menghidupkan_kategori_yang_sudah_dihapus() {
+        val lama = listOf(
+            Category("cat:expense:makanan", "Makanan", CategoryMigration.TYPE_EXPENSE, isDeleted = true)
+        )
+        val plan = CategoryMigration.planDefaultUpgrade(lama, now)
+
+        assertTrue(plan.renames.isEmpty())
+        assertTrue(plan.inserts.none { it.name == "Makanan & Minuman" })
+        // Kategori lain yang belum pernah ada tetap ditambahkan.
+        assertTrue(plan.inserts.any { it.name == "Kebutuhan Rumah" })
+    }
+
+    @Test
+    fun upgrade_tidak_menduplikasi_nama_yang_sudah_ada() {
+        val lama = listOf(
+            Category("cat:expense:makanan", "Makanan", CategoryMigration.TYPE_EXPENSE, updatedAt = 1L),
+            Category("buatan-user", "Makanan & Minuman", CategoryMigration.TYPE_EXPENSE, updatedAt = 2L)
+        )
+        val plan = CategoryMigration.planDefaultUpgrade(lama, now)
+
+        assertTrue(plan.renames.isEmpty())
+        assertTrue(plan.inserts.none { it.name == "Makanan & Minuman" })
+    }
+
+    @Test
+    fun upgrade_idempoten() {
+        val lama = listOf(
+            Category("cat:expense:makanan", "Makanan", CategoryMigration.TYPE_EXPENSE, updatedAt = 1L),
+            Category("cat:expense:hiburan", "Hiburan", CategoryMigration.TYPE_EXPENSE, updatedAt = 1L)
+        )
+        val plan = CategoryMigration.planDefaultUpgrade(lama, now)
+        val sesudah = lama
+            .filterNot { row -> plan.renames.any { it.id == row.id } } +
+            plan.renames + plan.inserts
+
+        val kedua = CategoryMigration.planDefaultUpgrade(sesudah, now + 1L)
+        assertTrue(kedua.renames.isEmpty())
+        assertTrue(kedua.inserts.isEmpty())
+    }
+
+    @Test
+    fun budget_lama_menemukan_kategori_yang_sudah_diganti_nama() {
+        val categories = CategoryMigration.buildCategories(
+            null, null, now
+        )
+        val (budgets, orphans) = CategoryMigration.buildBudgets(
+            budgetByName = mapOf("Makanan" to 750_000L, "Tagihan" to 400_000L),
+            categories = categories
+        )
+
+        assertEquals(emptyList<String>(), orphans)
+        assertEquals(
+            setOf("cat:expense:makanan-minuman", "cat:expense:tagihan-utilitas"),
+            budgets.map { it.categoryId }.toSet()
+        )
     }
 
     @Test

@@ -24,6 +24,23 @@ class CategoryHintsTest {
         "Gaji", "Investasi", "Freelance", "Lainnya"
     )
 
+    private val bawaanBaruIncome = listOf(
+        "Gaji", "Uang Saku", "Freelance", "Bisnis",
+        "Investasi", "Bonus", "Hadiah", "Lainnya"
+    )
+
+    private val bawaanBaruExpense = listOf(
+        "Makanan & Minuman", "Transportasi", "Belanja", "Kebutuhan Rumah",
+        "Tagihan & Utilitas", "Pendidikan", "Kesehatan", "Hiburan",
+        "Langganan", "Internet & Pulsa", "Perawatan Diri", "Donasi", "Lainnya"
+    )
+
+    /** Daftar sesuai jenis transaksi, seperti yang dipakai parser (bukan campuran). */
+    private val lengkapIncome = listOf("Gaji", "Investasi", "Freelance", "Lainnya")
+    private val lengkapExpense = listOf(
+        "Makanan", "Transportasi", "Tagihan", "Hiburan", "Belanja", "Kesehatan", "Lainnya"
+    )
+
     @Test
     fun `sarapan_dan_makan_menunjuk_makanan`() {
         assertEquals("Makanan", CategoryHints.suggest("sarapan nasi uduk", kategoriBawaan))
@@ -76,20 +93,86 @@ class CategoryHintsTest {
 
     @Test
     fun `kata_panjang_menang_atas_kata_pendek`() {
-        // "pasta gigi" dan "susu bayi" harus tetap Belanja, bukan Kesehatan/Makanan.
-        assertEquals("Belanja", CategoryHints.suggest("beli pasta gigi 20rb", kategoriLengkap))
-        assertEquals("Belanja", CategoryHints.suggest("beli susu bayi 120rb", kategoriLengkap))
-        assertEquals("Makanan", CategoryHints.suggest("beli susu 25rb", kategoriLengkap))
+        // "susu bayi" harus tetap Belanja, bukan Makanan.
+        assertEquals("Belanja", CategoryHints.suggest("beli susu bayi 120rb", lengkapExpense))
+        assertEquals("Makanan", CategoryHints.suggest("beli susu 25rb", lengkapExpense))
+        // "pasta gigi" bukan "gigi" (Kesehatan) dan bukan Belanja kalau
+        // kategori Perawatan Diri ada.
+        assertEquals("Perawatan Diri", CategoryHints.suggest("beli pasta gigi 20rb", bawaanBaruExpense))
+        assertEquals("Belanja", CategoryHints.suggest("beli susu bayi 120rb", bawaanBaruExpense))
     }
 
     @Test
     fun `kata_pemasukan_menunjuk_kategori_pemasukan`() {
-        assertEquals("Freelance", CategoryHints.suggest("jualan kue 500rb", kategoriLengkap))
-        assertEquals("Lainnya", CategoryHints.suggest("dapat hibah 10 juta", kategoriLengkap))
+        assertEquals("Freelance", CategoryHints.suggest("jualan kue 500rb", lengkapIncome))
+        assertEquals("Lainnya", CategoryHints.suggest("dapat hibah 10 juta", lengkapIncome))
         // Menjual barang pribadi bukan penghasilan freelance; biar model/fallback
         // yang menentukan ("Lainnya"), bukan kata "jual".
-        assertNull(CategoryHints.suggest("jual hp bekas 1,2 juta", kategoriLengkap))
-        assertEquals("Gaji", CategoryHints.suggest("slip gaji bulan ini", kategoriLengkap))
-        assertEquals("Investasi", CategoryHints.suggest("beli emas 1 gram", kategoriLengkap))
+        assertNull(CategoryHints.suggest("jual hp bekas 1,2 juta", lengkapIncome))
+        assertEquals("Gaji", CategoryHints.suggest("slip gaji bulan ini", lengkapIncome))
+        assertEquals("Investasi", CategoryHints.suggest("beli emas 1 gram", lengkapIncome))
+    }
+
+    @Test
+    fun `semua_kategori_bawaan_baru_dikenali_dari_kata_kuncinya`() {
+        val expense = bawaanBaruExpense
+        val income = bawaanBaruIncome
+
+        assertEquals("Gaji", CategoryHints.suggest("gaji bulanan 5 juta", income))
+        assertEquals("Uang Saku", CategoryHints.suggest("uang saku 200rb", income))
+        assertEquals("Freelance", CategoryHints.suggest("fee proyek desain 1 juta", income))
+        assertEquals("Bisnis", CategoryHints.suggest("penjualan online 2 juta", income))
+        assertEquals("Investasi", CategoryHints.suggest("dividen 500rb", income))
+        assertEquals("Bonus", CategoryHints.suggest("bonus tahunan 2 juta", income))
+        assertEquals("Hadiah", CategoryHints.suggest("dapat hadiah 300rb", income))
+        assertEquals("Lainnya", CategoryHints.suggest("dapat kiriman 100rb", income))
+
+        assertEquals("Makanan & Minuman", CategoryHints.suggest("makan siang 25rb", expense))
+        assertEquals("Transportasi", CategoryHints.suggest("isi bensin 50rb", expense))
+        assertEquals("Belanja", CategoryHints.suggest("beli sepatu 300rb", expense))
+        assertEquals("Kebutuhan Rumah", CategoryHints.suggest("beli sabun 15rb", expense))
+        assertEquals("Tagihan & Utilitas", CategoryHints.suggest("bayar listrik 200rb", expense))
+        assertEquals("Pendidikan", CategoryHints.suggest("bayar spp 500rb", expense))
+        assertEquals("Kesehatan", CategoryHints.suggest("beli obat 30rb", expense))
+        assertEquals("Hiburan", CategoryHints.suggest("nonton bioskop 50rb", expense))
+        assertEquals("Langganan", CategoryHints.suggest("netflix 54rb", expense))
+        assertEquals("Internet & Pulsa", CategoryHints.suggest("beli pulsa 25rb", expense))
+        assertEquals("Perawatan Diri", CategoryHints.suggest("beli skincare 150rb", expense))
+        assertEquals("Donasi", CategoryHints.suggest("sedekah 100rb", expense))
+    }
+
+    @Test
+    fun `kategori_lama_tetap_dilayani_lewat_cadangan_nama_baru`() {
+        // User yang belum migrasi v9 masih punya nama lama. Kata baru harus
+        // jatuh ke kategori lama yang setara, bukan dilewati.
+        assertEquals("Belanja", CategoryHints.suggest("beli sabun 15rb", kategoriLengkap))
+        assertEquals("Tagihan", CategoryHints.suggest("bayar spp 500rb", kategoriLengkap))
+        assertEquals("Hiburan", CategoryHints.suggest("netflix 54rb", kategoriLengkap))
+        assertEquals("Tagihan", CategoryHints.suggest("beli pulsa 25rb", kategoriLengkap))
+        assertEquals("Tagihan", CategoryHints.suggest("wifi bulanan 300rb", kategoriLengkap))
+
+        val incomeLama = listOf("Gaji", "Investasi", "Freelance", "Lainnya")
+        assertEquals("Lainnya", CategoryHints.suggest("uang saku 200rb", incomeLama))
+        assertEquals("Freelance", CategoryHints.suggest("penjualan online 2 juta", incomeLama))
+        assertEquals("Gaji", CategoryHints.suggest("bonus tahunan 2 juta", incomeLama))
+        assertEquals("Lainnya", CategoryHints.suggest("dapat hadiah 300rb", incomeLama))
+    }
+
+    @Test
+    fun `wifi_pindah_ke_internet_pulsa_hanya_kalau_kategorinya_ada`() {
+        assertEquals("Internet & Pulsa", CategoryHints.suggest("wifi bulanan 300rb", bawaanBaruExpense))
+        assertEquals("Tagihan", CategoryHints.suggest("wifi bulanan 300rb", kategoriLengkap))
+    }
+
+    @Test
+    fun `penampung_lainnya_dipakai_kalau_tidak_ada_kata_yang_cocok`() {
+        assertEquals(
+            "Lainnya",
+            CategoryResolver.finalCategory("entah apa", bawaanBaruExpense)
+        )
+        assertEquals(
+            "Lainnya",
+            CategoryResolver.finalCategory(null, bawaanBaruExpense)
+        )
     }
 }
