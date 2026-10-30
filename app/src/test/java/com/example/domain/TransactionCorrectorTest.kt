@@ -251,6 +251,17 @@ class TransactionCorrectorTest {
     }
 
     @Test
+    fun `sarapan_makan_dan_ongkir_dihitung_pengeluaran`() {
+        // Uji 40 kalimat di HP: model menebak pemasukan untuk "sarapan bubur ayam"
+        // dan "ongkir j&t", lalu kategorinya ikut jatuh ke Gaji/Freelance.
+        assertEquals("expense", jenisAkhir("sarapan bubur ayam 15rb", "income", "Gaji"))
+        assertEquals("expense", jenisAkhir("ongkir j&t 20rb", "income", "Freelance"))
+        assertEquals("expense", jenisAkhir("makan malam di resto 75rb", "income", "Gaji"))
+        // Frasa uang masuk yang muncul lebih dulu tetap menang.
+        assertEquals("income", jenisAkhir("dapat uang makan 500rb", "income", "Gaji"))
+    }
+
+    @Test
     fun `pemetaan_jenis_bawaan_ai_dinormalkan_dengan_aturan_yang_sama`() {
         // Dipakai jalur simpan DAN kartu konfirmasi. Satu tempat saja, supaya kartu
         // tidak pernah menampilkan jenis yang berbeda dari yang akhirnya disimpan.

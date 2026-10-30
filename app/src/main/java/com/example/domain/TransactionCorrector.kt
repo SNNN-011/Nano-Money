@@ -51,8 +51,8 @@ object TransactionCorrector {
     /** Kata kerja yang menandakan uang keluar dari user. */
     private val EXPENSE_VERBS = listOf(
         "bayar", "bayarin", "beli", "beliin", "belanja", "sewa", "cicil", "cicilan",
-        "angsuran", "transfer", "kirim", "topup", "isi", "ongkos", "parkir", "tarif",
-        "jajan", "servis", "cuci", "traktir", "nraktir",
+        "angsuran", "transfer", "kirim", "topup", "isi", "ongkos", "ongkir", "parkir",
+        "tarif", "jajan", "sarapan", "makan", "servis", "cuci", "traktir", "nraktir",
         "nyumbang", "sumbang", "sedekah", "infak"
     )
 
