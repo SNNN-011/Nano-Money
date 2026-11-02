@@ -3,6 +3,12 @@
 Catatan kemajuan otak lokal (model + aturan aplikasi). Terakhir diperbarui
 **2 Nov 2026**. Angka di sini angka yang benar-benar diukur, bukan target.
 
+> **Penting:** semua angka "eval" dan "uji HP" di bawah adalah **model + lapisan
+> kata kunci aplikasi** (`CategoryHints`). AI murni jauh lebih rendah: kategori
+> **67,9%** di eval dan **13–30%** pada 30 kalimat baru (tergantung format daftar
+> kategori). Goal proyek adalah 90–99% **AI murni**, dan itu belum tercapai.
+> Rincian angka murni ada di `PROJECT.md`.
+
 ## Keadaan sekarang
 
 | Hal | Nilai |
