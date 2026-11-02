@@ -210,6 +210,9 @@ object CategoryHints {
         "langganan" to "hiburan",
         "internet & pulsa" to "tagihan",
         "uang saku" to "lainnya",
+        // Donasi tidak punya padanan langsung di daftar lama; tanpa cadangan ini
+        // "sedekah ke panti asuhan" jatuh ke tebakan model (pernah jadi Kesehatan).
+        "donasi" to "lainnya",
         "bisnis" to "freelance",
         "jualan online" to "bisnis",
         "bonus" to "gaji",

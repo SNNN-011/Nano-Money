@@ -45,7 +45,41 @@ object TransactionCorrector {
         "pesangon", "beasiswa", "hadiah",
         // "uang masuk 2 juta dari sewa" adalah pemasukan, sedangkan "sewa" di
         // daftar kata keluar sempat membalik arahnya.
-        "masuk"
+        "masuk",
+        // Mengajar/memberi les adalah uang masuk. "bayaran" tidak dipakai karena
+        // arahnya dua ("bayaran sekolah" keluar), jadi kata kerja inilah yang
+        // menandai arahnya.
+        "ngajar", "mengajar"
+    )
+
+    /**
+     * Nama pemasukan yang berdiri sendiri, tanpa kata kerja.
+     *
+     * "tunjangan transportasi 600rb" berisi kata "transportasi" yang juga nama
+     * kategori pengeluaran milik user, dan aturan kategori membuat model menang
+     * (jadi PENGELUARAN). Padahal kata inti kalimatnya adalah pemasukan.
+     * Daftar ini dipakai HANYA kalau tidak ada kata kerja keluar: "bayar gaji"
+     * tetap pengeluaran.
+     *
+     * "bayaran" sengaja tidak masuk: arahnya dua, "bayaran sekolah" keluar
+     * sedangkan "bayaran gue" masuk. Untuk kalimat kerja, "ngajar"/"mengajar"
+     * dipakai sebagai penanda masuk yang tidak ambigu.
+     */
+    private val INCOME_NOUNS = listOf(
+        "gaji", "gajian", "tunjangan", "honor", "upah", "lembur", "bonus", "thr",
+        "insentif", "komisi", "pesangon", "beasiswa", "hadiah", "dividen"
+    )
+
+    /**
+     * Frasa yang memakai kata "masuk" tetapi bukan uang masuk.
+     *
+     * "masuk" ada di [INCOME_VERBS] karena "uang masuk 2 juta" adalah pemasukan.
+     * Akibatnya "tiket masuk kebun raya" ikut terbaca PEMASUKAN. Frasa ini
+     * dibuang dulu sebelum pencarian kata masuk, sedangkan "uang masuk" tidak
+     * ikut dibuang karena memang pemasukan.
+     */
+    private val INCOME_MASKS = listOf(
+        "tiket masuk", "biaya masuk", "pintu masuk", "tarif masuk"
     )
 
     /** Kata kerja yang menandakan uang keluar dari user. */
@@ -53,7 +87,9 @@ object TransactionCorrector {
         "bayar", "bayarin", "beli", "beliin", "belanja", "sewa", "cicil", "cicilan",
         "angsuran", "transfer", "kirim", "topup", "isi", "ongkos", "ongkir", "parkir",
         "tarif", "jajan", "sarapan", "makan", "servis", "cuci", "traktir", "nraktir",
-        "nyumbang", "sumbang", "sedekah", "infak"
+        "nyumbang", "sumbang", "sedekah", "infak",
+        // "masuk" di sini adalah bagian frasa beli tiket, bukan uang masuk.
+        "tiket masuk"
     )
 
     /**
@@ -120,6 +156,13 @@ object TransactionCorrector {
         if (adaVerbExpense && !adaVerbIncome && !adaKatIncome) return TYPE_EXPENSE
         if (adaVerbIncome && !adaVerbExpense && !adaKatExpense) return TYPE_INCOME
 
+        // 1a. Kalimat yang intinya nama pemasukan ("tunjangan transportasi")
+        //     tidak boleh kalah oleh nama kategori pengeluaran yang cuma jadi
+        //     keterangan. Kata kerja keluar tetap menang ("bayar gaji").
+        if (!adaVerbExpense && CategoryResolver.containsAnyWord(userText, INCOME_NOUNS)) {
+            return TYPE_INCOME
+        }
+
         // 1b. Dua kata kerja bercampur: kalau frasa uang masuk muncul lebih dulu,
         //     kata kerja pengeluaran sesudahnya hanya menyebut tujuan uang itu
         //     ("dikasih uang sama ayah 1 juta buat bayar kuliah" tetap pemasukan).
@@ -159,8 +202,18 @@ object TransactionCorrector {
     /** Ada kata kerja/frasa pemasukan di [text], dan tidak ada kata kerja dua arah. */
     private fun hasIncomeSignal(text: String?): Boolean {
         if (CategoryResolver.containsAnyWord(text, AMBIGUOUS_VERBS)) return false
-        return CategoryResolver.containsAnyWord(text, INCOME_VERBS) ||
-            containsAnyPhrase(text, INCOME_PHRASES)
+        // Frasa seperti "tiket masuk" dibuang dulu supaya kata "masuk" di
+        // dalamnya tidak dihitung sebagai uang masuk.
+        val bersih = stripIncomeMasks(text)
+        return CategoryResolver.containsAnyWord(bersih, INCOME_VERBS) ||
+            containsAnyPhrase(bersih, INCOME_PHRASES)
+    }
+
+    /** [text] tanpa frasa di [INCOME_MASKS], sudah dinormalkan. */
+    private fun stripIncomeMasks(text: String?): String? {
+        val haystack = CategoryResolver.normalize(text)
+        if (haystack.isEmpty()) return null
+        return INCOME_MASKS.fold(haystack) { acc, frasa -> acc.replace(frasa, " ") }
     }
 
     /** Ada kata kerja pengeluaran di [text], dan tidak ada kata kerja dua arah. */

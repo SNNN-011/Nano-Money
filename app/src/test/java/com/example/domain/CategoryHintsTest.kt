@@ -85,6 +85,21 @@ class CategoryHintsTest {
     }
 
     @Test
+    fun `donasi_tanpa_kategori_donasi_jadi_lainnya`() {
+        // Uji 30 kalimat baru: tanpa cadangan ini donasi jatuh ke tebakan model
+        // (pernah jadi Kesehatan). Kalau user punya kategori Donasi, nama itu
+        // yang dipakai.
+        assertEquals(
+            "Lainnya",
+            CategoryHints.suggest("sedekah ke panti asuhan 150rb", lengkapExpense)
+        )
+        assertEquals(
+            "Donasi",
+            CategoryHints.suggest("sedekah ke panti asuhan 150rb", bawaanBaruExpense)
+        )
+    }
+
+    @Test
     fun `kata_kesehatan_tidak_tertukar_belanja`() {
         assertEquals("Kesehatan", CategoryHints.suggest("beli vitamin 90rb", kategoriLengkap))
         assertEquals("Kesehatan", CategoryHints.suggest("cek darah di lab 200rb", kategoriLengkap))

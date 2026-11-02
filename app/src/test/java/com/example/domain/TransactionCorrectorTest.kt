@@ -262,6 +262,44 @@ class TransactionCorrectorTest {
     }
 
     @Test
+    fun `nama_pemasukan_menang_atas_nama_kategori_pengeluaran`() {
+        // Uji 30 kalimat baru: "tunjangan transportasi" tercatat PENGELUARAN
+        // karena "transportasi" juga nama kategori pengeluaran milik user,
+        // padahal kata inti kalimatnya pemasukan.
+        assertEquals(
+            "income",
+            jenisAkhir("tunjangan transportasi 600rb", "expense", "Transportasi")
+        )
+        assertEquals("income", jenisAkhir("honor mengajar 750rb", "expense", "Tagihan"))
+        // Kata kerja keluar tetap menang atas nama pemasukan. (Kalau model
+        // memilih kategori yang cuma ada di daftar pemasukan, aturan kategori
+        // masih menang -- perilaku lama, bukan yang diubah di sini.)
+        assertEquals("expense", jenisAkhir("bayar gaji karyawan 5 juta", "expense", "Lainnya"))
+    }
+
+    @Test
+    fun `tiket_masuk_bukan_uang_masuk`() {
+        // "masuk" adalah penanda pemasukan, tapi di "tiket masuk" ia bagian
+        // frasa beli tiket. Uang masuk yang sebenarnya tetap pemasukan.
+        assertEquals(
+            "expense",
+            jenisAkhir("tiket masuk kebun raya 25rb", "income", "Gaji")
+        )
+        assertEquals("income", jenisAkhir("uang masuk 2 juta dari sewa", "income", "Lainnya"))
+        assertEquals("income", jenisAkhir("dapat 500rb", "income", "Lainnya"))
+    }
+
+    @Test
+    fun `mengajar_dihitung_pemasukan`() {
+        // "bayaran ngajar les privat" tercatat pengeluaran karena "bayaran"
+        // bukan kata utuh "bayar" dan tidak ada penanda masuk lain.
+        assertEquals(
+            "income",
+            jenisAkhir("bayaran ngajar les privat 400rb", "expense", "Tagihan")
+        )
+    }
+
+    @Test
     fun `pemetaan_jenis_bawaan_ai_dinormalkan_dengan_aturan_yang_sama`() {
         // Dipakai jalur simpan DAN kartu konfirmasi. Satu tempat saja, supaya kartu
         // tidak pernah menampilkan jenis yang berbeda dari yang akhirnya disimpan.
