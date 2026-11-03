@@ -74,12 +74,6 @@ android {
     sourceCompatibility = JavaVersion.VERSION_11
     targetCompatibility = JavaVersion.VERSION_11
   }
-  // Model lokal (assets/rank64.cact, 63 MB) dibaca utuh sekali saat mode AI
-  // Lokal pertama kali dipakai. Disimpan tanpa kompresi supaya pembacaannya
-  // salinan langsung, bukan hasil dekompresi 63 MB di memori.
-  androidResources {
-    noCompress += "cact"
-  }
   buildFeatures {
     compose = true
     buildConfig = true

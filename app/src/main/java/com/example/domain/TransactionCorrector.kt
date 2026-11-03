@@ -37,7 +37,7 @@ object TransactionCorrector {
         // Bukan kata kerja, tapi penanda pemasukan yang sama kuatnya: "gaji
         // bulan ini 7 juta" tidak punya kata kerja apa pun. Daftar ini diuji
         // pada 554 baris `gold_v6/eval_599.jsonl`: jenis 97,7% -> 99,6% dan
-        // kategori 67,9% -> 87,4% setelah dipasang bersama CategoryHints
+        // kategori 67,9% -> 87,4% setelah lapisan aturan aplikasi dipasang
         // (`vm/measure_app_layer.py`). Tanpa "thr"/"bonus"/"insentif" di sini,
         // "THR Rp 20 juta" tercatat pengeluaran lalu kategorinya ikut salah.
         "gaji", "honor", "dividen", "dijual", "terjual",

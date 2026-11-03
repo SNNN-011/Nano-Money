@@ -102,8 +102,6 @@ private fun ChatScreenContent(
     // Satu sumber kebenaran: bendera dari ViewModel, bukan hasil hitung ulang isi
     // daftar pesan (dulu keduanya bisa berbeda).
     val isAiProcessing by viewModel.isAiProcessing.collectAsState()
-    // Otak yang sedang dipakai: AI Lokal (tanpa internet) atau AI Cloud (online).
-    val aiMode by viewModel.aiMode.collectAsState()
     val focusManager = LocalFocusManager.current
     var inputText by rememberSaveable { mutableStateOf("") }
     val listState = rememberLazyListState()
@@ -476,24 +474,6 @@ private fun ChatScreenContent(
                                 modifier = Modifier.size(20.dp)
                             )
                         }
-
-                        // Dua otak, satu kolom chat. AI Lokal jalan tanpa internet tapi
-                        // belum bisa baca foto struk; AI Cloud sebaliknya. Jarak tepi pil
-                        // dikecilkan supaya keduanya tetap muat di baris judul.
-                        EditorialPill(
-                            text = "AI Lokal",
-                            selected = aiMode == AiMode.LOCAL,
-                            onClick = { viewModel.setAiMode(AiMode.LOCAL) },
-                            contentPadding = Spacing.sm,
-                            testTag = "chat_mode_local_chip"
-                        )
-                        EditorialPill(
-                            text = "AI Cloud",
-                            selected = aiMode == AiMode.GEMINI,
-                            onClick = { viewModel.setAiMode(AiMode.GEMINI) },
-                            contentPadding = Spacing.sm,
-                            testTag = "chat_mode_gemini_chip"
-                        )
                     }
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -590,10 +570,7 @@ private fun ChatScreenContent(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(Spacing.sm)
             ) {
-                // Foto struk hanya bisa dibaca otak Gemini. Di mode AI Lokal
-                // tombolnya diredupkan (tidak disembunyikan) supaya tata letak
-                // tidak melompat saat user berganti mode.
-                val receiptDisabled = hasPending || isAiProcessing || aiMode == AiMode.LOCAL
+                val receiptDisabled = hasPending || isAiProcessing
 
                 IconButton(
                     onClick = { showSourceSelector = true },

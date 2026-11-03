@@ -43,23 +43,6 @@ sealed class ChatMessage {
     object ScanningReceiptIndicator : ChatMessage()
 }
 
-/**
- * Otak yang dipakai chat: model lokal (hasil training, tanpa internet) atau
- * Gemini (online, termasuk foto struk).
- *
- * Bawaannya Gemini supaya perilaku aplikasi tidak berubah sampai user memilih
- * sendiri mode lokal di layar chat.
- */
-enum class AiMode(val prefValue: String) {
-    LOCAL("local"),
-    GEMINI("gemini");
-
-    companion object {
-        fun fromPref(raw: String?): AiMode =
-            values().firstOrNull { it.prefValue == raw } ?: GEMINI
-    }
-}
-
 class ChatViewModel(
     private val application: Application,
     private val repository: FinancialRecordRepository
@@ -116,29 +99,6 @@ class ChatViewModel(
 
     private val _pendingConfirmation = MutableStateFlow<ExtractionResult?>(null)
     val pendingConfirmation: StateFlow<ExtractionResult?> = _pendingConfirmation.asStateFlow()
-
-    /**
-     * Otak yang sedang dipakai. Disimpan di prefs yang sama dengan setelan chat
-     * lainnya supaya pilihan user bertahan setelah aplikasi ditutup.
-     */
-    private val _aiMode = MutableStateFlow(AiMode.fromPref(prefs.getString(PREF_AI_MODE, null)))
-    val aiMode: StateFlow<AiMode> = _aiMode.asStateFlow()
-
-    fun setAiMode(mode: AiMode) {
-        if (_aiMode.value == mode) return
-        _aiMode.value = mode
-        prefs.edit().putString(PREF_AI_MODE, mode.prefValue).apply()
-    }
-
-    /**
-     * Otak lokal dibuat malas: model 63 MB baru dibaca saat benar-benar dipakai,
-     * bukan saat layar chat dibuka.
-     */
-    private val localParser by lazy {
-        com.example.domain.LocalTransactionParser(
-            com.example.data.local.NeedleLocalEngine(application)
-        )
-    }
 
     fun updatePendingTransaction(updated: ExtractionResult) {
         _pendingConfirmation.value = updated
@@ -234,13 +194,6 @@ class ChatViewModel(
     private val receiptUseCase = com.example.domain.ReceiptParserUseCase()
 
     fun scanReceipt(bitmap: Bitmap) {
-        // Foto struk dibaca model gambar (Gemini). Otak lokalnya teks saja, jadi
-        // jalur ini ditolak di pangkal, bukan gagal di tengah jalan.
-        if (_aiMode.value == AiMode.LOCAL) {
-            addAiMessage("Mode AI Lokal belum bisa membaca foto struk. Ganti ke AI Cloud atau ketik transaksinya ya 🙂")
-            return
-        }
-
         val now = System.currentTimeMillis()
         if (now - lastRequestTime < 600L || _isAiProcessing.value) return
         lastRequestTime = now
@@ -457,34 +410,20 @@ class ChatViewModel(
             try {
             val pendingContext = _pendingClarificationContext.value
 
-            // Satu-satunya titik pilih otak. Sisanya -- indikator proses, cabang
-            // klarifikasi/bukan transaksi, dialog konfirmasi, penyaring kategori,
-            // penyimpanan -- dipakai bersama, jadi jalur Gemini tidak berubah.
-            val resultStatus = when (_aiMode.value) {
-                AiMode.LOCAL -> localParser.parseTransaction(
-                    userText = userText,
-                    pendingContext = pendingContext,
-                    incomeCategories = incomeCategories.value,
-                    expenseCategories = expenseCategories.value
-                )
-
-                AiMode.GEMINI -> {
-                    val apiKeyRaw = try { BuildConfig.GEMINI_API_KEY } catch (e: Throwable) { "" } ?: ""
-                    val apiKey = if (apiKeyRaw.isEmpty() || apiKeyRaw == "MY_GEMINI_API_KEY" || apiKeyRaw == "GEMINI_API_KEY") {
-                        "CF_PROXY_KEY"
-                    } else {
-                        apiKeyRaw
-                    }
-
-                    useCase.parseTransaction(
-                        apiKey = apiKey,
-                        userText = userText,
-                        pendingContext = pendingContext,
-                        incomeCategories = incomeCategories.value,
-                        expenseCategories = expenseCategories.value
-                    )
-                }
+            val apiKeyRaw = try { BuildConfig.GEMINI_API_KEY } catch (e: Throwable) { "" } ?: ""
+            val apiKey = if (apiKeyRaw.isEmpty() || apiKeyRaw == "MY_GEMINI_API_KEY" || apiKeyRaw == "GEMINI_API_KEY") {
+                "CF_PROXY_KEY"
+            } else {
+                apiKeyRaw
             }
+
+            val resultStatus = useCase.parseTransaction(
+                apiKey = apiKey,
+                userText = userText,
+                pendingContext = pendingContext,
+                incomeCategories = incomeCategories.value,
+                expenseCategories = expenseCategories.value
+            )
 
             removeTypingIndicator()
 
@@ -679,9 +618,6 @@ class ChatViewModel(
 
 
     companion object {
-        /** Kunci prefs untuk pilihan otak chat (lihat [AiMode]). */
-        private const val PREF_AI_MODE = "chat_ai_mode"
-
         fun provideFactory(application: Application): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
