@@ -14,7 +14,8 @@ package com.example.data.local
  * persis dengan yang dilihat model saat latihan:
  *
  *  - hanya 2 alat, urutan: catat_pengeluaran lalu catat_masuk
- *  - urutan kunci: name, parameters{type, properties{amount, category, item, date}, required}
+ *  - urutan kunci: name, parameters{type, properties{amount, category, item}, required}
+ *  - TANPA properti `date`: tanggal dihitung app, bukan ditebak model
  *  - pemisah TANPA spasi (mesin merender `json.dumps(..., separators=(",",":"))`)
  *  - `required` = ["category"]
  *
@@ -69,7 +70,7 @@ internal object LocalToolsJson {
         }
         return """{"name":"$name","parameters":{"type":"object","properties":{""" +
             """"amount":{"type":"integer"},"category":$category,""" +
-            """"item":{"type":"string"},"date":{"type":"string"}},"required":["category"]}}"""
+            """"item":{"type":"string"}},"required":["category"]}}"""
     }
 
     /** Escape JSON minimal: cukup untuk nama kategori bebas. */

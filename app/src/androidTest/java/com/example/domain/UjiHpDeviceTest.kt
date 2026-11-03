@@ -11,7 +11,8 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * Uji 30 kalimat dari `UJI_HP.md` lewat jalur aplikasi sungguhan di HP.
+ * Uji 34 kalimat: 30 dari `UJI_HP.md` + 4 contoh wajib user, lewat jalur
+ * aplikasi sungguhan di HP.
  *
  * Bedanya dengan unit test JVM: di sini model benar-benar dimuat dari aset APK
  * dan dijalankan mesin native di perangkat, jadi yang terukur adalah yang akan
@@ -89,7 +90,12 @@ class UjiHpDeviceTest {
         // F. kalimat campur
         Kasus(28, "F", "bayar tagihan wifi 300rb sama beli pulsa 25 ribu", KELUAR, 300_000L, listOf("wifi", "tagihan")),
         Kasus(29, "F", "kemarin beli sepatu 800 ribu", KELUAR, 800_000L, listOf("sepatu")),
-        Kasus(30, "F", "dikasih uang sama ayah 1 juta buat bayar kuliah", MASUK, 1_000_000L, null)
+        Kasus(30, "F", "dikasih uang sama ayah 1 juta buat bayar kuliah", MASUK, 1_000_000L, null),
+        // G. contoh wajib dari user (satu kalimat panjang dipecah 4 pesan)
+        Kasus(31, "G", "gajian 5jt", MASUK, 5_000_000L, listOf("gajian")),
+        Kasus(32, "G", "beli es 5k", KELUAR, 5_000L, listOf("es")),
+        Kasus(33, "G", "beli bensin 50rbu", KELUAR, 50_000L, listOf("bensin")),
+        Kasus(34, "G", "dapet uang jajan 50000", MASUK, 50_000L, listOf("jajan", "uang"))
     )
 
     @Test

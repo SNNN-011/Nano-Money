@@ -29,6 +29,8 @@ class LocalToolsJsonTest {
 
         assertTrue(json, json.contains(""""enum":["Gaji"]"""))
         // Tanpa kategori, enum tidak dikirim sama sekali (bentuk model lama).
-        assertTrue(json, json.contains("""{"name":"catat_pengeluaran","parameters":{"type":"object","properties":{"amount":{"type":"integer"},"category":{"type":"string"},"item":{"type":"string"},"date":{"type":"string"}},"required":["category"]}}"""))
+        assertTrue(json, json.contains("""{"name":"catat_pengeluaran","parameters":{"type":"object","properties":{"amount":{"type":"integer"},"category":{"type":"string"},"item":{"type":"string"}},"required":["category"]}}"""))
+        // Tanggal dihitung app, jadi tidak boleh ikut diminta ke model.
+        assertTrue(json, !json.contains("\"date\""))
     }
 }
