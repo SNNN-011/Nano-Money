@@ -21,9 +21,9 @@ Nano Money kini memakai tema visual **Editorial Cream** yang terang, hangat, dan
 
 ## ✨ Fitur Produksi Utama
 
-### 💬 1. Dua Otak AI: Lokal (Offline) & Gemini, plus OCR Nota
-* **Pilih Otak di Kanan Judul Chat**: **AI Lokal** menjalankan model langsung di HP — tanpa internet dan tanpa mengirim teks ke mana pun. **AI Cloud** memakai jaringan dan bisa membaca foto struk. Bawaannya AI Cloud agar perilaku lama tidak berubah; mode lokal dipilih sendiri oleh user.
-* **Lapisan Aturan Deterministik**: Arah uang, nominal, item, dan kategori diperiksa ulang oleh aturan aplikasi (kata kerja masuk/keluar, kata kunci kategori, nama kategori milik user) sehingga hasilnya konsisten dan bisa diuji di JVM tanpa mesin AI.
+### 💬 1. AI Gemini & OCR Nota
+* **AI Cloud (Gemini)**: Chat memakai Gemini lewat proxy Cloudflare, jadi bisa membaca teks maupun foto struk. Daftar model dan cadangannya diatur di `AiModelConfig`.
+* **Lapisan Aturan Deterministik**: Arah uang, nominal, item, dan kategori diperiksa ulang oleh aturan aplikasi (kata kerja masuk/keluar, nama kategori milik user) sehingga hasilnya konsisten dan bisa diuji di JVM.
 * **Kemampuan Multimodal OCR**: Unggah atau potret struk fisik Anda. AI melakukan pemindaian semantik (*Optical Character Recognition*) untuk mendeteksi item belanja dan nominal akhir secara instan.
 * **Keamanan URL Endpoint & Multi-Model**: Mendukung peralihan model AI secara aman (seperti `gemma-4-31b-it` dan `gemini-3.5-flash-lite`) tanpa membocorkan infrastruktur serverless utama Anda.
 
@@ -56,30 +56,6 @@ Nano Money kini memakai tema visual **Editorial Cream** yang terang, hangat, dan
 
 ---
 
-## 🧠 Otak AI Lokal (Offline)
-
-Salah satu dari dua otak yang bisa dipilih di atas kolom chat. Model bahasa kecil
-(`rank64.cact`, ±63 MB) dijalankan langsung di perangkat lewat jembatan JNI
-`libneedle_jni.so`, dengan prefix prompt sesederhana baris tanggal agar sesuai
-dengan bentuk saat model dilatih.
-
-* **Tanpa jaringan, tanpa kirim data**: teks chat tidak pernah meninggalkan perangkat.
-* **Model**: hasil fine-tune dari model dasar **Needle** (Cactus Compute) untuk memilih
-  tool pencatatan transaksi dan mengisi argumennya.
-* **Kategori milik user ikut dikirim**: daftar kategori aktif dari database diteruskan
-  ke model lewat skema tool, bukan ditebak dari ingatan model.
-* **Belum bisa membaca foto struk**: untuk itu ganti ke AI Cloud. Otak lokal hanya
-  menerima teks.
-* **Hasil uji di HP**: 50 kalimat baru → 50/50 tercatat, arah uang 50/50, nominal 50/50,
-  kategori 47/50. Unit test JVM: 116 lulus.
-
-Berkas model dan library JNI **tidak** ikut repositori karena ukurannya besar; keduanya
-perlu disiapkan manual sebelum build release (lihat langkah instalasi). Rincian
-arsitektur, riwayat commit, dan keterbatasan yang masih tersisa ada di
-[`CATATAN-AI-LOKAL.md`](CATATAN-AI-LOKAL.md).
-
----
-
 ## 🛠️ Arsitektur & Tech Stack
 
 Nano Money diimplementasikan menggunakan arsitektur modular yang direkomendasikan Google (**MVVM + Clean Architecture + State-Driven UI**):
@@ -91,7 +67,7 @@ Nano Money diimplementasikan menggunakan arsitektur modular yang direkomendasika
 | **Navigation** | Kotlinx Serialization | Navigasi aman berbasis objek tipe data asli (`@Serializable`). |
 | **Data Engine** | Room + SQLCipher | Room untuk storage modular dengan validasi query waktu compile, SQLCipher untuk enkripsi database. |
 | **API Client** | Retrofit 2 & OkHttp3 | Pengiriman data terstruktur dengan interceptor header dinamis. |
-| **AI Lokal** | JNI + mesin Needle | Model `.cact` dijalankan di perangkat; chat-to-track tidak memanggil jaringan. |
+| **AI Cloud** | Gemini API (lewat proxy) | Parsing teks dan pembacaan foto struk; model cadangan diatur `AiModelConfig`. |
 | **Cloud Sync** | Firebase Auth + Firestore | Sinkronisasi antar perangkat dan proteksi biometrik. |
 | **Asynchronous** | StateFlow & SharedFlow | Mekanisme transmisi status reaktif antara UI dan ViewModel. |
 | **Background Work** | WorkManager | Menjadwalkan sinkronisasi dan pencadangan terjadwal. |
@@ -125,7 +101,7 @@ Mekanisme pertahanan:
 2. Aplikasi client menghitung SHA-256 dan menyertakan header keamanan khusus `X-Worker-Secret` yang diekstrak menggunakan fungsionalitas kunci Android Keystore internal aman.
 3. Workers di Cloudflare memvalidasi kecocokan tanda tangan data sebelum meneruskan instruksi menuju server Google.
 
-Jalur **AI Lokal** tidak melewati proxy ini karena teks diproses sepenuhnya di perangkat. Proxy tetap dipakai saat mode **AI Cloud** aktif, termasuk pembacaan foto struk.
+Proxy dipakai untuk semua permintaan AI, termasuk pembacaan foto struk.
 
 ---
 
@@ -170,14 +146,6 @@ Jalur **AI Lokal** tidak melewati proxy ini karena teks diproses sepenuhnya di p
    }
    ```
    Pasang juga `app/src/debug/google-services.json` bila ingin menimpa konfigurasi khusus untuk build debug.
-5. **Siapkan Otak AI Lokal**:
-   Dua berkas besar sengaja tidak di-commit karena ukurannya. Letakkan keduanya sebelum build:
-   ```
-   app/src/main/assets/rank64.cact                 # bobot model (±63 MB)
-   app/src/main/jniLibs/arm64-v8a/libneedle_jni.so # jembatan JNI (±2,6 MB)
-   ```
-   Keduanya wajib ada sebelum `assembleRelease`; tanpa itu aplikasi tetap bisa dibangun,
-   tetapi fitur chat akan gagal memuat model saat dijalankan.
 6. **Build & Run**:
    Hubungkan ponsel Android Anda atau aktifkan Emulator bawaan Studio, tekan **Run (Shift + F10)** untuk mendeploy aplikasi.
 
